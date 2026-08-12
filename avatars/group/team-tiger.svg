@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teamtigerg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#CCFF00"></stop><stop offset="1" stop-color="#8FB300"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teamtigerg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M34 34l10 14M86 34L76 48" stroke="#0B0E14" stroke-width="12" stroke-linecap="round"></path><circle cx="60" cy="62" r="26" fill="#0B0E14"></circle><path d="M42 48l6 8M78 48l-6 8M38 62h8M74 62h8" stroke="#CCFF00" stroke-width="4" stroke-linecap="round"></path><circle cx="51" cy="60" r="3.5" fill="#CCFF00"></circle><circle cx="69" cy="60" r="3.5" fill="#CCFF00"></circle><path d="M54 76q6 5 12 0" stroke="#CCFF00" stroke-width="4" stroke-linecap="round" fill="none"></path></svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teambullg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#FF7BA6"></stop><stop offset="1" stop-color="#C24C76"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teambullg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M30 40q-6 -14 8 -14 4 10 14 12zM90 40q6 -14-8 -14-4 10-14 12z" fill="#0B0E14"></path><path d="M44 38h32l-4 28-12 12-12-12z" fill="#0B0E14"></path><path d="M50 50l8 3-8 3zM70 50l-8 3 8 3z" fill="#FF7BA6"></path><circle cx="60" cy="70" r="3.5" fill="#FF7BA6"></circle></svg>

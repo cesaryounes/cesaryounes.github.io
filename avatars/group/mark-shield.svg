@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="markshieldg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#9FD4E8"></stop><stop offset="1" stop-color="#4F92AD"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#markshieldg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 28l26 10v22c0 16-12 26-26 32-14-6-26-16-26-32V38z" fill="#0B0E14"></path><path d="M60 44l6 13 14 2-10 10 3 14-13-7-13 7 3-14-10-10 14-2z" fill="#9FD4E8"></path></svg>

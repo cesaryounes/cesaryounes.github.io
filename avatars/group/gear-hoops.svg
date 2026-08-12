@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="gearhoopsg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#FF7BA6"></stop><stop offset="1" stop-color="#C24C76"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#gearhoopsg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<circle cx="60" cy="60" r="27" fill="#0B0E14"></circle><path d="M33 60h54M60 33v54M42 40q10 20 0 40M78 40q-10 20 0 40" stroke="#FF7BA6" stroke-width="3.5" fill="none"></path></svg>

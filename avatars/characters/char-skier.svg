@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<defs><radialGradient id="charskierbg" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#9FD4E8"></stop><stop offset="1" stop-color="#4f92ad"></stop></radialGradient><radialGradient id="charskiersk" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#F5D9BE"></stop><stop offset="1" stop-color="#D3AC86"></stop></radialGradient><linearGradient id="charskierha" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#9AA4B2"></stop><stop offset="1" stop-color="#6B7480"></stop></linearGradient><linearGradient id="charskierki" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#FF6B4A"></stop><stop offset="1" stop-color="#C23A1C"></stop></linearGradient>
+<radialGradient id="charskiersh" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#000" stop-opacity=".38"></stop><stop offset="1" stop-color="#000" stop-opacity="0"></stop></radialGradient>
+<clipPath id="charskierc"><circle cx="80" cy="80" r="80"></circle></clipPath></defs>
+<circle cx="80" cy="80" r="80" fill="url(#charskierbg)"></circle>
+<g clip-path="url(#charskierc)">
+<ellipse cx="80" cy="138" rx="34" ry="9" fill="url(#charskiersh)"></ellipse>
+<path d="M20 140h120M28 150h120" stroke="#F0F6FC" stroke-width="7" stroke-linecap="round"></path>
+<rect x="66" y="104" width="14" height="28" rx="7" fill="url(#charskiersk)"></rect><rect x="80" y="104" width="14" height="28" rx="7" fill="url(#charskiersk)"></rect>
+<ellipse cx="72" cy="134" rx="11" ry="7" fill="#141821"></ellipse><ellipse cx="88" cy="134" rx="11" ry="7" fill="#141821"></ellipse>
+<rect x="60" y="76" width="40" height="36" rx="17" fill="url(#charskierki)"></rect>
+<rect x="49" y="80" width="13" height="30" rx="6.5" fill="url(#charskiersk)"></rect><rect x="98" y="80" width="13" height="30" rx="6.5" fill="url(#charskiersk)"></rect>
+<circle cx="80" cy="50" r="28" fill="url(#charskiersk)"></circle>
+<path d="M52 50a28 28 0 0 1 56 0z" fill="#141821"></path><path d="M52 50h56v5H52z" fill="#0f1319" opacity=".35"></path>
+<ellipse cx="80" cy="46" rx="22" ry="14" fill="#fff" opacity=".1"></ellipse>
+<circle cx="71" cy="52" r="3.4" fill="#141821"></circle><circle cx="89" cy="52" r="3.4" fill="#141821"></circle><path d="M73 61q7 6 14 0" stroke="#141821" stroke-width="3" stroke-linecap="round" fill="none"></path>
+<path d="M44 74v52M118 74v52" stroke="#141821" stroke-width="4" stroke-linecap="round"></path>
+</g></svg>

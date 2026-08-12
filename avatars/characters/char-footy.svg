@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<defs><radialGradient id="charfootybg" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#7EE787"></stop><stop offset="1" stop-color="#3fa14a"></stop></radialGradient><radialGradient id="charfootysk" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#D9A066"></stop><stop offset="1" stop-color="#A9743F"></stop></radialGradient><linearGradient id="charfootyha" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#3B2A20"></stop><stop offset="1" stop-color="#20150F"></stop></linearGradient><linearGradient id="charfootyki" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#48B4FF"></stop><stop offset="1" stop-color="#1B73B8"></stop></linearGradient>
+<radialGradient id="charfootysh" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#000" stop-opacity=".38"></stop><stop offset="1" stop-color="#000" stop-opacity="0"></stop></radialGradient>
+<clipPath id="charfootyc"><circle cx="80" cy="80" r="80"></circle></clipPath></defs>
+<circle cx="80" cy="80" r="80" fill="url(#charfootybg)"></circle>
+<g clip-path="url(#charfootyc)">
+<ellipse cx="80" cy="138" rx="34" ry="9" fill="url(#charfootysh)"></ellipse>
+<circle cx="124" cy="126" r="18" fill="#F0F6FC" stroke="#141821" stroke-width="4"></circle><path d="M124 116l8 6-3 10h-10l-3-10z" fill="#141821"></path>
+<rect x="66" y="104" width="14" height="28" rx="7" fill="url(#charfootysk)"></rect><rect x="80" y="104" width="14" height="28" rx="7" fill="url(#charfootysk)"></rect>
+<ellipse cx="72" cy="134" rx="11" ry="7" fill="#141821"></ellipse><ellipse cx="88" cy="134" rx="11" ry="7" fill="#141821"></ellipse>
+<rect x="60" y="76" width="40" height="36" rx="17" fill="url(#charfootyki)"></rect>
+<rect x="49" y="80" width="13" height="30" rx="6.5" fill="url(#charfootysk)"></rect><rect x="98" y="80" width="13" height="30" rx="6.5" fill="url(#charfootysk)"></rect>
+<circle cx="80" cy="50" r="28" fill="url(#charfootysk)"></circle>
+<path d="M53 44a27 27 0 0 1 54 0c-4-10-14-16-27-16S57 34 53 44z" fill="url(#char-footyha)"></path>
+<ellipse cx="80" cy="46" rx="22" ry="14" fill="#fff" opacity=".1"></ellipse>
+<circle cx="71" cy="52" r="3.4" fill="#141821"></circle><circle cx="89" cy="52" r="3.4" fill="#141821"></circle><path d="M73 61q7 6 14 0" stroke="#141821" stroke-width="3" stroke-linecap="round" fill="none"></path>
+
+</g></svg>

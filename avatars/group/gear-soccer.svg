@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="gearsoccerg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#A98BFF"></stop><stop offset="1" stop-color="#6B4FC4"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#gearsoccerg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<circle cx="60" cy="60" r="27" fill="#0B0E14"></circle><path d="M60 44l12 9-4.5 14h-15L48 53z" fill="#A98BFF"></path><path d="M60 33v11M44 47l4 6M76 47l-4 6M50 84l3-11M70 84l-3-11" stroke="#A98BFF" stroke-width="4" stroke-linecap="round"></path></svg>

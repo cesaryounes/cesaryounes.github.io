@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="gearracketg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#7EE787"></stop><stop offset="1" stop-color="#3FA14A"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#gearracketg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<ellipse cx="54" cy="48" rx="20" ry="24" fill="none" stroke="#0B0E14" stroke-width="7"></ellipse><path d="M40 38h28M40 48h28M40 58h28M50 28v40M60 28v40" stroke="#0B0E14" stroke-width="2.5"></path><path d="M62 70l14 22" stroke="#0B0E14" stroke-width="8" stroke-linecap="round"></path><circle cx="84" cy="46" r="8" fill="#0B0E14"></circle></svg>

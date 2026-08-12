@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teamwolfg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#A98BFF"></stop><stop offset="1" stop-color="#6B4FC4"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teamwolfg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M32 40l12 6 16-8 16 8 12-6-4 20-24 30-24-30z" fill="#0B0E14"></path><path d="M46 58l10 4-10 4zM74 58l-10 4 10 4z" fill="#A98BFF"></path><path d="M56 76h8" stroke="#A98BFF" stroke-width="4" stroke-linecap="round"></path></svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="markcrowng" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#CCFF00"></stop><stop offset="1" stop-color="#8FB300"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#markcrowng)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M30 78l-4-38 18 14 16-24 16 24 18-14-4 38z" fill="#0B0E14"></path><path d="M32 86h56" stroke="#0B0E14" stroke-width="6" stroke-linecap="round"></path><circle cx="60" cy="60" r="4.5" fill="#CCFF00"></circle></svg>

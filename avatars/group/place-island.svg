@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="placeislandg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#48B4FF"></stop><stop offset="1" stop-color="#1B73B8"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#placeislandg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 44v40" stroke="#0B0E14" stroke-width="7" stroke-linecap="round"></path><path d="M60 44q-18 -8 -24 6 12 -6 24 2zM60 44q18 -8 24 6-12 -6-24 2zM60 42q-6 -14 -20 -12 12 2 20 12z" fill="#0B0E14"></path><path d="M32 86q28 -10 56 0" fill="none" stroke="#0B0E14" stroke-width="6" stroke-linecap="round"></path></svg>

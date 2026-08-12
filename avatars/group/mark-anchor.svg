@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="markanchorg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#7EE787"></stop><stop offset="1" stop-color="#3FA14A"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#markanchorg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<circle cx="60" cy="34" r="8" fill="none" stroke="#0B0E14" stroke-width="6"></circle><path d="M60 42v42M42 54h36" stroke="#0B0E14" stroke-width="7" stroke-linecap="round"></path><path d="M34 66q0 22 26 20 26 2 26-20" fill="none" stroke="#0B0E14" stroke-width="7" stroke-linecap="round"></path></svg>

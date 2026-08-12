@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<defs><radialGradient id="charyogibg" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#A98BFF"></stop><stop offset="1" stop-color="#6B4FC4"></stop></radialGradient><radialGradient id="charyogisk" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#F0C39A"></stop><stop offset="1" stop-color="#C99669"></stop></radialGradient><linearGradient id="charyogiha" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#E8C46A"></stop><stop offset="1" stop-color="#B8933D"></stop></linearGradient><linearGradient id="charyogiki" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#FF7BA6"></stop><stop offset="1" stop-color="#C24C76"></stop></linearGradient>
+<radialGradient id="charyogish" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#000" stop-opacity=".38"></stop><stop offset="1" stop-color="#000" stop-opacity="0"></stop></radialGradient>
+<clipPath id="charyogic"><circle cx="80" cy="80" r="80"></circle></clipPath></defs>
+<circle cx="80" cy="80" r="80" fill="url(#charyogibg)"></circle>
+<g clip-path="url(#charyogic)">
+<ellipse cx="80" cy="138" rx="34" ry="9" fill="url(#charyogish)"></ellipse>
+<circle cx="80" cy="80" r="58" fill="none" stroke="#fff" stroke-width="3" opacity=".18"></circle>
+<rect x="66" y="104" width="14" height="28" rx="7" fill="url(#charyogisk)"></rect><rect x="80" y="104" width="14" height="28" rx="7" fill="url(#charyogisk)"></rect>
+<ellipse cx="72" cy="134" rx="11" ry="7" fill="#F0F6FC"></ellipse><ellipse cx="88" cy="134" rx="11" ry="7" fill="#F0F6FC"></ellipse>
+<rect x="60" y="76" width="40" height="36" rx="17" fill="url(#charyogiki)"></rect>
+<rect x="49" y="80" width="13" height="30" rx="6.5" fill="url(#charyogisk)"></rect><rect x="98" y="80" width="13" height="30" rx="6.5" fill="url(#charyogisk)"></rect>
+<circle cx="80" cy="50" r="28" fill="url(#charyogisk)"></circle>
+<path d="M53 44a27 27 0 0 1 54 0c-4-10-14-16-27-16S57 34 53 44z" fill="url(#char-yogiha)"></path><circle cx="80" cy="22" r="10" fill="url(#char-yogiha)"></circle>
+<ellipse cx="80" cy="46" rx="22" ry="14" fill="#fff" opacity=".1"></ellipse>
+<circle cx="71" cy="52" r="3.4" fill="#141821"></circle><circle cx="89" cy="52" r="3.4" fill="#141821"></circle><path d="M73 61q7 6 14 0" stroke="#141821" stroke-width="3" stroke-linecap="round" fill="none"></path>
+
+</g></svg>

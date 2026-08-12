@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teamsharkg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#7EE787"></stop><stop offset="1" stop-color="#3FA14A"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teamsharkg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 26l26 44H34z" fill="#0B0E14"></path><path d="M26 82q12 -8 22 0t22 0t24 0" fill="none" stroke="#0B0E14" stroke-width="6" stroke-linecap="round"></path><path d="M50 62h20l-4 6h-12z" fill="#7EE787"></path></svg>

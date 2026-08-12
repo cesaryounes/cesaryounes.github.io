@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="gearwatchg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#48B4FF"></stop><stop offset="1" stop-color="#1B73B8"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#gearwatchg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<circle cx="60" cy="64" r="26" fill="#0B0E14"></circle><circle cx="60" cy="64" r="18" fill="none" stroke="#48B4FF" stroke-width="3"></circle><path d="M60 50v14l10 6" stroke="#48B4FF" stroke-width="4.5" stroke-linecap="round" fill="none"></path><rect x="52" y="30" width="16" height="9" rx="4" fill="#0B0E14"></rect></svg>

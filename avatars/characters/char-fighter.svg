@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<defs><radialGradient id="charfighterbg" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#2ED9B4"></stop><stop offset="1" stop-color="#12907a"></stop></radialGradient><radialGradient id="charfightersk" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#FFE3CB"></stop><stop offset="1" stop-color="#E3BC9C"></stop></radialGradient><linearGradient id="charfighterha" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#141821"></stop><stop offset="1" stop-color="#000000"></stop></linearGradient><linearGradient id="charfighterki" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#F0F6FC"></stop><stop offset="1" stop-color="#B9C3CF"></stop></linearGradient>
+<radialGradient id="charfightersh" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#000" stop-opacity=".38"></stop><stop offset="1" stop-color="#000" stop-opacity="0"></stop></radialGradient>
+<clipPath id="charfighterc"><circle cx="80" cy="80" r="80"></circle></clipPath></defs>
+<circle cx="80" cy="80" r="80" fill="url(#charfighterbg)"></circle>
+<g clip-path="url(#charfighterc)">
+<ellipse cx="80" cy="138" rx="34" ry="9" fill="url(#charfightersh)"></ellipse>
+<path d="M60 60l-16-16M100 60l16-16" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".35"></path>
+<rect x="66" y="104" width="14" height="28" rx="7" fill="url(#charfightersk)"></rect><rect x="80" y="104" width="14" height="28" rx="7" fill="url(#charfightersk)"></rect>
+<ellipse cx="72" cy="134" rx="11" ry="7" fill="#141821"></ellipse><ellipse cx="88" cy="134" rx="11" ry="7" fill="#141821"></ellipse>
+<rect x="60" y="76" width="40" height="36" rx="17" fill="url(#charfighterki)"></rect>
+<rect x="49" y="80" width="13" height="30" rx="6.5" fill="url(#charfightersk)"></rect><rect x="98" y="80" width="13" height="30" rx="6.5" fill="url(#charfightersk)"></rect>
+<circle cx="80" cy="50" r="28" fill="url(#charfightersk)"></circle>
+<path d="M53 44a27 27 0 0 1 54 0c-4-10-14-16-27-16S57 34 53 44z" fill="url(#char-fighterha)"></path><circle cx="80" cy="22" r="10" fill="url(#char-fighterha)"></circle>
+<ellipse cx="80" cy="46" rx="22" ry="14" fill="#fff" opacity=".1"></ellipse>
+<circle cx="71" cy="52" r="3.4" fill="#141821"></circle><circle cx="89" cy="52" r="3.4" fill="#141821"></circle><path d="M73 61q7 6 14 0" stroke="#141821" stroke-width="3" stroke-linecap="round" fill="none"></path>
+<path d="M46 96h28" stroke="#141821" stroke-width="6" stroke-linecap="round"></path>
+</g></svg>

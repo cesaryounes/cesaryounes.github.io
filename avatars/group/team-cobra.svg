@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teamcobrag" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#FF6B4A"></stop><stop offset="1" stop-color="#C23A1C"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teamcobrag)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 32q26 6 26 26 0 16-26 30-26-14-26-30 0-20 26-26z" fill="#0B0E14"></path><circle cx="51" cy="54" r="4" fill="#FF6B4A"></circle><circle cx="69" cy="54" r="4" fill="#FF6B4A"></circle><path d="M54 70l6 6 6-6" fill="none" stroke="#FF6B4A" stroke-width="4" stroke-linecap="round"></path></svg>

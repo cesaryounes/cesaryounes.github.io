@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="markstarg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#E0B87A"></stop><stop offset="1" stop-color="#A8813F"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#markstarg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 28l10 22 24 3-17 17 4 24-21-12-21 12 4-24-17-17 24-3z" fill="#0B0E14"></path></svg>

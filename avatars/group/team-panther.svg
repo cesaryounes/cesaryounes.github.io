@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teampantherg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#2ED9B4"></stop><stop offset="1" stop-color="#12907A"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teampantherg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M34 36l12 12M86 36L74 48" stroke="#0B0E14" stroke-width="11" stroke-linecap="round"></path><path d="M38 48h44l-6 24-16 16-16-16z" fill="#0B0E14"></path><path d="M46 58l8 4-8 4zM74 58l-8 4 8 4z" fill="#2ED9B4"></path><path d="M56 76h8" stroke="#2ED9B4" stroke-width="4" stroke-linecap="round"></path></svg>

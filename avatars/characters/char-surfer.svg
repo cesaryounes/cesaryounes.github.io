@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<defs><radialGradient id="charsurferbg" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#48B4FF"></stop><stop offset="1" stop-color="#1b73b8"></stop></radialGradient><radialGradient id="charsurfersk" cx="0.35" cy="0.3" r="0.85"><stop offset="0" stop-color="#F0C39A"></stop><stop offset="1" stop-color="#C99669"></stop></radialGradient><linearGradient id="charsurferha" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#E8C46A"></stop><stop offset="1" stop-color="#B8933D"></stop></linearGradient><linearGradient id="charsurferki" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#CCFF00"></stop><stop offset="1" stop-color="#8FB300"></stop></linearGradient>
+<radialGradient id="charsurfersh" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#000" stop-opacity=".38"></stop><stop offset="1" stop-color="#000" stop-opacity="0"></stop></radialGradient>
+<clipPath id="charsurferc"><circle cx="80" cy="80" r="80"></circle></clipPath></defs>
+<circle cx="80" cy="80" r="80" fill="url(#charsurferbg)"></circle>
+<g clip-path="url(#charsurferc)">
+<ellipse cx="80" cy="138" rx="34" ry="9" fill="url(#charsurfersh)"></ellipse>
+<path d="M0 136q20 -12 40 0t40 0t40 0t40 0" stroke="#9FD4E8" stroke-width="7" fill="none" opacity=".6"></path><path d="M128 44c10 24 10 60 0 84-10-24-10-60 0-84z" fill="#FFC400" stroke="#141821" stroke-width="4"></path>
+<rect x="66" y="104" width="14" height="28" rx="7" fill="url(#charsurfersk)"></rect><rect x="80" y="104" width="14" height="28" rx="7" fill="url(#charsurfersk)"></rect>
+<ellipse cx="72" cy="134" rx="11" ry="7" fill="#F0F6FC"></ellipse><ellipse cx="88" cy="134" rx="11" ry="7" fill="#F0F6FC"></ellipse>
+<rect x="60" y="76" width="40" height="36" rx="17" fill="url(#charsurferki)"></rect>
+<rect x="49" y="80" width="13" height="30" rx="6.5" fill="url(#charsurfersk)"></rect><rect x="98" y="80" width="13" height="30" rx="6.5" fill="url(#charsurfersk)"></rect>
+<circle cx="80" cy="50" r="28" fill="url(#charsurfersk)"></circle>
+<path d="M52 48a28 28 0 0 1 56 0v26c0-12-5-18-5-26 0-10-9-16-23-16S57 38 57 48c0 8-5 14-5 26z" fill="url(#char-surferha)"></path>
+<ellipse cx="80" cy="46" rx="22" ry="14" fill="#fff" opacity=".1"></ellipse>
+<circle cx="71" cy="52" r="3.4" fill="#141821"></circle><circle cx="89" cy="52" r="3.4" fill="#141821"></circle><path d="M73 61q7 6 14 0" stroke="#141821" stroke-width="3" stroke-linecap="round" fill="none"></path>
+
+</g></svg>

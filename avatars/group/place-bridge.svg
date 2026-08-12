@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="placebridgeg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#FF6B4A"></stop><stop offset="1" stop-color="#C23A1C"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#placebridgeg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M28 76q32 -34 64 0" fill="none" stroke="#0B0E14" stroke-width="7"></path><path d="M28 76v12M92 76v12M44 64v24M60 58v30M76 64v24" stroke="#0B0E14" stroke-width="5" stroke-linecap="round"></path></svg>

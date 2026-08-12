@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="markflameg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#7EE787"></stop><stop offset="1" stop-color="#3FA14A"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#markflameg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M60 26c14 16 22 26 22 38 0 14-10 24-22 24s-22-10-22-24c0-12 8-22 22-38z" fill="#0B0E14"></path><path d="M60 54c6 8 9 12 9 18 0 6-4 10-9 10s-9-4-9-10c0-6 3-10 9-18z" fill="#7EE787"></path></svg>

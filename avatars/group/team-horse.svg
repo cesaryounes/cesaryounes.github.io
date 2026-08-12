@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<defs><radialGradient id="teamhorseg" cx="0.34" cy="0.28" r="0.85"><stop offset="0" stop-color="#48B4FF"></stop><stop offset="1" stop-color="#1B73B8"></stop></radialGradient></defs>
+<circle cx="60" cy="60" r="60" fill="url(#teamhorseg)"></circle>
+<circle cx="60" cy="60" r="52" fill="none" stroke="#0B0E14" stroke-width="4" opacity=".9"></circle>
+<circle cx="60" cy="60" r="45" fill="none" stroke="#0B0E14" stroke-width="2" opacity=".35"></circle>
+<path d="M42 88V58q0-18 18-22l6-8 4 10q14 4 14 18 0 8-8 10l-4 22z" fill="#0B0E14"></path><path d="M60 30l-2-10 8 8z" fill="#0B0E14"></path><circle cx="70" cy="50" r="3.5" fill="#48B4FF"></circle><path d="M42 58q-10-4-12-14 10 2 14 8z" fill="#0B0E14"></path></svg>
