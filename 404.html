@@ -3,17 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Join a KeepUp club</title>
+<title>Page not found — KeepUp</title>
 <!--
-  Doubles as the /join/<groupId> landing page. GitHub Pages has no server-side routing, so any
-  path that isn't a real file (every /join/<id> request, since <id> changes per club) falls
-  through to this 404.html — the standard static-host trick for "catch everything, read the
-  actual path in JS". Still returns an HTTP 404 status, which doesn't matter for a page a human
-  is looking at.
-
-  On a device where the https App Link (see AndroidManifest.xml + .well-known/assetlinks.json)
-  is verified, Android intercepts the tap and opens the KeepUp app directly — this page is only
-  ever seen as a fallback: app not installed yet, or verification hasn't completed.
+  Plain 404 — join links now hit join/index.html directly (a real file, real 200 status, so
+  WhatsApp/etc. link previews actually work) instead of being caught here. This only shows for
+  a genuinely broken/mistyped URL on this site.
 -->
 <style>
   :root { color-scheme: dark; }
@@ -29,7 +23,7 @@
     text-align: center;
     padding: 24px;
   }
-  .wrap { max-width: 360px; width: 100%; }
+  .wrap { max-width: 360px; }
   .logo {
     width: 56px; height: 56px; margin: 0 auto 20px;
     border-radius: 18px;
@@ -38,99 +32,15 @@
     font-weight: 900; font-size: 22px; color: #0a0c10;
   }
   h1 { font-size: 20px; margin: 0 0 8px; letter-spacing: 0.01em; }
-  p { color: #9aa3ad; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
-  a.button, button {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 14px 20px;
-    border-radius: 14px;
-    border: none;
-    background: #d6ff3f;
-    color: #0a0c10;
-    font-size: 16px;
-    font-weight: 700;
-    font-family: inherit;
-    text-decoration: none;
-    cursor: pointer;
-  }
-  a.button:active, button:active { opacity: 0.85; }
-  .already-have-it {
-    margin-top: 16px;
-    font-size: 13px;
-    color: #9aa3ad;
-    text-decoration: underline;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-    padding: 0;
-    width: auto;
-  }
-  .hint { margin-top: 16px; font-size: 12px; color: #6b7280; }
-  .not-found { display: none; }
+  p { color: #9aa3ad; font-size: 14px; line-height: 1.5; margin: 0; }
+  a { color: #d6ff3f; }
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="logo">K</div>
-    <div id="joinView">
-      <h1>You've been invited to a KeepUp club</h1>
-      <p id="joinCopy">Get KeepUp to accept the invite.</p>
-      <a class="button" id="getAppBtn" href="#">Get KeepUp</a>
-      <button class="already-have-it" id="openBtn" type="button">Already have it? Open the invite</button>
-      <p class="hint" id="installHint">This installs an APK directly — not from the Play Store yet. Android will ask you to allow installs from this source; that's expected for now.</p>
-    </div>
-    <div id="notFoundView" class="not-found">
-      <h1>Page not found</h1>
-      <p>This isn't a valid KeepUp link.</p>
-    </div>
+    <h1>Page not found</h1>
+    <p>Looking for a club invite? Ask whoever shared it to resend the link from KeepUp's Share button — or head back to <a href="/">the homepage</a>.</p>
   </div>
-  <script>
-    (function () {
-      // ---- SWAP THIS ONE BLOCK WHEN KEEPUP GOES LIVE ON THE PLAY STORE ----
-      // Direct-APK distribution for now (pre-launch/beta): source the actual file from
-      // /downloads/keepup-debug.apk in this same repo. Once there's a real Play Store listing,
-      // change PLAY_STORE_MODE to true and set PLAY_STORE_URL — nothing else on this page needs
-      // to change (copy/hint text below adapts automatically).
-      var PLAY_STORE_MODE = false;
-      var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.example.keepup";
-      var APK_URL = "/downloads/keepup-debug.apk";
-      // ---- end swap block ----
-
-      var getAppBtn = document.getElementById('getAppBtn');
-      var joinCopy = document.getElementById('joinCopy');
-      var installHint = document.getElementById('installHint');
-      if (PLAY_STORE_MODE) {
-        getAppBtn.href = PLAY_STORE_URL;
-        getAppBtn.textContent = 'Get KeepUp on Google Play';
-        joinCopy.textContent = 'Get KeepUp from the Play Store to accept the invite.';
-        installHint.style.display = 'none';
-      } else {
-        getAppBtn.href = APK_URL;
-        getAppBtn.textContent = 'Get KeepUp';
-      }
-
-      // "/join/<id>/" -> "<id>" — matches extractGroupCode() in the app's Models.kt (which just
-      // looks for "join/" and takes everything after it), so any id shape that works there works
-      // here too.
-      var match = location.pathname.match(/\/join\/([^/]+)\/?$/);
-      if (!match) {
-        document.getElementById('joinView').style.display = 'none';
-        document.getElementById('notFoundView').style.display = 'block';
-        return;
-      }
-      var groupId = decodeURIComponent(match[1]);
-      var deepLink = 'keepup://join/' + groupId;
-
-      document.getElementById('openBtn').addEventListener('click', function () {
-        window.location.href = deepLink;
-      });
-
-      // Best-effort automatic handoff too, in case the app is installed but this device hasn't
-      // finished (or ever completed) App Link verification — harmless no-op if it's not.
-      window.location.href = deepLink;
-    })();
-  </script>
 </body>
 </html>
