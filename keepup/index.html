@@ -948,8 +948,10 @@ supabase.auth.onAuthStateChange((_event, session) => {
 // Each tab loads its own data only when activated, not eagerly on sign-in — don't fetch what
 // isn't shown yet. loadHeaderStats() is the one exception (see its own doc comment) — it fires on
 // every switch, not just one tab, since the top banner it feeds is visible regardless of tab.
+const TAB_ORDER = ["dashboard", "club", "leaderboard", "profile"];
+
 function switchTab(tab) {
-  ["dashboard", "club", "leaderboard", "profile"].forEach((t) => {
+  TAB_ORDER.forEach((t) => {
     el(`tab-${t}`).classList.toggle("hidden", t !== tab);
     el(`nav-${t}`).classList.toggle("active", t === tab);
   });
@@ -963,6 +965,71 @@ function switchTab(tab) {
 Array.from(el("signed-in-view").querySelectorAll(".tab-nav button")).forEach((btn) => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
+
+// ---------- Swipe between tabs (user request 08-21: "can we swipe screen to change tabs") ----------
+//
+// Same idea as HomeScreen.kt's HorizontalPager (swipe left/right between Dashboard/Club/
+// Leaderboard/Profile) — no such gesture library here, so this is a plain touch listener: track
+// the finger, decide once early whether the drag reads as horizontal or vertical, and only ever
+// act on horizontal ones. Bails out entirely (never even starts tracking) for anything with its
+// own horizontal interaction — a club-pill/period-pill row's own side-scroll, or a text/number/
+// date/select field where a drag is selecting text or dragging a control, not paging.
+(function initSwipeTabs() {
+  const SWIPE_THRESHOLD_PX = 60;
+  const DIRECTION_LOCK_PX = 10;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false; // false until DIRECTION_LOCK_PX of movement decides horizontal vs vertical
+  let horizontal = false;
+
+  const container = el("signed-in-view");
+
+  container.addEventListener("touchstart", (e) => {
+    const target = e.target;
+    if (target.closest(".club-pills, .period-pills, input, select, textarea, .photo-preview")) {
+      tracking = false;
+      return;
+    }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    horizontal = false;
+  }, { passive: true });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!tracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > DIRECTION_LOCK_PX) {
+      horizontal = Math.abs(dx) > Math.abs(dy);
+      if (!horizontal) {
+        tracking = false; // reads as a vertical scroll — hand it back to the page immediately
+        return;
+      }
+    }
+    if (horizontal) e.preventDefault(); // stop the page from also scrolling sideways mid-swipe
+  }, { passive: false });
+
+  container.addEventListener("touchend", (e) => {
+    if (!tracking || !horizontal) {
+      tracking = false;
+      return;
+    }
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+
+    const activeBtn = document.querySelector(".tab-nav button.active");
+    const currentIndex = activeBtn ? TAB_ORDER.indexOf(activeBtn.dataset.tab) : -1;
+    if (currentIndex === -1) return;
+    // Swipe left (dx negative) -> next tab; swipe right (dx positive) -> previous tab — same
+    // direction convention as a HorizontalPager. Clamped at both ends, no wraparound.
+    const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex >= 0 && nextIndex < TAB_ORDER.length) {
+      switchTab(TAB_ORDER[nextIndex]);
+    }
+  }, { passive: true });
+})();
 
 // ---------- Gamification math ----------
 //
