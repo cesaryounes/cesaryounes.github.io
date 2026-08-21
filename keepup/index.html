@@ -513,8 +513,26 @@
         <div id="submit-flow" class="hidden">
           <button class="btn-text" id="cancel-submit-btn" style="margin-bottom:8px;">Cancel</button>
 
-          <!-- Step 1: pick photo -->
-          <div id="upload-step" class="card">
+          <!-- Step 0: pick a method (user request 08-21: "clicking on log workout, should ask,
+               manual or image upload") — was straight into the photo picker every time, with no
+               way to skip photo parsing and just type stats in directly (the confirm-step's
+               fields were always there, but only reachable via a photo). Both methods land on the
+               same confirm-step below — see currentEntryMode's own comment for how that one step
+               serves both. -->
+          <div id="choice-step" class="card">
+            <p class="section-label" style="margin-bottom:14px;">How do you want to log this?</p>
+            <button class="btn-secondary" id="choose-photo-btn" style="text-align:left; padding:16px; margin-bottom:10px;">
+              <div style="font-weight:700; color:var(--text-main); font-size:14px;">Upload a photo</div>
+              <div class="muted" style="font-size:12px; margin-top:2px;">Read the stats automatically from a screenshot</div>
+            </button>
+            <button class="btn-secondary" id="choose-manual-btn" style="text-align:left; padding:16px;">
+              <div style="font-weight:700; color:var(--text-main); font-size:14px;">Enter manually</div>
+              <div class="muted" style="font-size:12px; margin-top:2px;">Type in the activity, duration, calories and heart rate yourself</div>
+            </button>
+          </div>
+
+          <!-- Step 1: pick photo (photo mode only) -->
+          <div id="upload-step" class="card hidden">
             <div id="drop-zone" class="drop-zone photo-input">
               <!-- No capture="environment" here on purpose — that attribute forces mobile browsers
                    straight into the camera, skipping the file/gallery picker entirely. Without it,
@@ -525,17 +543,21 @@
             </div>
           </div>
 
-          <!-- Step 2: parsing -->
+          <!-- Step 2: parsing (photo mode only) -->
           <div id="parsing-step" class="card center hidden">
             <div class="spinner"></div>
             <p class="muted">Reading your photo…</p>
           </div>
 
-          <!-- Step 3: confirm/edit -->
+          <!-- Step 3: confirm/edit — shared by both methods. In manual mode, #confirm-photo-section
+               (photo preview/confidence/parse-error) and "Choose a different photo" stay hidden;
+               the fields below start blank instead of pre-filled from a parse. -->
           <div id="confirm-step" class="card hidden">
-            <img id="photo-preview" class="photo-preview" />
-            <div id="confidence-row" style="margin-bottom:14px;"></div>
-            <div id="parse-error" class="error-box hidden"></div>
+            <div id="confirm-photo-section">
+              <img id="photo-preview" class="photo-preview" />
+              <div id="confidence-row" style="margin-bottom:14px;"></div>
+              <div id="parse-error" class="error-box hidden"></div>
+            </div>
 
             <div class="field">
               <label for="activity-select">Activity</label>
@@ -1871,12 +1893,20 @@ el("promo-redeem-btn").addEventListener("click", async () => {
 });
 
 // ---------- Submit flow (expand/collapse in place on the Dashboard) ----------
+//
+// FIX (user request 08-21: "clicking on log workout, should ask, manual or image upload") — was
+// straight into the photo picker every time. currentEntryMode ("photo" | "manual") tracks which
+// method is active; confirm-step is shared by both — #confirm-photo-section (preview/confidence/
+// parse-error) and "Choose a different photo" only make sense in photo mode, so
+// showManualEntryStep() hides them and blanks the fields instead of duplicating the whole step.
+
+let currentEntryMode = "photo";
 
 el("open-submit-btn").addEventListener("click", () => {
   hide("open-submit-btn");
   hide("workouts-card");
   show("submit-flow");
-  resetToUploadStep();
+  resetSubmitFlow();
 });
 
 function collapseSubmitFlow({ refresh = true } = {}) {
@@ -1891,19 +1921,60 @@ function collapseSubmitFlow({ refresh = true } = {}) {
 
 el("cancel-submit-btn").addEventListener("click", () => collapseSubmitFlow({ refresh: false }));
 el("done-submit-btn").addEventListener("click", () => collapseSubmitFlow());
-el("log-another-btn").addEventListener("click", resetToUploadStep);
+el("log-another-btn").addEventListener("click", resetSubmitFlow);
 
-function resetToUploadStep() {
+// Back to "how do you want to log this?" — used opening the flow fresh and after "Log another"
+// (asking again each time, rather than assuming the last method, since there's no real cost to
+// asking and someone might want to switch methods for their next entry).
+function resetSubmitFlow() {
+  currentParse = null;
+  currentPhotoDataUrl = null;
+  el("photo-input").value = "";
+  show("choice-step");
+  hide("upload-step");
+  hide("parsing-step");
+  hide("confirm-step");
+  hide("saved-step");
+}
+
+el("choose-photo-btn").addEventListener("click", () => {
+  currentEntryMode = "photo";
+  hide("choice-step");
+  showUploadStep();
+});
+
+el("choose-manual-btn").addEventListener("click", () => {
+  currentEntryMode = "manual";
+  hide("choice-step");
+  showManualEntryStep();
+});
+
+// Photo mode's step 1 (the picker itself) — also what "Choose a different photo" (retake-btn)
+// returns to, one level up from resetSubmitFlow() (which would send them all the way back to
+// choice-step instead of just letting them pick a different photo in the same mode).
+function showUploadStep() {
   currentParse = null;
   currentPhotoDataUrl = null;
   el("photo-input").value = "";
   show("upload-step");
   hide("parsing-step");
   hide("confirm-step");
-  hide("saved-step");
 }
+el("retake-btn").addEventListener("click", showUploadStep);
 
-el("retake-btn").addEventListener("click", resetToUploadStep);
+// Manual mode skips upload-step/parsing-step entirely and opens confirm-step directly, blank —
+// same fields save-btn already reads from either way, so no separate save path was needed.
+function showManualEntryStep() {
+  hide("confirm-photo-section");
+  hide("retake-btn");
+  hide("parse-error");
+  el("confidence-row").innerHTML = "";
+  el("activity-select").value = "running";
+  el("duration-input").value = "";
+  el("calories-input").value = "";
+  el("hr-input").value = "";
+  show("confirm-step");
+}
 
 // ---------- Photo capture + downscale ----------
 
@@ -1973,6 +2044,8 @@ el("photo-input").addEventListener("change", async (e) => {
   } catch (err) {
     hide("parsing-step");
     show("confirm-step");
+    show("confirm-photo-section");
+    show("retake-btn");
     el("photo-preview").src = currentPhotoDataUrl ?? "";
     el("parse-error").textContent = err.message || "Something went wrong reading that photo — you can still enter the stats yourself.";
     show("parse-error");
@@ -1981,6 +2054,11 @@ el("photo-input").addEventListener("change", async (e) => {
 });
 
 function populateConfirmStep(result) {
+  // Re-shown here (not just left as their HTML default) since a manual-mode visit earlier in the
+  // same session (showManualEntryStep) hides both — confirm-step is shared, so it has to reset
+  // fully back to "photo mode" shape every time a real parse result lands here.
+  show("confirm-photo-section");
+  show("retake-btn");
   el("photo-preview").src = currentPhotoDataUrl;
   hide("parse-error");
 
