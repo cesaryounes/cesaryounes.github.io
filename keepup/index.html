@@ -449,19 +449,22 @@
       </div>
 
       <!-- ============ LEADERBOARD ============
-           Scoped strictly to clubs this account is actually a member of. There is no global or
-           cross-club view here on purpose: get_leaderboard is only ever called below with a
-           specific p_group_id the user belongs to, never null (which would be Global). No way to
-           browse or see any other club's standings from this page (user request 08-17/08-18). -->
+           FIX (user request 08-21: "I can only see one [leaderboard], but it does not show which
+           one... we need to see the global, and the ones that the user is part of") — was
+           scoped strictly to clubs this account is a member of, with no way to tell which club
+           was showing when there was only one (the club-pills scope switcher only rendered once
+           there were 2+ options — see renderClubPills below). Now always offers Global first
+           (get_leaderboard's own p_group_id default) plus every club the account belongs to, same
+           idea as LeaderboardScreen.kt's Global/Region/Club scope tabs (Region isn't offered here
+           — not asked for, and this account has no region-picker UI anywhere on this page). The
+           active pill is always visible now, including when Global is the only option, which is
+           what actually fixes "doesn't show which one" — a single unlabeled leaderboard becomes a
+           highlighted "Global" pill instead. -->
       <div id="tab-leaderboard" class="tab-view hidden">
-        <div id="no-clubs-step" class="card center hidden">
-          <p class="muted" style="margin-bottom:4px;">You're not in a club yet.</p>
-          <p class="muted">Check the Club tab to join one and see a leaderboard.</p>
-        </div>
-
-        <div id="club-step" class="card hidden">
-          <p class="section-label" style="margin-bottom:12px;">Your club</p>
-          <div class="club-pills hidden" id="club-pills"></div>
+        <div class="card">
+          <p class="section-label" style="margin-bottom:12px;">Leaderboard</p>
+          <div class="club-pills" id="club-pills"></div>
+          <p class="muted hidden" id="no-clubs-hint" style="margin-bottom:14px;">Join a club from the Club tab to see its own leaderboard too.</p>
           <div class="period-pills" id="period-pills">
             <div class="period-pill" data-period="weekly">Week</div>
             <div class="period-pill" data-period="monthly">Month</div>
@@ -763,14 +766,15 @@ async function loadDashboard() {
 
 // ---------- Clubs + leaderboard ----------
 //
-// Deliberately scoped: get_leaderboard is only ever called below with a specific p_group_id this
-// account is already a member of (from group_members, RLS-scoped to the caller's own rows) —
-// never with p_group_id omitted/null, which is what Global means to that RPC. There is no way to
-// browse or view any other club's standings from this page, by design (user request 08-17:
-// "they should only have access to the club they are in").
+// FIX (user request 08-21): used to be scoped strictly to clubs this account belongs to, with
+// Global (get_leaderboard's own p_group_id default) deliberately never offered (user request
+// 08-17: "they should only have access to the club they are in"). Superseded by this later,
+// explicit request — Global is now always the first scope pill, same as
+// LeaderboardScreen.kt's own Global/Region/Club tabs (Region isn't offered here, wasn't asked
+// for). currentClubId === null now means "Global" rather than "nothing selected yet".
 
 let myClubs = [];
-let currentClubId = null;
+let currentClubId = null; // null = Global
 let currentPeriod = "weekly";
 
 // Pure data fetch, shared by the Leaderboard tab (needs the full list to build its scope) and the
@@ -790,16 +794,15 @@ async function fetchMyClubs() {
 async function loadMyClubs() {
   myClubs = await fetchMyClubs();
 
-  if (myClubs.length === 0) {
-    hide("club-step");
-    show("no-clubs-step");
-    return;
+  // If the previously-selected club was left (or this is a stale id from a prior session), fall
+  // back to Global rather than guessing a different club — Global is always valid, so this can
+  // never land on an empty/broken state the way falling back to myClubs[0] could once myClubs is
+  // allowed to be empty (it always used to be non-empty here, back when 0 clubs meant "hide the
+  // whole tab" instead of "just show Global").
+  if (currentClubId && !myClubs.some((c) => c.id === currentClubId)) {
+    currentClubId = null;
   }
-  hide("no-clubs-step");
-  show("club-step");
-  if (!currentClubId || !myClubs.some((c) => c.id === currentClubId)) {
-    currentClubId = myClubs[0].id;
-  }
+  el("no-clubs-hint").classList.toggle("hidden", myClubs.length > 0);
   renderClubPills();
   await loadClubLeaderboard();
 }
@@ -807,11 +810,17 @@ async function loadMyClubs() {
 function renderClubPills() {
   const wrap = el("club-pills");
   wrap.innerHTML = "";
-  if (myClubs.length <= 1) {
-    hide("club-pills");
-    return;
-  }
-  show("club-pills");
+
+  const globalPill = document.createElement("div");
+  globalPill.className = "club-pill" + (currentClubId === null ? " active" : "");
+  globalPill.textContent = "Global";
+  globalPill.addEventListener("click", async () => {
+    currentClubId = null;
+    renderClubPills();
+    await loadClubLeaderboard();
+  });
+  wrap.appendChild(globalPill);
+
   myClubs.forEach((c) => {
     const pill = document.createElement("div");
     pill.className = "club-pill" + (c.id === currentClubId ? " active" : "");
@@ -835,7 +844,8 @@ Array.from(el("period-pills").children).forEach((pill, i) => {
 });
 
 async function loadClubLeaderboard() {
-  if (!currentClubId) return;
+  // currentClubId === null is Global — get_leaderboard's own p_group_id default, same RPC call
+  // shape LeaderboardScreen.kt's Global tab already uses.
   const { data, error } = await supabase.rpc("get_leaderboard", {
     p_period: currentPeriod,
     p_group_id: currentClubId,
