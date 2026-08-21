@@ -277,6 +277,19 @@
     text-align: center; line-height: 1.2;
   }
 
+  /* ---- Dashboard: Activity Summary card (user request 08-21, "show the points too") — mirrors
+     DashboardScreen.kt's Activity Summary: period switcher, PTS hero, sessions/duration/calories
+     tiles. ---- */
+  .activity-summary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .see-all-link { font-size: 12px; font-weight: 700; color: var(--accent); cursor: pointer; }
+  .activity-hero { display: flex; align-items: baseline; gap: 6px; margin: 18px 0 16px; }
+  .activity-hero span:first-child { font-size: 38px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .activity-hero-unit { font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; }
+  .activity-tiles { display: flex; gap: 8px; }
+  .activity-tile { flex: 1; background: var(--card-raised); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .activity-tile-value { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .activity-tile-label { font-size: 10px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.04em; margin-top: 2px; text-transform: uppercase; }
+
   /* ---- Workout list: activity icon tile (user request 08-21, "align" pass — mirrors
      DashboardScreen.kt's WorkoutRow, which puts an accent-soft icon tile before the label). ---- */
   .workout-icon-tile {
@@ -466,6 +479,31 @@
               <div class="tier-badge"></div>
               <span id="gami-tier-name">ROOKIE</span>
             </div>
+          </div>
+        </div>
+
+        <!-- FIX (user request 08-21: "show the points too") — mirrors DashboardScreen.kt's
+             Activity Summary card: a period switcher (same Week/Month/Year/All the Leaderboard
+             tab uses, but its own independent selection — activityPeriodPills below, not
+             period-pills), a hero PTS number for whatever period is selected, and
+             sessions/duration/calories tiles underneath. Filled by loadActivitySummary(), called
+             from loadDashboard(). -->
+        <div class="card" id="activity-summary-card">
+          <div class="activity-summary-header">
+            <p class="section-label">Activity summary</p>
+            <span class="see-all-link" id="activity-see-all">See all ›</span>
+          </div>
+          <div class="period-pills" id="activity-period-pills">
+            <div class="period-pill" data-period="weekly">Week</div>
+            <div class="period-pill" data-period="monthly">Month</div>
+            <div class="period-pill" data-period="yearly">Year</div>
+            <div class="period-pill" data-period="alltime">All</div>
+          </div>
+          <div class="activity-hero"><span id="activity-points">0.0</span><span class="activity-hero-unit">PTS</span></div>
+          <div class="activity-tiles">
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-sessions">0</div><div class="activity-tile-label">Sessions</div></div>
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-duration">0 min</div><div class="activity-tile-label">Duration</div></div>
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-calories">0</div><div class="activity-tile-label">Calories</div></div>
           </div>
         </div>
 
@@ -989,7 +1027,80 @@ async function loadHeaderStats() {
 }
 
 async function loadDashboard() {
-  await Promise.all([loadHistory(), loadGamificationCard()]);
+  await Promise.all([loadHistory(), loadGamificationCard(), loadActivitySummary()]);
+}
+
+// ---------- Activity Summary (user request 08-21: "show the points too") ----------
+//
+// Mirrors DashboardScreen.kt's own period-scoped sums exactly, including matching its choice to
+// NOT exclude rejected workouts from these totals (LeaderboardScreen.kt's ranking does exclude
+// them via get_leaderboard's own join filter, but this card sums the raw workout list the same
+// way DashboardScreen.kt's periodPoints does — matching the app's real behavior here, not a
+// "more correct" version that would disagree with what the app itself shows).
+
+let currentActivityPeriod = "weekly";
+
+function periodStartMs(period) {
+  const now = new Date();
+  if (period === "monthly") return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  if (period === "yearly") return Date.UTC(now.getUTCFullYear(), 0, 1);
+  if (period === "weekly") {
+    // Monday-start ISO week in UTC — same convention periodStart() (DashboardScreen.kt) and
+    // get_leaderboard()'s date_trunc('week', ...) both already use.
+    const day = now.getUTCDay(); // 0 = Sunday .. 6 = Saturday
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday);
+  }
+  return null; // alltime
+}
+
+// Whole points, except a sub-10 total keeps one decimal so a genuinely small result doesn't round
+// down to an indistinguishable "0" — same reasoning as formatHeroPoints (DashboardScreen.kt).
+function formatHeroPoints(value) {
+  return value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString("en-US");
+}
+// "1500" -> "1.5 K", same convention formatCompactCount (DashboardScreen.kt) uses for the tiles.
+function formatCompactCount(value) {
+  const rounded = Math.round(value);
+  if (Math.abs(rounded) < 1000) return String(rounded);
+  const scaled = (rounded / 1000).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return `${scaled} K`;
+}
+
+Array.from(el("activity-period-pills").children).forEach((pill, i) => {
+  if (i === 0) pill.classList.add("active");
+  pill.addEventListener("click", async () => {
+    currentActivityPeriod = pill.dataset.period;
+    Array.from(el("activity-period-pills").children).forEach((p) => p.classList.toggle("active", p === pill));
+    await loadActivitySummary();
+  });
+});
+
+el("activity-see-all").addEventListener("click", () => {
+  el("workouts-card").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+async function loadActivitySummary() {
+  const { data, error } = await supabase
+    .from("workouts")
+    .select("points_earned, duration_mins, calories, created_at")
+    .eq("user_id", currentSession.user.id);
+  if (error || !data) {
+    console.error("Couldn't load activity summary:", error);
+    return;
+  }
+
+  const start = periodStartMs(currentActivityPeriod);
+  const inPeriod = start === null ? data : data.filter((w) => w.created_at && new Date(w.created_at).getTime() >= start);
+
+  const points = inPeriod.reduce((sum, w) => sum + Number(w.points_earned ?? 0), 0);
+  const duration = inPeriod.reduce((sum, w) => sum + Number(w.duration_mins ?? 0), 0);
+  const calories = inPeriod.reduce((sum, w) => sum + Number(w.calories ?? 0), 0);
+
+  el("activity-points").textContent = formatHeroPoints(points);
+  el("activity-sessions").textContent = formatCompactCount(inPeriod.length);
+  el("activity-duration").textContent = `${formatCompactCount(duration)} min`;
+  el("activity-calories").textContent = formatCompactCount(calories);
 }
 
 // Feeds the Dashboard's level/XP card (GamificationCard's equivalent — user request 08-21:
