@@ -81,9 +81,18 @@
     padding: 24px 16px 64px;
   }
   .wrap { width: 100%; max-width: 420px; }
-  header { text-align: center; margin-bottom: 20px; }
-  header .mark { width: 40px; height: 40px; margin: 0 auto 10px; display: block; }
-  h1 { font-size: 18px; font-weight: 800; margin: 0; letter-spacing: -0.01em; }
+
+  /* ---- Top banner (mirrors HomeScreen.kt's TopBanner) — logo left, stat cluster right, always
+     visible across every tab, not just Dashboard, same as the app. ---- */
+  .top-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline);
+  }
+  .top-banner-logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .top-banner-logo .mark-sm { width: 22px; height: 22px; display: block; }
+  .top-banner-logo .wordmark {
+    font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: var(--text-main);
+  }
 
   .card {
     background: var(--card); border: 1px solid var(--hairline); border-radius: 16px;
@@ -233,15 +242,16 @@
     text-transform: uppercase; letter-spacing: 0.02em;
   }
 
-  /* ---- Dashboard stat cluster (mirrors HomeScreen.kt's TopBanner: streak/freeze/gems/
-     multiplier, icon+number only, no labels) ---- */
-  .stat-cluster { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
-  .stat-cell { display: flex; align-items: center; gap: 6px; }
-  .stat-cell svg { width: 16px; height: 16px; flex-shrink: 0; }
-  .stat-cell span { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* ---- Stat cluster, in the top banner (mirrors HomeScreen.kt's TopBanner: streak/freeze/
+     gems/multiplier, icon+number only, no labels — always visible across every tab, not just
+     Dashboard, same as the app since the 08-19 "show it on all screens" fix). ---- */
+  .stat-cluster { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .stat-cell { display: flex; align-items: center; gap: 4px; }
+  .stat-cell svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .stat-cell span { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .stat-mult {
     background: var(--accent-soft); color: var(--accent); border-radius: 6px;
-    padding: 3px 8px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+    padding: 2px 6px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
   }
 
   /* ---- Profile tab ---- */
@@ -281,22 +291,47 @@
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <!-- Same mark as the Android launcher icon (ic_launcher_foreground.xml / _background.xml)
-           — dark tile, gradient chevron, amber spark — reproduced here as inline SVG instead of
-           a raster export so it stays crisp at any size. -->
-      <svg class="mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-label="KeepUp">
-        <rect width="108" height="108" rx="24" fill="#0B0E14" />
-        <path d="M36,70 L54,46 L72,70" fill="none" stroke="url(#markChevron)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
-        <circle cx="54" cy="32" r="5.5" fill="#FFC400" />
-        <defs>
-          <linearGradient id="markChevron" x1="54" y1="70" x2="54" y2="46" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#7A9E00" />
-            <stop offset="1" stop-color="#CCFF00" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <h1>KeepUp</h1>
+    <!-- FIX (user request 08-21: "same feel as the app... like the top Banner where there is the
+         Logo on the left") — was a big centered mark + "KeepUp" H1, shown once above everything.
+         Now a slim top bar matching HomeScreen.kt's TopBanner exactly: small logo + wordmark on
+         the LEFT, and the streak/freeze/gems/multiplier stat cluster — which used to live inside
+         the Dashboard tab's own card, only visible on that one tab — moved up here so it's always
+         visible across every tab, same as the app's own TopBanner has been since the "show it on
+         all screens" fix. The stat-cluster div itself (ids unchanged) just moved location; its
+         JS (loadHeaderStats below) is unchanged in what it does, only in when it's called. -->
+    <header class="top-banner">
+      <div class="top-banner-logo">
+        <!-- Same mark as the Android launcher icon (ic_launcher_foreground.xml /
+             _background.xml) — dark tile, gradient chevron, amber spark — reproduced here as
+             inline SVG instead of a raster export so it stays crisp at any size. -->
+        <svg class="mark-sm" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-label="KeepUp">
+          <rect width="108" height="108" rx="24" fill="#0B0E14" />
+          <path d="M36,70 L54,46 L72,70" fill="none" stroke="url(#markChevron)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="54" cy="32" r="5.5" fill="#FFC400" />
+          <defs>
+            <linearGradient id="markChevron" x1="54" y1="70" x2="54" y2="46" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#7A9E00" />
+              <stop offset="1" stop-color="#CCFF00" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="wordmark">KEEPUP</span>
+      </div>
+      <div class="stat-cluster hidden" id="stat-cluster">
+        <div class="stat-cell" style="color:var(--text-muted);">
+          <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
+          <span id="stat-streak">0</span>
+        </div>
+        <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
+          <svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg>
+          <span id="stat-freeze">0</span>
+        </div>
+        <div class="stat-cell" style="color:var(--amber);">
+          <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
+          <span id="stat-gems" style="color:var(--text-main);">0</span>
+        </div>
+        <div class="stat-mult" id="stat-multiplier">1.00x</div>
+      </div>
     </header>
 
     <!-- Signed out -->
@@ -316,29 +351,12 @@
       </nav>
 
       <!-- ============ DASHBOARD ============
-           Streak/freeze/gems/multiplier readout (TopBanner's equivalent), a "Log a workout" entry
-           point that expands the same photo -> parse -> confirm -> save flow the old Submit tab
-           had, and the workout list (the old Workouts tab) underneath — merged into one screen,
-           same idea as DashboardScreen.kt's DashboardTab. -->
+           A "Log a workout" entry point that expands the same photo -> parse -> confirm -> save
+           flow the old Submit tab had, and the workout list (the old Workouts tab) underneath —
+           merged into one screen, same idea as DashboardScreen.kt's DashboardTab. The stat
+           cluster that used to open this tab now lives in the top banner instead (see header
+           above) — visible on every tab, not just this one. -->
       <div id="tab-dashboard" class="tab-view">
-        <div class="card">
-          <div class="stat-cluster" id="stat-cluster">
-            <div class="stat-cell" style="color:var(--text-muted);">
-              <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
-              <span id="stat-streak">0</span>
-            </div>
-            <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
-              <svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg>
-              <span id="stat-freeze">0</span>
-            </div>
-            <div class="stat-cell" style="color:var(--amber);">
-              <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
-              <span id="stat-gems" style="color:var(--text-main);">0</span>
-            </div>
-            <div class="stat-mult" id="stat-multiplier">1.00x</div>
-          </div>
-        </div>
-
         <button class="btn-primary" id="open-submit-btn" style="margin-bottom:16px;">+ Log a workout</button>
 
         <!-- Submit flow — hidden until "Log a workout" is tapped. -->
@@ -666,11 +684,13 @@ function renderAuthState() {
   if (currentSession) {
     hide("signed-out-view");
     show("signed-in-view");
+    show("stat-cluster");
     collapseSubmitFlow({ refresh: false });
     switchTab("dashboard");
   } else {
     show("signed-out-view");
     hide("signed-in-view");
+    hide("stat-cluster");
   }
 }
 
@@ -687,12 +707,14 @@ supabase.auth.onAuthStateChange((_event, session) => {
 // ---------- Tabs ----------
 //
 // Each tab loads its own data only when activated, not eagerly on sign-in — don't fetch what
-// isn't shown yet.
+// isn't shown yet. loadHeaderStats() is the one exception (see its own doc comment) — it fires on
+// every switch, not just one tab, since the top banner it feeds is visible regardless of tab.
 function switchTab(tab) {
   ["dashboard", "club", "leaderboard", "profile"].forEach((t) => {
     el(`tab-${t}`).classList.toggle("hidden", t !== tab);
     el(`nav-${t}`).classList.toggle("active", t === tab);
   });
+  loadHeaderStats();
   if (tab === "dashboard") loadDashboard();
   if (tab === "club") loadClubDirectory();
   if (tab === "leaderboard") loadMyClubs();
@@ -737,30 +759,35 @@ function statusTierFor(level) {
   return tier.name;
 }
 
-// ---------- Dashboard (stats + workout list) ----------
+// ---------- Top banner stats + Dashboard workout list ----------
 
-async function loadDashboard() {
+// Feeds the top banner's stat cluster (streak/freeze/gems/multiplier) — called from switchTab()
+// on every tab switch, not just Dashboard, since the banner itself is always visible now (see
+// switchTab's own comment). Cheap: one single-row profile select.
+async function loadHeaderStats() {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("current_streak, streak_freezes_available, gems, premium_until")
     .eq("id", currentSession.user.id)
     .single();
 
-  if (!error && profile) {
-    el("stat-streak").textContent = profile.current_streak ?? 0;
-    el("stat-flame-icon").style.color = profile.current_streak > 0 ? "var(--amber)" : "var(--text-muted)";
-    el("stat-gems").textContent = profile.gems ?? 0;
-    el("stat-multiplier").textContent = multiplierForStreak(profile.current_streak ?? 0).toFixed(2) + "x";
+  if (error || !profile) return;
 
-    const isPremiumNow = profile.premium_until && new Date(profile.premium_until) > new Date();
-    if (isPremiumNow) {
-      show("stat-freeze-cell");
-      el("stat-freeze").textContent = profile.streak_freezes_available ?? 0;
-    } else {
-      hide("stat-freeze-cell");
-    }
+  el("stat-streak").textContent = profile.current_streak ?? 0;
+  el("stat-flame-icon").style.color = profile.current_streak > 0 ? "var(--amber)" : "var(--text-muted)";
+  el("stat-gems").textContent = profile.gems ?? 0;
+  el("stat-multiplier").textContent = multiplierForStreak(profile.current_streak ?? 0).toFixed(2) + "x";
+
+  const isPremiumNow = profile.premium_until && new Date(profile.premium_until) > new Date();
+  if (isPremiumNow) {
+    show("stat-freeze-cell");
+    el("stat-freeze").textContent = profile.streak_freezes_available ?? 0;
+  } else {
+    hide("stat-freeze-cell");
   }
+}
 
+async function loadDashboard() {
   await loadHistory();
 }
 
@@ -1071,7 +1098,7 @@ el("promo-redeem-btn").addEventListener("click", async () => {
     show("promo-message");
     if (data.success) {
       input.value = "";
-      await loadProfile();
+      await Promise.all([loadProfile(), loadHeaderStats()]);
     }
   } catch (err) {
     msg.textContent = err.message || "Something went wrong — try again.";
@@ -1096,7 +1123,10 @@ function collapseSubmitFlow({ refresh = true } = {}) {
   hide("submit-flow");
   show("open-submit-btn");
   show("workouts-card");
-  if (refresh) loadDashboard();
+  if (refresh) {
+    loadDashboard();
+    loadHeaderStats(); // a new workout can bump streak/gems — keep the banner in sync too
+  }
 }
 
 el("cancel-submit-btn").addEventListener("click", () => collapseSubmitFlow({ refresh: false }));
@@ -1437,6 +1467,7 @@ function renderHistoryRow(w) {
       });
       if (error) throw error;
       await loadDashboard();
+      loadHeaderStats(); // duration/HR changes can move points_earned, gems, etc.
     } catch (err) {
       alert(err.message || "Couldn't save changes.");
       btn.disabled = false;
@@ -1457,6 +1488,7 @@ function renderHistoryRow(w) {
       return;
     }
     await loadDashboard();
+    loadHeaderStats(); // deleting a workout can move the streak
   });
 
   return li;
