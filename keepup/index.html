@@ -287,6 +287,58 @@
   .membership-title { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
   .membership-card.is-active .membership-title { color: var(--accent); }
   .membership-desc { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+
+  /* ---- Profile: avatar picker + danger zone (user request 08-21, item 1/5) ---- */
+  .avatar-edit-wrap {
+    position: relative; width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+    cursor: pointer; margin-bottom: 6px;
+  }
+  .avatar-edit-wrap input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .danger-card { border-color: rgba(255,107,92,0.3) !important; }
+
+  /* ---- Club: create form (user request 08-21, item 2) ---- */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .toggle-row:last-of-type { border-bottom: none; }
+  .toggle-row .toggle-label { font-size: 14px; }
+  .toggle-row .toggle-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+  .switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; margin: 0; }
+  .switch .track {
+    position: absolute; inset: 0; background: var(--card-raised); border: 1px solid var(--hairline);
+    border-radius: 999px; transition: background 0.15s ease;
+  }
+  .switch .thumb {
+    position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--text-muted); transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .switch input:checked + .track { background: var(--accent-soft); border-color: var(--accent); }
+  .switch input:checked + .track + .thumb { transform: translateX(18px); background: var(--accent); }
+
+  /* ---- Leaderboard: search + podium + rank-delta (user request 08-21, item 7) ---- */
+  .lb-search { margin-bottom: 14px; }
+  .rank-delta { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex-shrink: 0; }
+  .podium { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 18px; }
+  .podium-slot { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+  .podium-slot .podium-avatar {
+    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-weight: 800; font-size: 15px; margin-bottom: 6px;
+    background: var(--card-raised); color: var(--accent); border: 2px solid var(--hairline);
+  }
+  .podium-slot.first .podium-avatar { width: 56px; height: 56px; font-size: 18px; border-color: var(--amber); }
+  .podium-slot .podium-name { font-size: 12.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .podium-slot .podium-points { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .podium-slot .podium-bar {
+    width: 100%; margin-top: 8px; border-radius: 8px 8px 0 0; background: var(--card-raised);
+    border: 1px solid var(--hairline); border-bottom: none;
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+    font-weight: 800; font-size: 13px; color: var(--text-muted);
+  }
+  .podium-slot.first .podium-bar { height: 64px; background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .podium-slot.second .podium-bar { height: 46px; }
+  .podium-slot.third .podium-bar { height: 34px; }
 </style>
 </head>
 <body>
@@ -454,10 +506,52 @@
         </div>
       </div>
 
-      <!-- ============ CLUB (join only — no create, matches Android's own premium gate) ============
-           Deliberately simple: every club with allow_score_uploads on, in one list, with a
-           Join/Request button per row. No code, no link, no search — user request 08-18. -->
+      <!-- ============ CLUB ============
+           FIX (user request 08-21, item 2): create-club added — was join-only before. The web's
+           "allow_score_uploads" is forced on and NOT offered as a toggle here (unlike
+           GroupsScreen.kt's create dialog, which lets an Android user choose it) — a club created
+           from this page exists specifically so its members' web-submitted (source='web_photo')
+           workouts count, so making that optional would let someone create a web club that can't
+           actually do the one thing this page is for. fn_create_group(p_allow_score_uploads) still
+           takes the argument normally; this page just always passes true and never exposes the
+           control. Gear-bonus stays a real optional toggle, same as the app. -->
       <div id="tab-club" class="tab-view hidden">
+        <button class="btn-primary" id="open-create-club-btn" style="margin-bottom:16px;">+ Create a club</button>
+
+        <div class="card hidden" id="create-club-flow">
+          <p class="section-label" style="margin-bottom:14px;">New club</p>
+          <div class="field">
+            <label>Club name</label>
+            <input type="text" id="new-club-name" placeholder="Sunday Runners" />
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Public club</div>
+              <div class="toggle-sub">Anyone can join a public club; a private one needs your approval.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="new-club-public" checked />
+              <span class="track"></span><span class="thumb"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Gear bonus</div>
+              <div class="toggle-sub">Equipped Gear/Frames give members a small scoring boost, in this club only.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="new-club-gear-bonus" />
+              <span class="track"></span><span class="thumb"></span>
+            </label>
+          </div>
+          <p class="muted" style="margin: 12px 0 16px;">Web-submitted workouts always count toward a club created here — that's what makes it usable from this page.</p>
+          <div class="btn-row">
+            <button class="btn-secondary" id="cancel-create-club-btn">Cancel</button>
+            <button class="btn-primary" id="save-create-club-btn">Create club</button>
+          </div>
+          <p class="muted hidden" id="create-club-message" style="margin-top:10px; color:var(--danger);"></p>
+        </div>
+
         <div class="card">
           <p class="section-label" style="margin-bottom:4px;">Clubs open to web uploads</p>
           <p class="muted" style="margin-bottom:14px;">Only clubs whose owner turned on "Allow score uploads" show up here — the same setting from the app's create-club screen.</p>
@@ -467,17 +561,12 @@
       </div>
 
       <!-- ============ LEADERBOARD ============
-           FIX (user request 08-21: "I can only see one [leaderboard], but it does not show which
-           one... we need to see the global, and the ones that the user is part of") — was
-           scoped strictly to clubs this account is a member of, with no way to tell which club
-           was showing when there was only one (the club-pills scope switcher only rendered once
-           there were 2+ options — see renderClubPills below). Now always offers Global first
-           (get_leaderboard's own p_group_id default) plus every club the account belongs to, same
-           idea as LeaderboardScreen.kt's Global/Region/Club scope tabs (Region isn't offered here
-           — not asked for, and this account has no region-picker UI anywhere on this page). The
-           active pill is always visible now, including when Global is the only option, which is
-           what actually fixes "doesn't show which one" — a single unlabeled leaderboard becomes a
-           highlighted "Global" pill instead. -->
+           Was scoped strictly to clubs this account is a member of, with no way to tell which
+           club was showing when there was only one, and no Global or Region scope at all — see
+           renderScopePills/loadClubLeaderboard below for the Global/Region/Club fix (user request
+           08-21). Podium (top 3), rank-delta arrows, and search are the same request's item 7 —
+           same visual idea as LeaderboardScreen.kt's LeaderboardPodium/RankDeltaIndicator, a flat
+           HTML/CSS version instead of Compose. -->
       <div id="tab-leaderboard" class="tab-view hidden">
         <div class="card">
           <p class="section-label" style="margin-bottom:12px;">Leaderboard</p>
@@ -489,6 +578,10 @@
             <div class="period-pill" data-period="yearly">Year</div>
             <div class="period-pill" data-period="alltime">All</div>
           </div>
+          <div class="field lb-search">
+            <input type="text" id="lb-search-input" placeholder="Search this leaderboard…" />
+          </div>
+          <div class="podium hidden" id="lb-podium"></div>
           <div id="lb-rows"></div>
           <p class="muted hidden" id="lb-empty">No points logged for this period yet.</p>
         </div>
@@ -549,6 +642,44 @@
           </div>
         </div>
 
+        <!-- FIX (user request 08-21, item 1) — this whole card is new; the Profile tab used to
+             only ever display profile fields, mirroring AccountTab's identity row but not its
+             edit form. Same fields AccountTab/OnboardingScreen.kt save (firstName/familyName/
+             dateOfBirth/displayName/avatar), via saveProfileDetails()'s equivalent update, plus a
+             region picker (item 3) — profile.region_code/region_code_source
+             (0076_manual_region_override.sql) has no other way to ever get set for a web-only
+             account, since there's no device locale to auto-detect from the way
+             AppViewModel.syncRegionCodeIfNeeded() does on Android. -->
+        <div class="card">
+          <p class="section-label" style="margin-bottom:14px;">Edit profile</p>
+          <label class="avatar-edit-wrap" for="edit-avatar-input">
+            <div id="edit-avatar-preview" style="width:64px; height:64px;"></div>
+            <input type="file" id="edit-avatar-input" accept="image/*" />
+          </label>
+          <p class="muted" style="margin-bottom:16px;">Tap your photo to change it</p>
+
+          <div class="row">
+            <div class="field"><label>First name</label><input type="text" id="edit-first-name" /></div>
+            <div class="field"><label>Family name</label><input type="text" id="edit-family-name" /></div>
+          </div>
+          <div class="field">
+            <label>Display name (shown on leaderboards)</label>
+            <input type="text" id="edit-display-name" />
+          </div>
+          <div class="field">
+            <label>Date of birth</label>
+            <input type="date" id="edit-dob" />
+          </div>
+          <div class="field">
+            <label>Region</label>
+            <select id="edit-region"></select>
+            <p class="muted" style="margin-top:6px;">Powers the Leaderboard tab's Region scope.</p>
+          </div>
+
+          <button class="btn-primary" id="save-profile-btn">Save changes</button>
+          <p class="muted hidden" id="profile-save-message" style="margin-top:10px;"></p>
+        </div>
+
         <div class="card membership-card" id="membership-card">
           <p class="membership-title" id="membership-title">Free plan</p>
           <p class="membership-desc" id="membership-desc">Upgrade from the KeepUp Android app, or redeem a promo code below.</p>
@@ -560,6 +691,20 @@
         </div>
 
         <button class="btn-text" id="sign-out-btn">Sign out</button>
+
+        <!-- FIX (user request 08-21, item 5) — was no way to delete a web account at all. Same
+             fn_delete_own_account() RPC HomeScreen.kt's AccountTab uses (its own
+             showCancelAccountDialog), same "type nothing, just confirm on a second, explicit tap"
+             pattern — no typed confirmation phrase either place. -->
+        <div class="card danger-card" style="margin-top: 16px;">
+          <p class="section-label" style="color: var(--danger); margin-bottom: 6px;">Danger zone</p>
+          <p class="muted" style="margin-bottom: 14px;">Permanently deletes your account — workouts, streaks, and club memberships all go with it, and this can't be undone. If you're currently premium, that's canceled too.</p>
+          <button class="btn-secondary" id="delete-account-btn" style="color: var(--danger); border-color: rgba(255,107,92,0.4);">Delete my account</button>
+          <div class="btn-row hidden" id="delete-confirm-row" style="margin-top: 10px;">
+            <button class="btn-secondary" id="delete-cancel-btn">Keep account</button>
+            <button class="btn-primary" id="delete-confirm-btn" style="background: var(--danger); color: #fff;">Yes, delete</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -794,15 +939,19 @@ async function loadDashboard() {
 // ---------- Clubs + leaderboard ----------
 //
 // FIX (user request 08-21): used to be scoped strictly to clubs this account belongs to, with
-// Global (get_leaderboard's own p_group_id default) deliberately never offered (user request
-// 08-17: "they should only have access to the club they are in"). Superseded by this later,
-// explicit request — Global is now always the first scope pill, same as
-// LeaderboardScreen.kt's own Global/Region/Club tabs (Region isn't offered here, wasn't asked
-// for). currentClubId === null now means "Global" rather than "nothing selected yet".
+// Global/Region (get_leaderboard's own p_group_id/p_region_code defaults) deliberately never
+// offered (user request 08-17: "they should only have access to the club they are in").
+// Superseded by this later, explicit request — same 3-scope idea as LeaderboardScreen.kt's own
+// Global/Region/Club tabs. currentScope is one of {type:"global"} | {type:"region", code} |
+// {type:"club", id, name} — a plain object instead of overloading a single id/null the way the
+// Global-only version did, since Region needs a code value Club/Global don't have.
 
 let myClubs = [];
-let currentClubId = null; // null = Global
+let myRegionCode = null; // from profiles.region_code — see the Region pill below
+let currentScope = { type: "global" };
 let currentPeriod = "weekly";
+let lastLeaderboardRows = [];
+let lbSearchQuery = "";
 
 // Pure data fetch, shared by the Leaderboard tab (needs the full list to build its scope) and the
 // Club tab (needs it just to know which directory rows are already "Joined").
@@ -821,43 +970,60 @@ async function fetchMyClubs() {
 async function loadMyClubs() {
   myClubs = await fetchMyClubs();
 
-  // If the previously-selected club was left (or this is a stale id from a prior session), fall
-  // back to Global rather than guessing a different club — Global is always valid, so this can
-  // never land on an empty/broken state the way falling back to myClubs[0] could once myClubs is
-  // allowed to be empty (it always used to be non-empty here, back when 0 clubs meant "hide the
-  // whole tab" instead of "just show Global").
-  if (currentClubId && !myClubs.some((c) => c.id === currentClubId)) {
-    currentClubId = null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("region_code")
+    .eq("id", currentSession.user.id)
+    .single();
+  myRegionCode = profile?.region_code || null;
+
+  // If the previously-selected scope no longer applies (left the club; region got cleared) fall
+  // back to Global rather than guessing — Global is always valid, unlike falling back to
+  // myClubs[0] once myClubs is allowed to be empty (it always used to be non-empty here, back
+  // when 0 clubs meant "hide the whole tab" instead of "just show Global").
+  if (currentScope.type === "club" && !myClubs.some((c) => c.id === currentScope.id)) {
+    currentScope = { type: "global" };
   }
+  if (currentScope.type === "region" && !myRegionCode) {
+    currentScope = { type: "global" };
+  }
+
   el("no-clubs-hint").classList.toggle("hidden", myClubs.length > 0);
-  renderClubPills();
+  renderScopePills();
   await loadClubLeaderboard();
 }
 
-function renderClubPills() {
+function scopeKey(scope) {
+  if (scope.type === "region") return `region:${scope.code}`;
+  if (scope.type === "club") return scope.id;
+  return "global";
+}
+
+function setScope(scope) {
+  currentScope = scope;
+  renderScopePills();
+  loadClubLeaderboard();
+}
+
+function renderScopePills() {
   const wrap = el("club-pills");
   wrap.innerHTML = "";
 
-  const globalPill = document.createElement("div");
-  globalPill.className = "club-pill" + (currentClubId === null ? " active" : "");
-  globalPill.textContent = "Global";
-  globalPill.addEventListener("click", async () => {
-    currentClubId = null;
-    renderClubPills();
-    await loadClubLeaderboard();
-  });
-  wrap.appendChild(globalPill);
-
-  myClubs.forEach((c) => {
+  const addPill = (label, isActive, onClick) => {
     const pill = document.createElement("div");
-    pill.className = "club-pill" + (c.id === currentClubId ? " active" : "");
-    pill.textContent = c.name;
-    pill.addEventListener("click", async () => {
-      currentClubId = c.id;
-      renderClubPills();
-      await loadClubLeaderboard();
-    });
+    pill.className = "club-pill" + (isActive ? " active" : "");
+    pill.textContent = label;
+    pill.addEventListener("click", onClick);
     wrap.appendChild(pill);
+  };
+
+  addPill("Global", currentScope.type === "global", () => setScope({ type: "global" }));
+  // Only shown once the account has a region set (Profile tab) — nothing to scope to otherwise.
+  if (myRegionCode) {
+    addPill(myRegionCode, currentScope.type === "region", () => setScope({ type: "region", code: myRegionCode }));
+  }
+  myClubs.forEach((c) => {
+    addPill(c.name, currentScope.type === "club" && currentScope.id === c.id, () => setScope({ type: "club", id: c.id, name: c.name }));
   });
 }
 
@@ -870,33 +1036,145 @@ Array.from(el("period-pills").children).forEach((pill, i) => {
   });
 });
 
-async function loadClubLeaderboard() {
-  // currentClubId === null is Global — get_leaderboard's own p_group_id default, same RPC call
-  // shape LeaderboardScreen.kt's Global tab already uses.
-  const { data, error } = await supabase.rpc("get_leaderboard", {
-    p_period: currentPeriod,
-    p_group_id: currentClubId,
+el("lb-search-input").addEventListener("input", (e) => {
+  lbSearchQuery = e.target.value.trim().toLowerCase();
+  renderLeaderboardRows(lastLeaderboardRows);
+});
+
+// ---------- Rank-delta (user request 08-21, item 7) ----------
+//
+// Mirrors AppViewModel.kt's rank-snapshot persistence exactly (same "period|scope" key shape,
+// same prevRank-minus-newRank formula, Models.kt's computeRankDeltas) — localStorage instead of
+// SharedPreferences, same reasoning as that fix: comparing against nothing but this session's own
+// memory means a fresh page load never has anything to diff against, so arrows would only ever
+// appear after a second load within the same visit.
+const RANK_SNAPSHOT_KEY = "keepup_leaderboard_rank_snapshot";
+
+function readRankSnapshot() {
+  try {
+    return JSON.parse(localStorage.getItem(RANK_SNAPSHOT_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function persistRankSnapshotEntry(entryKey, ranks) {
+  const all = readRankSnapshot();
+  all[entryKey] = ranks;
+  try {
+    localStorage.setItem(RANK_SNAPSHOT_KEY, JSON.stringify(all));
+  } catch {
+    // Storage full/disabled (private browsing, etc.) — arrows just won't show next time. Not
+    // worth surfacing an error for.
+  }
+}
+function computeRankDeltas(previousRanks, rows) {
+  if (!previousRanks) return {};
+  const deltas = {};
+  rows.forEach((row) => {
+    const prevRank = previousRanks[row.user_id];
+    if (prevRank != null && prevRank !== row.rank) deltas[row.user_id] = prevRank - row.rank;
   });
+  return deltas;
+}
+function rankDeltaHtml(delta) {
+  if (!delta) return "";
+  const up = delta > 0;
+  const color = up ? "var(--success)" : "var(--danger)";
+  const path = up ? "M12 7l6 8H6z" : "M12 17l-6-8h12z";
+  return `<span class="rank-delta" title="${up ? "Up" : "Down"} ${Math.abs(delta)}"><svg viewBox="0 0 24 24"><path d="${path}" fill="${color}"/></svg></span>`;
+}
+function initialsFor(name) {
+  return (name || "?").trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+}
 
-  const rowsWrap = el("lb-rows");
-  rowsWrap.innerHTML = "";
+async function loadClubLeaderboard() {
+  const params = { p_period: currentPeriod, p_group_id: null, p_region_code: null };
+  if (currentScope.type === "club") params.p_group_id = currentScope.id;
+  if (currentScope.type === "region") params.p_region_code = currentScope.code;
 
-  if (error || !data || data.length === 0) {
-    if (error) console.error("Couldn't load club leaderboard:", error);
-    el("lb-empty").textContent = error ? "Couldn't load the leaderboard right now." : "No points logged for this period yet.";
+  const { data, error } = await supabase.rpc("get_leaderboard", params);
+
+  if (error || !data) {
+    if (error) console.error("Couldn't load leaderboard:", error);
+    lastLeaderboardRows = [];
+    hide("lb-podium");
+    el("lb-rows").innerHTML = "";
+    el("lb-empty").textContent = "Couldn't load the leaderboard right now.";
     show("lb-empty");
     return;
   }
-  hide("lb-empty");
+
+  const entryKey = `${currentPeriod}|${scopeKey(currentScope)}`;
+  const previous = readRankSnapshot()[entryKey];
+  const deltas = computeRankDeltas(previous, data);
+  const newRanks = {};
+  data.forEach((r) => { newRanks[r.user_id] = r.rank; });
+  persistRankSnapshotEntry(entryKey, newRanks);
 
   // Every member is shown, including 0-point ones — same convention get_leaderboard's other
-  // callers (LeaderboardScreen.kt) already rely on, not filtered out here.
-  data.forEach((r) => {
+  // callers (LeaderboardScreen.kt) already rely on.
+  lastLeaderboardRows = data.map((r) => ({ ...r, _delta: deltas[r.user_id] ?? null }));
+  renderLeaderboardRows(lastLeaderboardRows);
+}
+
+// Podium for the top 3 (LeaderboardPodium's equivalent), the rest as plain rows underneath —
+// skipped entirely while actively searching, since "find someone specific" and "who's on top"
+// are different questions and the ceremony just gets in the way of the former.
+function renderLeaderboardRows(rows) {
+  if (!rows || rows.length === 0) {
+    hide("lb-podium");
+    el("lb-rows").innerHTML = "";
+    el("lb-empty").textContent = "No points logged for this period yet.";
+    show("lb-empty");
+    return;
+  }
+
+  const podiumWrap = el("lb-podium");
+  if (lbSearchQuery) {
+    hide("lb-podium");
+  } else {
+    podiumWrap.innerHTML = "";
+    const top3 = rows.slice(0, 3);
+    const slotNames = ["first", "second", "third"];
+    // Visual left-to-right order is silver/gold/bronze; slotNames (and so the CSS bar height)
+    // stays keyed to actual rank, not display position.
+    const displayOrder = top3.length === 3 ? [1, 0, 2] : top3.length === 2 ? [1, 0] : [0];
+    displayOrder.forEach((i) => {
+      const r = top3[i];
+      const slot = document.createElement("div");
+      slot.className = "podium-slot " + slotNames[i];
+      slot.innerHTML = `
+        <div class="podium-avatar">${escapeHtml(initialsFor(r.display_name))}</div>
+        <div class="podium-name">${escapeHtml(r.display_name || "Member")}</div>
+        <div class="podium-points">${Number(r.period_points ?? 0).toFixed(2)}${rankDeltaHtml(r._delta)}</div>
+        <div class="podium-bar">${i + 1}</div>
+      `;
+      podiumWrap.appendChild(slot);
+    });
+    show("lb-podium");
+  }
+
+  const rowsWrap = el("lb-rows");
+  rowsWrap.innerHTML = "";
+  hide("lb-empty");
+
+  const listRows = lbSearchQuery
+    ? rows.filter((r) => (r.display_name || "").toLowerCase().includes(lbSearchQuery))
+    : rows.slice(Math.min(3, rows.length));
+
+  if (lbSearchQuery && listRows.length === 0) {
+    el("lb-empty").textContent = `No one matching "${lbSearchQuery}".`;
+    show("lb-empty");
+    return;
+  }
+
+  listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
+      ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
     `;
     rowsWrap.appendChild(row);
@@ -984,6 +1262,59 @@ function renderDirectoryRow(group) {
   return li;
 }
 
+// ---------- Create a club (user request 08-21, item 2) ----------
+//
+// p_allow_score_uploads is always true, hardcoded — deliberately not a toggle here, unlike
+// GroupsScreen.kt's own create dialog (see this tab's own doc comment above for why: a club made
+// on this page exists specifically to accept web-submitted workouts).
+
+el("open-create-club-btn").addEventListener("click", () => {
+  hide("open-create-club-btn");
+  show("create-club-flow");
+  el("new-club-name").value = "";
+  el("new-club-public").checked = true;
+  el("new-club-gear-bonus").checked = false;
+  hide("create-club-message");
+});
+el("cancel-create-club-btn").addEventListener("click", () => {
+  hide("create-club-flow");
+  show("open-create-club-btn");
+});
+
+el("save-create-club-btn").addEventListener("click", async () => {
+  const btn = el("save-create-club-btn");
+  const name = el("new-club-name").value.trim();
+  const msg = el("create-club-message");
+
+  if (!name) {
+    msg.textContent = "Enter a club name first";
+    show("create-club-message");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Creating…";
+  try {
+    const { error } = await supabase.rpc("fn_create_group", {
+      p_name: name,
+      p_is_public: el("new-club-public").checked,
+      p_allow_score_uploads: true,
+      p_allow_gear_multipliers: el("new-club-gear-bonus").checked,
+    });
+    if (error) throw error;
+
+    hide("create-club-flow");
+    show("open-create-club-btn");
+    await loadClubDirectory();
+  } catch (err) {
+    msg.textContent = err.message || "Couldn't create this club — try again.";
+    show("create-club-message");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create club";
+  }
+});
+
 // ---------- Profile ----------
 
 function renderAvatar(container, name, avatarUrl, sizePx) {
@@ -1011,7 +1342,7 @@ function renderAvatar(container, name, avatarUrl, sizePx) {
 async function loadProfile() {
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until")
+    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until, first_name, family_name, date_of_birth, region_code")
     .eq("id", currentSession.user.id)
     .single();
 
@@ -1019,6 +1350,16 @@ async function loadProfile() {
     console.error("Couldn't load profile:", error);
     return;
   }
+
+  // Edit-profile form (user request 08-21, item 1) — only re-populated when the field isn't
+  // currently focused, so a save-in-flight refresh (loadProfile() is called again right after a
+  // successful save) can't stomp on something the person started typing in the meantime.
+  if (document.activeElement !== el("edit-first-name")) el("edit-first-name").value = profile.first_name || "";
+  if (document.activeElement !== el("edit-family-name")) el("edit-family-name").value = profile.family_name || "";
+  if (document.activeElement !== el("edit-display-name")) el("edit-display-name").value = profile.display_name || "";
+  if (document.activeElement !== el("edit-dob")) el("edit-dob").value = profile.date_of_birth || "";
+  if (document.activeElement !== el("edit-region")) el("edit-region").value = profile.region_code || "";
+  renderAvatar(el("edit-avatar-preview"), profile.display_name, profile.avatar_url, 64);
 
   renderAvatar(el("profile-avatar"), profile.display_name, profile.avatar_url, 56);
   el("profile-name").textContent = profile.display_name || "Athlete";
@@ -1050,6 +1391,145 @@ async function loadProfile() {
   }
   renderMembershipCard(profile.premium_until);
 }
+
+// ---------- Edit profile + Region (user request 08-21, items 1 and 3) ----------
+//
+// ISO 3166-1 alpha-2 codes, matching profiles.region_code's own convention
+// (0073_region_leaderboard.sql/0076_manual_region_override.sql) — a curated common-country list
+// rather than the full ~250-entry ISO set, same "cover what people will actually pick" reasoning
+// AppViewModel's device-locale detection implicitly has by only ever landing on a real country.
+const COUNTRY_LIST = [
+  ["US", "United States"], ["GB", "United Kingdom"], ["CA", "Canada"], ["AU", "Australia"],
+  ["IE", "Ireland"], ["NZ", "New Zealand"], ["CY", "Cyprus"], ["GR", "Greece"], ["FR", "France"],
+  ["DE", "Germany"], ["ES", "Spain"], ["IT", "Italy"], ["PT", "Portugal"], ["NL", "Netherlands"],
+  ["BE", "Belgium"], ["LU", "Luxembourg"], ["CH", "Switzerland"], ["AT", "Austria"],
+  ["SE", "Sweden"], ["NO", "Norway"], ["DK", "Denmark"], ["FI", "Finland"], ["IS", "Iceland"],
+  ["PL", "Poland"], ["CZ", "Czechia"], ["SK", "Slovakia"], ["HU", "Hungary"], ["RO", "Romania"],
+  ["BG", "Bulgaria"], ["HR", "Croatia"], ["SI", "Slovenia"], ["RS", "Serbia"], ["UA", "Ukraine"],
+  ["EE", "Estonia"], ["LV", "Latvia"], ["LT", "Lithuania"], ["MT", "Malta"],
+  ["AE", "United Arab Emirates"], ["SA", "Saudi Arabia"], ["QA", "Qatar"], ["KW", "Kuwait"],
+  ["BH", "Bahrain"], ["OM", "Oman"], ["JO", "Jordan"], ["LB", "Lebanon"], ["IL", "Israel"],
+  ["TR", "Turkey"], ["EG", "Egypt"],
+  ["ZA", "South Africa"], ["NG", "Nigeria"], ["KE", "Kenya"], ["MA", "Morocco"],
+  ["IN", "India"], ["PK", "Pakistan"], ["BD", "Bangladesh"], ["CN", "China"], ["JP", "Japan"],
+  ["KR", "South Korea"], ["SG", "Singapore"], ["MY", "Malaysia"], ["ID", "Indonesia"],
+  ["TH", "Thailand"], ["VN", "Vietnam"], ["PH", "Philippines"], ["HK", "Hong Kong"],
+  ["MX", "Mexico"], ["BR", "Brazil"], ["AR", "Argentina"], ["CL", "Chile"], ["CO", "Colombia"],
+  ["PE", "Peru"],
+];
+
+function populateRegionSelect() {
+  const select = el("edit-region");
+  select.innerHTML = '<option value="">Not set</option>' +
+    COUNTRY_LIST.map(([code, name]) => `<option value="${code}">${escapeHtml(name)}</option>`).join("");
+}
+populateRegionSelect();
+
+// Same bucket/path convention as AppViewModel.kt's uploadAvatar() (`avatars` bucket,
+// `${userId}/avatar.jpg`, upsert) — a web-uploaded photo and an app-uploaded one overwrite the
+// same object, so whichever was set most recently always wins, never two stale copies drifting.
+let pendingAvatarFile = null;
+el("edit-avatar-input").addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  pendingAvatarFile = file;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const preview = el("edit-avatar-preview");
+    preview.innerHTML = `<img src="${reader.result}" style="width:64px;height:64px;" />`;
+  };
+  reader.readAsDataURL(file);
+});
+
+async function uploadAvatarIfChanged() {
+  if (!pendingAvatarFile) return null;
+  const path = `${currentSession.user.id}/avatar.jpg`;
+  const { error } = await supabase.storage.from("avatars").upload(path, pendingAvatarFile, {
+    upsert: true,
+    contentType: pendingAvatarFile.type || "image/jpeg",
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+el("save-profile-btn").addEventListener("click", async () => {
+  const btn = el("save-profile-btn");
+  const msg = el("profile-save-message");
+  const displayName = el("edit-display-name").value.trim();
+
+  if (!displayName) {
+    msg.textContent = "Display name can't be empty";
+    msg.style.color = "var(--danger)";
+    show("profile-save-message");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const avatarUrl = await uploadAvatarIfChanged();
+    const update = {
+      first_name: el("edit-first-name").value.trim(),
+      family_name: el("edit-family-name").value.trim(),
+      display_name: displayName,
+      date_of_birth: el("edit-dob").value || null,
+      // Manual — the same convention Android's own Region override uses
+      // (0076_manual_region_override.sql) — a deliberate pick here should never later get
+      // silently overwritten by anything auto-detected.
+      region_code: el("edit-region").value || null,
+      region_code_source: "manual",
+    };
+    if (avatarUrl) update.avatar_url = avatarUrl;
+
+    const { error } = await supabase.from("profiles").update(update).eq("id", currentSession.user.id);
+    if (error) throw error;
+
+    pendingAvatarFile = null;
+    msg.textContent = "Saved";
+    msg.style.color = "var(--success)";
+    show("profile-save-message");
+    await Promise.all([loadProfile(), loadHeaderStats()]);
+  } catch (err) {
+    // 23505 = Postgres unique_violation — profiles_display_name_unique_idx
+    // (0011_display_name_unique.sql), same constraint AppViewModel.kt's saveProfileDetails()
+    // turns into a dedicated message for.
+    msg.textContent = err.code === "23505" ? "That display name is already taken — try another." : (err.message || "Couldn't save changes.");
+    msg.style.color = "var(--danger)";
+    show("profile-save-message");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save changes";
+  }
+});
+
+// ---------- Delete account (user request 08-21, item 5) ----------
+//
+// Same fn_delete_own_account() RPC HomeScreen.kt's AccountTab uses.
+
+el("delete-account-btn").addEventListener("click", () => {
+  hide("delete-account-btn");
+  show("delete-confirm-row");
+});
+el("delete-cancel-btn").addEventListener("click", () => {
+  hide("delete-confirm-row");
+  show("delete-account-btn");
+});
+el("delete-confirm-btn").addEventListener("click", async () => {
+  const btn = el("delete-confirm-btn");
+  btn.disabled = true;
+  btn.textContent = "Deleting…";
+  try {
+    const { error } = await supabase.rpc("fn_delete_own_account");
+    if (error) throw error;
+    await supabase.auth.signOut();
+    await refreshSession();
+  } catch (err) {
+    alert(err.message || "Couldn't delete your account — try again.");
+    btn.disabled = false;
+    btn.textContent = "Yes, delete";
+  }
+});
 
 function renderMembershipCard(premiumUntil) {
   const card = el("membership-card");
