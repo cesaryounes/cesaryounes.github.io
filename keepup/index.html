@@ -285,10 +285,6 @@
     color: var(--accent); font-weight: 800; font-size: 11px;
   }
 
-  /* ---- Leaderboard: avatars (user request 08-21 — "show the profile picture/avatar in the
-     leaderboard"), same avatar-or-initials treatment Profile/Dashboard already use. ---- */
-  .podium-avatar-wrap { margin-bottom: 6px; }
-
   /* ---- Profile tab ---- */
   .profile-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .profile-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -355,19 +351,28 @@
   /* ---- Leaderboard: search + podium + rank-delta (user request 08-21, item 7) ---- */
   .lb-search { margin-bottom: 14px; }
   .rank-delta { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex-shrink: 0; }
-  .podium { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 18px; }
+
+  /* ---- Podium (user request 08-21: "can it be closer to the app") — mirrors
+     LeaderboardScreen.kt's LeaderboardPodium/PodiumSlot almost exactly: a crown above a
+     medal-ringed avatar (rank badge overlapping its bottom-right corner), name, then delta+points
+     underneath — flat, no bar-chart tiles/scenery, same as the real reference design. Second/
+     first(bigger, center)/third order, same as the app. ---- */
+  .podium { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 18px; }
   .podium-slot { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
-  .podium-slot .podium-name { font-size: 12.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .podium-slot .podium-points { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
-  .podium-slot .podium-bar {
-    width: 100%; margin-top: 8px; border-radius: 8px 8px 0 0; background: var(--card-raised);
-    border: 1px solid var(--hairline); border-bottom: none;
-    display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
-    font-weight: 800; font-size: 13px; color: var(--text-muted);
+  .podium-crown { width: 15px; height: 15px; margin-bottom: 3px; }
+  .podium-slot.first .podium-crown { width: 18px; height: 18px; }
+  .podium-avatar-wrap { position: relative; width: 42px; height: 42px; margin-bottom: 5px; }
+  .podium-slot.first .podium-avatar-wrap { width: 52px; height: 52px; }
+  .podium-rank-badge {
+    position: absolute; bottom: -2px; right: -2px; width: 17px; height: 17px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800;
+    color: #0B0E14; border: 1.5px solid var(--bg);
   }
-  .podium-slot.first .podium-bar { height: 64px; background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .podium-slot.second .podium-bar { height: 46px; }
-  .podium-slot.third .podium-bar { height: 34px; }
+  .podium-slot.first .podium-rank-badge { width: 20px; height: 20px; font-size: 10px; }
+  .podium-slot .podium-name { font-size: 13px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); }
+  .podium-slot.is-me .podium-name { color: var(--accent); }
+  .podium-points-row { display: flex; align-items: center; gap: 2px; margin-top: 1px; }
+  .podium-points-row span { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -1229,18 +1234,27 @@ function renderLeaderboardRows(rows) {
     podiumWrap.innerHTML = "";
     const top3 = rows.slice(0, 3);
     const slotNames = ["first", "second", "third"];
-    // Visual left-to-right order is silver/gold/bronze; slotNames (and so the CSS bar height)
-    // stays keyed to actual rank, not display position.
+    // Fixed gold/silver/bronze per rank, same reasoning as LeaderboardScreen.kt's own
+    // medalColorFor() — a medal's meaning shouldn't change with the active accent color.
+    const medalColors = ["#FFD54F", "#C7CCD1", "#CD8B4E"];
+    // Visual left-to-right order is silver/gold/bronze; slotNames/medalColors stay keyed to
+    // actual rank, not display position.
     const displayOrder = top3.length === 3 ? [1, 0, 2] : top3.length === 2 ? [1, 0] : [0];
     displayOrder.forEach((i) => {
       const r = top3[i];
+      const isMe = r.user_id === currentSession.user.id;
+      const medal = medalColors[i];
+      const avatarSize = i === 0 ? 52 : 42;
       const slot = document.createElement("div");
-      slot.className = "podium-slot " + slotNames[i];
+      slot.className = "podium-slot " + slotNames[i] + (isMe ? " is-me" : "");
       slot.innerHTML = `
-        <div class="podium-avatar-wrap">${avatarHtml(r.display_name, r.avatar_url, i === 0 ? 56 : 44, i === 0 ? "var(--amber)" : "var(--hairline)")}</div>
-        <div class="podium-name">${escapeHtml(r.display_name || "Member")}</div>
-        <div class="podium-points">${Number(r.period_points ?? 0).toFixed(2)}${rankDeltaHtml(r._delta)}</div>
-        <div class="podium-bar">${i + 1}</div>
+        <svg class="podium-crown" viewBox="0 0 24 24"><path d="M3 18h18l-1.5-9-4.5 4-3-6-3 6-4.5-4L3 18z" fill="${medal}"/></svg>
+        <div class="podium-avatar-wrap">
+          ${avatarHtml(r.display_name, r.avatar_url, avatarSize, medal)}
+          <div class="podium-rank-badge" style="background:${medal};">${i + 1}</div>
+        </div>
+        <div class="podium-name">${escapeHtml(r.display_name || "Member")}${isMe ? " (You)" : ""}</div>
+        <div class="podium-points-row">${rankDeltaHtml(r._delta)}<span>${Number(r.period_points ?? 0).toFixed(2)} pts</span></div>
       `;
       podiumWrap.appendChild(slot);
     });
