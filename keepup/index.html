@@ -870,7 +870,7 @@ async function loadClubLeaderboard() {
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
-      <div class="lb-points">${Math.round(Number(r.period_points))}</div>
+      <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
     `;
     rowsWrap.appendChild(row);
   });
