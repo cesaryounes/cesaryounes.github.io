@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>KeepUp — Dashboard</title>
+<!-- hl=en pins the rendered button/prompt text to English regardless of the visitor's browser
+     locale (Google's default is to auto-localize, which is why it showed Greek before). -->
+<script src="https://accounts.google.com/gsi/client?hl=en" async defer></script>
+<!--
+  KeepUp web dashboard (user request 08-21: "can we have a profile similar to the app... show
+  submitted workouts with their details and score... remove the Workout tab, have a dashboard
+  similar to the app where they can see the streak, multiplier, workouts logged and scores, and
+  the xp... from the dashboard have somewhere to submit a workout... Dashboard, Club, Leaderboard
+  and Profile tabs"). Grew out of the original photo-upload-only page (08-17/08-18) — Submit and
+  Workouts merged into one Dashboard tab (stats + a "Log a workout" flow that expands in place +
+  the workout list, in that order, same idea as DashboardScreen.kt), Profile is new (mirrors
+  HomeScreen.kt's AccountTab + TopBanner's streak/freeze/gems/multiplier cluster, which on Android
+  are two different pieces of UI — there's no persistent top banner here, so both live in Profile/
+  Dashboard instead). Club and Leaderboard tabs are unchanged from the original page.
+
+  Still static, no build step — deploy straight to Netlify by pointing a site at this folder (see
+  netlify.toml alongside this file). Talks to the SAME Supabase project the Android app uses (same
+  public anon key the app itself ships with — see SupabaseClient.kt's own comment on why that's
+  safe to be public).
+
+  Auth is Google Sign-In, matching the Android app exactly (LoginScreen.kt is Google-only) — NOT
+  email/magic-link. That's a deliberate choice, not an oversight: this project's existing users
+  only have a Google identity, and Supabase Auth treats a different sign-in method for the same
+  email as a genuinely different account unless identity linking is explicitly configured. Using
+  the same provider is what guarantees a returning user lands on their real, existing account
+  (same auth.uid(), same streak, same clubs) instead of silently creating a second empty one.
+
+  This page never calls anything with elevated privileges — every read/write here rides the same
+  signed-in user's own RLS grants the Android app relies on (profiles' own-row SELECT policy,
+  0050_tighten_profiles_rls.sql; workouts' own-row policy, 0049_fix_workouts_rls_leak.sql), so it
+  can only ever see/change what that account could already see/change from the app.
+-->
+<style>
+  :root {
+    --bg: #0B0E14;
+    --card: #161B22;
+    --card-raised: #1D2430;
+    --accent: #CCFF00;
+    --accent-soft: rgba(204,255,0,0.12);
+    --amber: #FFC400;
+    --text-main: #F0F6FC;
+    --text-muted: #8B949E;
+    --danger: #FF6B5C;
+    --success: #3DDC84;
+    --hairline: rgba(255,255,255,0.09);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg); color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  body {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 64px;
+  }
+  .wrap { width: 100%; max-width: 420px; }
+  header { text-align: center; margin-bottom: 20px; }
+  header .mark { width: 40px; height: 40px; margin: 0 auto 10px; display: block; }
+  h1 { font-size: 18px; font-weight: 800; margin: 0; letter-spacing: -0.01em; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--hairline); border-radius: 16px;
+    padding: 20px; margin-bottom: 16px;
+  }
+
+  button {
+    font-family: inherit; font-size: 15px; font-weight: 700; border: none; border-radius: 12px;
+    padding: 14px 20px; cursor: pointer; width: 100%; min-height: 48px;
+  }
+  .btn-primary { background: var(--accent); color: #0B0E14; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-secondary { background: var(--card-raised); color: var(--text-main); border: 1px solid var(--hairline); }
+  .btn-text { background: transparent; color: var(--text-muted); font-weight: 600; padding: 10px; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row button { min-height: 44px; }
+
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%; background: var(--card-raised); border: 1px solid var(--hairline);
+    border-radius: 10px; color: var(--text-main); font-size: 16px; padding: 12px 14px;
+    font-family: inherit;
+  }
+  .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 12px; }
+  .row .field { flex: 1; }
+
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
+  }
+  .badge-high { background: rgba(61,220,132,0.15); color: var(--success); }
+  .badge-medium { background: rgba(255,196,0,0.15); color: var(--amber); }
+  .badge-low { background: rgba(255,107,92,0.15); color: var(--danger); }
+
+  .muted { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+  .center { text-align: center; }
+  .hidden { display: none !important; }
+
+  .photo-input { position: relative; }
+  .photo-input input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .photo-preview {
+    width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px;
+    margin-bottom: 14px; background: #000;
+  }
+  .drop-zone {
+    border: 1.5px dashed var(--hairline); border-radius: 14px; padding: 32px 16px;
+    text-align: center; color: var(--text-muted); font-size: 14px;
+  }
+
+  .spinner {
+    width: 22px; height: 22px; border-radius: 50%; margin: 0 auto 12px;
+    border: 3px solid var(--hairline); border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .club-list { list-style: none; margin: 0; padding: 0; }
+  .club-list li {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 14px;
+  }
+  .club-list li:last-child { border-bottom: none; }
+
+  .error-box {
+    background: rgba(255,107,92,0.1); border: 1px solid rgba(255,107,92,0.3);
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--danger);
+    margin-bottom: 14px;
+  }
+
+  .section-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--text-muted); margin: 0;
+  }
+  .history-list { list-style: none; margin: 0; padding: 0; }
+  .history-row { padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+  .history-row:last-child { border-bottom: none; }
+  .history-row-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .history-row-main strong { font-size: 14px; }
+  .history-row-score { flex-shrink: 0; text-align: right; }
+  .history-row-actions { display: flex; gap: 4px; flex-shrink: 0; margin-top: 8px; }
+  .history-row-actions button {
+    width: auto; min-height: 32px; padding: 6px 10px; font-size: 12px;
+  }
+  .history-edit-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--hairline); }
+  .history-edit-form .row { margin-bottom: 0; }
+  .history-edit-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .history-edit-actions button { min-height: 40px; font-size: 13px; }
+  .source-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--text-muted); background: var(--card-raised); border-radius: 6px;
+    padding: 2px 6px; margin-left: 6px; vertical-align: middle;
+  }
+  .rejected-reason { color: var(--danger); font-size: 12px; margin-top: 4px; }
+
+  .club-pills { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px; }
+  .club-pill {
+    flex-shrink: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    background: var(--card-raised); border: 1px solid var(--hairline); color: var(--text-muted);
+    cursor: pointer; white-space: nowrap;
+  }
+  .club-pill.active { background: var(--accent); color: #0B0E14; border-color: var(--accent); }
+
+  .period-pills { display: flex; gap: 6px; margin-bottom: 16px; }
+  .period-pill {
+    flex: 1; padding: 8px 0; border-radius: 8px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.02em; text-align: center; cursor: pointer;
+    background: var(--card-raised); border: 1px solid var(--hairline); color: var(--text-muted);
+  }
+  .period-pill.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .lb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row.is-me { background: rgba(204,255,0,0.06); margin: 0 -20px; padding: 10px 20px; border-radius: 8px; }
+  .lb-rank { width: 24px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
+  .lb-row.is-me .lb-rank { color: var(--accent); }
+  .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+  .tab-nav {
+    display: flex; gap: 4px; margin-bottom: 20px; background: var(--card);
+    border: 1px solid var(--hairline); border-radius: 12px; padding: 5px;
+  }
+  .tab-nav button {
+    flex: 1; width: auto; min-height: 40px; padding: 9px 2px; font-size: 13px; font-weight: 700;
+    background: transparent; color: var(--text-muted); border-radius: 8px;
+  }
+  .tab-nav button.active { background: var(--accent); color: #0B0E14; }
+  .tab-view.hidden { display: none !important; }
+
+  .directory-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .directory-row:last-child { border-bottom: none; }
+  .directory-row-name { font-size: 14px; font-weight: 600; min-width: 0; }
+  .directory-row-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .directory-row button { width: auto; min-height: 36px; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
+  .joined-tag {
+    font-size: 12px; font-weight: 700; color: var(--success); flex-shrink: 0;
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+
+  /* ---- Dashboard stat cluster (mirrors HomeScreen.kt's TopBanner: streak/freeze/gems/
+     multiplier, icon+number only, no labels) ---- */
+  .stat-cluster { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .stat-cell { display: flex; align-items: center; gap: 6px; }
+  .stat-cell svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .stat-cell span { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-mult {
+    background: var(--accent-soft); color: var(--accent); border-radius: 6px;
+    padding: 3px 8px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Profile tab ---- */
+  .profile-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .profile-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .avatar-initials, .profile-top-row img {
+    border-radius: 50%; flex-shrink: 0; object-fit: cover;
+  }
+  .avatar-initials {
+    display: flex; align-items: center; justify-content: center;
+    background: var(--card-raised); border: 1px solid var(--hairline);
+    color: var(--accent); font-weight: 800;
+  }
+  .profile-name { font-size: 16px; font-weight: 800; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .profile-email { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .level-chip {
+    background: var(--accent-soft); color: var(--accent); border-radius: 8px;
+    padding: 6px 10px; font-size: 13px; font-weight: 800; flex-shrink: 0;
+  }
+  .xp-track { width: 100%; height: 8px; border-radius: 999px; background: var(--card-raised); overflow: hidden; margin: 10px 0 8px; }
+  .xp-fill { height: 100%; background: var(--accent); border-radius: 999px; width: 0%; transition: width 0.3s ease; }
+  .profile-stat-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 14px;
+  }
+  .profile-stat-row:last-child { border-bottom: none; }
+  .profile-stat-row .label { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+  .profile-stat-row .label svg { width: 15px; height: 15px; }
+  .profile-stat-row .value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .membership-card { border: 1px solid var(--hairline); }
+  .membership-card.is-active { border-color: var(--accent); }
+  .membership-title { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
+  .membership-card.is-active .membership-title { color: var(--accent); }
+  .membership-desc { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <!-- Same mark as the Android launcher icon (ic_launcher_foreground.xml / _background.xml)
+           — dark tile, gradient chevron, amber spark — reproduced here as inline SVG instead of
+           a raster export so it stays crisp at any size. -->
+      <svg class="mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-label="KeepUp">
+        <rect width="108" height="108" rx="24" fill="#0B0E14" />
+        <path d="M36,70 L54,46 L72,70" fill="none" stroke="url(#markChevron)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="54" cy="32" r="5.5" fill="#FFC400" />
+        <defs>
+          <linearGradient id="markChevron" x1="54" y1="70" x2="54" y2="46" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#7A9E00" />
+            <stop offset="1" stop-color="#CCFF00" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <h1>KeepUp</h1>
+    </header>
+
+    <!-- Signed out -->
+    <div id="signed-out-view" class="card center hidden">
+      <p class="muted" style="margin-bottom:16px;">Sign in with the same Google account you use on KeepUp.</p>
+      <div id="google-signin-button" style="display:flex; justify-content:center;"></div>
+      <p class="muted hidden" id="google-signin-error" style="margin-top:12px; color:var(--danger);"></p>
+    </div>
+
+    <!-- Signed in -->
+    <div id="signed-in-view" class="hidden">
+      <nav class="tab-nav">
+        <button id="nav-dashboard" class="active" data-tab="dashboard">Dashboard</button>
+        <button id="nav-club" data-tab="club">Club</button>
+        <button id="nav-leaderboard" data-tab="leaderboard">Leaderboard</button>
+        <button id="nav-profile" data-tab="profile">Profile</button>
+      </nav>
+
+      <!-- ============ DASHBOARD ============
+           Streak/freeze/gems/multiplier readout (TopBanner's equivalent), a "Log a workout" entry
+           point that expands the same photo -> parse -> confirm -> save flow the old Submit tab
+           had, and the workout list (the old Workouts tab) underneath — merged into one screen,
+           same idea as DashboardScreen.kt's DashboardTab. -->
+      <div id="tab-dashboard" class="tab-view">
+        <div class="card">
+          <div class="stat-cluster" id="stat-cluster">
+            <div class="stat-cell" style="color:var(--text-muted);">
+              <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
+              <span id="stat-streak">0</span>
+            </div>
+            <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
+              <svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg>
+              <span id="stat-freeze">0</span>
+            </div>
+            <div class="stat-cell" style="color:var(--amber);">
+              <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
+              <span id="stat-gems" style="color:var(--text-main);">0</span>
+            </div>
+            <div class="stat-mult" id="stat-multiplier">1.00x</div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="open-submit-btn" style="margin-bottom:16px;">+ Log a workout</button>
+
+        <!-- Submit flow — hidden until "Log a workout" is tapped. -->
+        <div id="submit-flow" class="hidden">
+          <button class="btn-text" id="cancel-submit-btn" style="margin-bottom:8px;">Cancel</button>
+
+          <!-- Step 1: pick photo -->
+          <div id="upload-step" class="card">
+            <div id="drop-zone" class="drop-zone photo-input">
+              <!-- No capture="environment" here on purpose — that attribute forces mobile browsers
+                   straight into the camera, skipping the file/gallery picker entirely. Without it,
+                   the browser shows its normal picker (Photos/gallery, plus a camera option where
+                   the OS offers one) — user request 08-18. -->
+              <input type="file" id="photo-input" accept="image/*" />
+              <span id="drop-zone-label">Tap to choose a photo</span>
+            </div>
+          </div>
+
+          <!-- Step 2: parsing -->
+          <div id="parsing-step" class="card center hidden">
+            <div class="spinner"></div>
+            <p class="muted">Reading your photo…</p>
+          </div>
+
+          <!-- Step 3: confirm/edit -->
+          <div id="confirm-step" class="card hidden">
+            <img id="photo-preview" class="photo-preview" />
+            <div id="confidence-row" style="margin-bottom:14px;"></div>
+            <div id="parse-error" class="error-box hidden"></div>
+
+            <div class="field">
+              <label for="activity-select">Activity</label>
+              <select id="activity-select">
+                <option value="running">Running</option>
+                <option value="walking">Walking</option>
+                <option value="cycling">Cycling</option>
+                <option value="swimming">Swimming</option>
+                <option value="strength_training">Strength Training</option>
+                <option value="hiking">Hiking</option>
+                <option value="yoga">Yoga</option>
+                <option value="rowing">Rowing</option>
+                <option value="elliptical">Elliptical</option>
+                <option value="stair_climbing">Stair Climbing</option>
+                <option value="boxing">Boxing</option>
+                <option value="dancing">Dancing</option>
+                <option value="other_workout">Other</option>
+              </select>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="duration-input">Duration (min)</label>
+                <input type="number" id="duration-input" min="1" max="600" inputmode="numeric" />
+              </div>
+              <div class="field">
+                <label for="calories-input">Calories</label>
+                <input type="number" id="calories-input" min="0" max="5000" inputmode="numeric" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="hr-input">Avg heart rate (bpm)</label>
+              <input type="number" id="hr-input" min="30" max="220" inputmode="numeric" />
+            </div>
+
+            <button class="btn-primary" id="save-btn" style="margin-bottom:10px;">Save workout</button>
+            <button class="btn-secondary" id="retake-btn">Choose a different photo</button>
+          </div>
+
+          <!-- Step 4: saved -->
+          <div id="saved-step" class="card center hidden">
+            <div class="badge badge-high" style="margin-bottom:10px;">Saved</div>
+            <p class="muted" id="saved-summary" style="margin-bottom:14px;"></p>
+            <div id="saved-clubs-wrap" class="hidden" style="text-align:left; margin-bottom:16px;">
+              <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-muted); margin-bottom:8px;">Counts toward</label>
+              <ul class="club-list" id="saved-clubs-list"></ul>
+            </div>
+            <div class="btn-row">
+              <button class="btn-secondary" id="log-another-btn">Log another</button>
+              <button class="btn-primary" id="done-submit-btn">Done</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workout list — every workout this account has (any source), same as the app's
+             Dashboard list. Score shown for scored ones; rejected ones show why instead. Edit/
+             Delete only apply to workouts submitted from this page (source = 'web_photo') — a
+             Health-Connect-synced entry is shown for visibility only, same reasoning the old
+             Workouts tab already documented. -->
+        <div class="card" id="workouts-card">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+            <p class="section-label">Your workouts</p>
+            <button class="btn-text" id="refresh-history-btn" style="width:auto; padding:4px 8px;">Refresh</button>
+          </div>
+          <p class="muted" id="history-empty">No workouts yet — log one above and it'll show up here.</p>
+          <ul class="history-list hidden" id="history-list"></ul>
+        </div>
+      </div>
+
+      <!-- ============ CLUB (join only — no create, matches Android's own premium gate) ============
+           Deliberately simple: every club with allow_score_uploads on, in one list, with a
+           Join/Request button per row. No code, no link, no search — user request 08-18. -->
+      <div id="tab-club" class="tab-view hidden">
+        <div class="card">
+          <p class="section-label" style="margin-bottom:4px;">Clubs open to web uploads</p>
+          <p class="muted" style="margin-bottom:14px;">Only clubs whose owner turned on "Allow score uploads" show up here — the same setting from the app's create-club screen.</p>
+          <p class="muted" id="club-directory-empty">No clubs currently accept web uploads.</p>
+          <ul class="history-list hidden" id="club-directory-list"></ul>
+        </div>
+      </div>
+
+      <!-- ============ LEADERBOARD ============
+           Scoped strictly to clubs this account is actually a member of. There is no global or
+           cross-club view here on purpose: get_leaderboard is only ever called below with a
+           specific p_group_id the user belongs to, never null (which would be Global). No way to
+           browse or see any other club's standings from this page (user request 08-17/08-18). -->
+      <div id="tab-leaderboard" class="tab-view hidden">
+        <div id="no-clubs-step" class="card center hidden">
+          <p class="muted" style="margin-bottom:4px;">You're not in a club yet.</p>
+          <p class="muted">Check the Club tab to join one and see a leaderboard.</p>
+        </div>
+
+        <div id="club-step" class="card hidden">
+          <p class="section-label" style="margin-bottom:12px;">Your club</p>
+          <div class="club-pills hidden" id="club-pills"></div>
+          <div class="period-pills" id="period-pills">
+            <div class="period-pill" data-period="weekly">Week</div>
+            <div class="period-pill" data-period="monthly">Month</div>
+            <div class="period-pill" data-period="yearly">Year</div>
+            <div class="period-pill" data-period="alltime">All</div>
+          </div>
+          <div id="lb-rows"></div>
+          <p class="muted hidden" id="lb-empty">No points logged for this period yet.</p>
+        </div>
+      </div>
+
+      <!-- ============ PROFILE ============
+           Mirrors HomeScreen.kt's AccountTab (avatar, name, level) plus the streak/freeze/gems/
+           multiplier readout it doesn't carry itself (that lives in TopBanner on Android, which
+           has no equivalent persistent header here — folded into Dashboard's stat-cluster
+           instead, this tab shows the level/XP/membership side). Sign out lives here now instead
+           of a separate top bar. -->
+      <div id="tab-profile" class="tab-view hidden">
+        <div class="card">
+          <div class="profile-top-row">
+            <div class="profile-identity">
+              <div id="profile-avatar" style="width:56px; height:56px;"></div>
+              <div style="min-width:0;">
+                <p class="profile-name" id="profile-name"></p>
+                <p class="profile-email" id="profile-email"></p>
+              </div>
+            </div>
+            <div class="level-chip" id="profile-level-chip">LV 1</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="section-label" id="profile-tier">ROOKIE</p>
+          <div class="xp-track"><div class="xp-fill" id="profile-xp-fill"></div></div>
+          <p class="muted" id="profile-xp-label">0 / 0 XP to next level</p>
+        </div>
+
+        <div class="card">
+          <div class="profile-stat-row">
+            <span class="label">
+              <svg viewBox="0 0 24 24" fill="var(--amber)"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              Current streak
+            </span>
+            <span class="value" id="profile-streak">0 days</span>
+          </div>
+          <div class="profile-stat-row">
+            <span class="label">Longest streak</span>
+            <span class="value" id="profile-longest-streak">0 days</span>
+          </div>
+          <div class="profile-stat-row hidden" id="profile-freeze-row">
+            <span class="label">Streak freezes</span>
+            <span class="value" id="profile-freezes">0</span>
+          </div>
+          <div class="profile-stat-row">
+            <span class="label">
+              <svg viewBox="0 0 24 24" fill="var(--amber)"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
+              Gems
+            </span>
+            <span class="value" id="profile-gems">0</span>
+          </div>
+          <div class="profile-stat-row">
+            <span class="label">Streak multiplier</span>
+            <span class="value" id="profile-multiplier">1.00x</span>
+          </div>
+        </div>
+
+        <div class="card membership-card" id="membership-card">
+          <p class="membership-title" id="membership-title">Free plan</p>
+          <p class="membership-desc" id="membership-desc">Upgrade from the KeepUp Android app, or redeem a promo code below.</p>
+          <div class="field" style="margin-bottom:10px;">
+            <input type="text" id="promo-input" placeholder="Promo code" style="text-transform:uppercase;" />
+          </div>
+          <button class="btn-primary" id="promo-redeem-btn">Redeem</button>
+          <p class="muted hidden" id="promo-message" style="margin-top:10px;"></p>
+        </div>
+
+        <button class="btn-text" id="sign-out-btn">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Same project + public anon key the Android app ships with (SupabaseClient.kt) — safe to be
+// public; access control lives in this project's RLS policies, not in keeping this key secret.
+const SUPABASE_URL = "https://cfflfqobladpkwssdjka.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmZmxmcW9ibGFkcGt3c3NkamthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjQ2MjYsImV4cCI6MjEwMTEwMDYyNn0.NkhhSl9Ixe2k-nNPX2Q4KEUueWOLA10Ku2D0yzkD6rI";
+const PARSE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/parse-workout-photo`;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const el = (id) => document.getElementById(id);
+const show = (id) => el(id).classList.remove("hidden");
+const hide = (id) => el(id).classList.add("hidden");
+
+let currentSession = null;
+let currentParse = null; // last successful parse-workout-photo response
+let currentPhotoDataUrl = null;
+
+// ---------- Auth ----------
+//
+// Deliberately NOT supabase-js's signInWithOAuth (the redirect/authorization-code flow) — that
+// needs a Google "Web application" OAuth client with a client secret configured in the Supabase
+// dashboard, plus this page's URL added to Supabase Auth's redirect allowlist, neither of which
+// exists today. Instead this mirrors GoogleAuth.kt's Android flow exactly: Google Identity
+// Services hands back a signed ID token in the browser (no redirect involved), which
+// signInWithIdToken exchanges directly — against the SAME Web Client ID Android already uses and
+// that Supabase's Google provider is already configured to accept. The one remaining setup step
+// is registering this page's origin as an "Authorized JavaScript origin" for that same client ID
+// in Google Cloud Console (see deploy notes) — nothing on the Supabase side needs to change.
+const GOOGLE_WEB_CLIENT_ID = "249841541433-oqutn83s9nn1m0mq99v3h57ct5pcn1b1.apps.googleusercontent.com";
+let currentRawNonce = null;
+
+async function sha256Hex(input) {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function waitForGoogleIdentity(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function poll() {
+      if (window.google?.accounts?.id) return resolve();
+      if (Date.now() - start > timeoutMs) return reject(new Error("Google Sign-In didn't load — check your connection and reload."));
+      setTimeout(poll, 50);
+    })();
+  });
+}
+
+// crypto.subtle / crypto.randomUUID only exist in a secure context (https, or localhost) — a
+// plain file:// preview (no origin at all) doesn't get them, so this function on its own would
+// throw before the button ever renders. safeRandomUUID() below covers the file:// preview case;
+// sha256Hex() still needs crypto.subtle, which genuinely can't be polyfilled client-side, so that
+// failure is caught and surfaced as a real message instead of a silent crash — it will not happen
+// on the actual https Netlify deploy.
+function safeRandomUUID() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+async function initGoogleSignIn() {
+  try {
+    await waitForGoogleIdentity();
+
+    if (!window.crypto?.subtle) {
+      throw new Error("This preview is loaded over file:// — Google Sign-In needs https (or localhost) to work. It'll work once deployed to Netlify.");
+    }
+
+    // Same nonce convention as GoogleAuth.kt: Google gets the SHA-256 hash (embedded into the ID
+    // token it signs), Supabase gets the raw value so it can hash-and-compare — stops a captured
+    // token from being replayed.
+    currentRawNonce = safeRandomUUID();
+    const hashedNonce = await sha256Hex(currentRawNonce);
+
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_WEB_CLIENT_ID,
+      callback: handleGoogleCredential,
+      nonce: hashedNonce,
+    });
+    window.google.accounts.id.renderButton(el("google-signin-button"), {
+      theme: "filled_black",
+      size: "large",
+      width: 300,
+      text: "continue_with",
+    });
+  } catch (err) {
+    el("google-signin-error").textContent = err.message;
+    show("google-signin-error");
+  }
+}
+
+async function handleGoogleCredential(response) {
+  const { error } = await supabase.auth.signInWithIdToken({
+    provider: "google",
+    token: response.credential,
+    nonce: currentRawNonce,
+  });
+  if (error) {
+    el("google-signin-error").textContent = `Sign-in failed: ${error.message}`;
+    show("google-signin-error");
+    return;
+  }
+  await refreshSession();
+}
+
+async function refreshSession() {
+  const { data } = await supabase.auth.getSession();
+  currentSession = data.session;
+  renderAuthState();
+}
+
+function renderAuthState() {
+  if (currentSession) {
+    hide("signed-out-view");
+    show("signed-in-view");
+    collapseSubmitFlow({ refresh: false });
+    switchTab("dashboard");
+  } else {
+    show("signed-out-view");
+    hide("signed-in-view");
+  }
+}
+
+el("sign-out-btn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  await refreshSession();
+});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  currentSession = session;
+  renderAuthState();
+});
+
+// ---------- Tabs ----------
+//
+// Each tab loads its own data only when activated, not eagerly on sign-in — don't fetch what
+// isn't shown yet.
+function switchTab(tab) {
+  ["dashboard", "club", "leaderboard", "profile"].forEach((t) => {
+    el(`tab-${t}`).classList.toggle("hidden", t !== tab);
+    el(`nav-${t}`).classList.toggle("active", t === tab);
+  });
+  if (tab === "dashboard") loadDashboard();
+  if (tab === "club") loadClubDirectory();
+  if (tab === "leaderboard") loadMyClubs();
+  if (tab === "profile") loadProfile();
+}
+
+Array.from(el("signed-in-view").querySelectorAll(".tab-nav button")).forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// ---------- Gamification math ----------
+//
+// Client-side mirrors of Models.kt's XpCurve/StreakCurve/StatusTier — kept in sync manually with
+// fn_apply_workout_gamification() (0039_softer_level_curve.sql / 0001_gamification.sql), same as
+// the Android app's own copy already is. If that SQL formula ever changes, update both client
+// copies, not just this one.
+const XP_K = 100 * Math.sqrt(10);
+function levelForXp(totalXp) {
+  return Math.floor(Math.pow(totalXp / XP_K, 2 / 3)) + 1;
+}
+function xpForLevelStart(level) {
+  return Math.floor(XP_K * Math.pow(level - 1, 1.5));
+}
+function progressWithinLevel(totalXp) {
+  const level = levelForXp(totalXp);
+  const floor = xpForLevelStart(level);
+  const ceiling = xpForLevelStart(level + 1);
+  if (ceiling <= floor) return { fraction: 0, floor, ceiling };
+  return { fraction: Math.min(1, Math.max(0, (totalXp - floor) / (ceiling - floor))), floor, ceiling };
+}
+function multiplierForStreak(streak) {
+  return Math.min(1.5, 1 + Math.max(0, streak - 1) * (0.5 / 14));
+}
+const STATUS_TIERS = [
+  { name: "Rookie", min: 1 }, { name: "Grinder", min: 6 }, { name: "Athlete", min: 11 },
+  { name: "Warrior", min: 21 }, { name: "Elite", min: 31 }, { name: "Champion", min: 41 },
+  { name: "Master", min: 51 }, { name: "Titan", min: 71 }, { name: "Legend", min: 91 },
+];
+function statusTierFor(level) {
+  let tier = STATUS_TIERS[0];
+  for (const t of STATUS_TIERS) if (level >= t.min) tier = t;
+  return tier.name;
+}
+
+// ---------- Dashboard (stats + workout list) ----------
+
+async function loadDashboard() {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("current_streak, streak_freezes_available, gems, premium_until")
+    .eq("id", currentSession.user.id)
+    .single();
+
+  if (!error && profile) {
+    el("stat-streak").textContent = profile.current_streak ?? 0;
+    el("stat-flame-icon").style.color = profile.current_streak > 0 ? "var(--amber)" : "var(--text-muted)";
+    el("stat-gems").textContent = profile.gems ?? 0;
+    el("stat-multiplier").textContent = multiplierForStreak(profile.current_streak ?? 0).toFixed(2) + "x";
+
+    const isPremiumNow = profile.premium_until && new Date(profile.premium_until) > new Date();
+    if (isPremiumNow) {
+      show("stat-freeze-cell");
+      el("stat-freeze").textContent = profile.streak_freezes_available ?? 0;
+    } else {
+      hide("stat-freeze-cell");
+    }
+  }
+
+  await loadHistory();
+}
+
+// ---------- Clubs + leaderboard ----------
+//
+// Deliberately scoped: get_leaderboard is only ever called below with a specific p_group_id this
+// account is already a member of (from group_members, RLS-scoped to the caller's own rows) —
+// never with p_group_id omitted/null, which is what Global means to that RPC. There is no way to
+// browse or view any other club's standings from this page, by design (user request 08-17:
+// "they should only have access to the club they are in").
+
+let myClubs = [];
+let currentClubId = null;
+let currentPeriod = "weekly";
+
+// Pure data fetch, shared by the Leaderboard tab (needs the full list to build its scope) and the
+// Club tab (needs it just to know which directory rows are already "Joined").
+async function fetchMyClubs() {
+  const { data, error } = await supabase
+    .from("group_members")
+    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads)")
+    .eq("user_id", currentSession.user.id);
+  if (error) {
+    console.error("Couldn't load your clubs:", error);
+    return [];
+  }
+  return (data || []).map((row) => row.groups);
+}
+
+async function loadMyClubs() {
+  myClubs = await fetchMyClubs();
+
+  if (myClubs.length === 0) {
+    hide("club-step");
+    show("no-clubs-step");
+    return;
+  }
+  hide("no-clubs-step");
+  show("club-step");
+  if (!currentClubId || !myClubs.some((c) => c.id === currentClubId)) {
+    currentClubId = myClubs[0].id;
+  }
+  renderClubPills();
+  await loadClubLeaderboard();
+}
+
+function renderClubPills() {
+  const wrap = el("club-pills");
+  wrap.innerHTML = "";
+  if (myClubs.length <= 1) {
+    hide("club-pills");
+    return;
+  }
+  show("club-pills");
+  myClubs.forEach((c) => {
+    const pill = document.createElement("div");
+    pill.className = "club-pill" + (c.id === currentClubId ? " active" : "");
+    pill.textContent = c.name;
+    pill.addEventListener("click", async () => {
+      currentClubId = c.id;
+      renderClubPills();
+      await loadClubLeaderboard();
+    });
+    wrap.appendChild(pill);
+  });
+}
+
+Array.from(el("period-pills").children).forEach((pill, i) => {
+  if (i === 0) pill.classList.add("active");
+  pill.addEventListener("click", async () => {
+    currentPeriod = pill.dataset.period;
+    Array.from(el("period-pills").children).forEach((p) => p.classList.toggle("active", p === pill));
+    await loadClubLeaderboard();
+  });
+});
+
+async function loadClubLeaderboard() {
+  if (!currentClubId) return;
+  const { data, error } = await supabase.rpc("get_leaderboard", {
+    p_period: currentPeriod,
+    p_group_id: currentClubId,
+  });
+
+  const rowsWrap = el("lb-rows");
+  rowsWrap.innerHTML = "";
+
+  if (error || !data || data.length === 0) {
+    if (error) console.error("Couldn't load club leaderboard:", error);
+    el("lb-empty").textContent = error ? "Couldn't load the leaderboard right now." : "No points logged for this period yet.";
+    show("lb-empty");
+    return;
+  }
+  hide("lb-empty");
+
+  // Every member is shown, including 0-point ones — same convention get_leaderboard's other
+  // callers (LeaderboardScreen.kt) already rely on, not filtered out here.
+  data.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
+    row.innerHTML = `
+      <div class="lb-rank">${r.rank}</div>
+      <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
+      <div class="lb-points">${Math.round(Number(r.period_points))}</div>
+    `;
+    rowsWrap.appendChild(row);
+  });
+}
+
+// ---------- Club directory (join only — no create, no code needed) ----------
+//
+// Reuses the exact same server-side gates Android's own joinGroup() relies on. Public clubs are
+// free to join (capped at 3 for free accounts, 0072_free_public_club_join.sql) — this is what
+// makes the web page actually usable for someone with no Android app and no way to ever become
+// premium (Play Billing doesn't exist here). A private club with allow_score_uploads on can still
+// show up in this same list (the two settings are independent) — its "Request" button still goes
+// through fn_request_join_private_group, which still requires Premium, unchanged; whatever
+// message an RPC raises (limit hit, premium required, etc.) is just shown as-is, same as every
+// other error path on this page. groups' own RLS already allows reading any club (public SELECT
+// policy, 0028_fix_permissive_rls_leftovers.sql), so filtering to allow_score_uploads = true here
+// is just this page choosing what's relevant to show, not a new permission — every one of these
+// rows was already readable.
+
+async function loadClubDirectory() {
+  myClubs = await fetchMyClubs(); // refresh membership so Join/Joined state below is current
+
+  const { data, error } = await supabase
+    .from("groups")
+    .select("id, name, is_public")
+    .eq("allow_score_uploads", true)
+    .order("name");
+
+  const list = el("club-directory-list");
+  list.innerHTML = "";
+
+  if (error || !data || data.length === 0) {
+    hide("club-directory-list");
+    show("club-directory-empty");
+    if (error) console.error("Couldn't load club directory:", error);
+    return;
+  }
+  hide("club-directory-empty");
+  show("club-directory-list");
+  data.forEach((group) => list.appendChild(renderDirectoryRow(group)));
+}
+
+function renderDirectoryRow(group) {
+  const li = document.createElement("li");
+  li.className = "directory-row";
+
+  const info = document.createElement("div");
+  info.innerHTML = `
+    <div class="directory-row-name">${escapeHtml(group.name)}</div>
+    <div class="directory-row-sub">${group.is_public ? "Public" : "Private — needs owner approval"}</div>
+  `;
+  li.appendChild(info);
+
+  if (myClubs.some((c) => c.id === group.id)) {
+    const tag = document.createElement("span");
+    tag.className = "joined-tag";
+    tag.textContent = "Joined";
+    li.appendChild(tag);
+    return li;
+  }
+
+  const btn = document.createElement("button");
+  btn.className = "btn-secondary";
+  btn.type = "button";
+  btn.textContent = group.is_public ? "Join" : "Request";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "…";
+    const rpcName = group.is_public ? "fn_join_public_group" : "fn_request_join_private_group";
+    const { error } = await supabase.rpc(rpcName, { p_group_id: group.id });
+    if (error) {
+      alert(error.message);
+      btn.disabled = false;
+      btn.textContent = group.is_public ? "Join" : "Request";
+      return;
+    }
+    if (group.is_public) {
+      await loadClubDirectory();
+    } else {
+      btn.textContent = "Requested";
+    }
+  });
+  li.appendChild(btn);
+  return li;
+}
+
+// ---------- Profile ----------
+
+function renderAvatar(container, name, avatarUrl, sizePx) {
+  container.innerHTML = "";
+  container.style.width = sizePx + "px";
+  container.style.height = sizePx + "px";
+  if (avatarUrl) {
+    const img = document.createElement("img");
+    img.src = avatarUrl;
+    img.style.width = sizePx + "px";
+    img.style.height = sizePx + "px";
+    container.appendChild(img);
+    return;
+  }
+  const initials = (name || "?").trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+  const div = document.createElement("div");
+  div.className = "avatar-initials";
+  div.style.width = sizePx + "px";
+  div.style.height = sizePx + "px";
+  div.style.fontSize = Math.round(sizePx * 0.38) + "px";
+  div.textContent = initials || "?";
+  container.appendChild(div);
+}
+
+async function loadProfile() {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until")
+    .eq("id", currentSession.user.id)
+    .single();
+
+  if (error || !profile) {
+    console.error("Couldn't load profile:", error);
+    return;
+  }
+
+  renderAvatar(el("profile-avatar"), profile.display_name, profile.avatar_url, 56);
+  el("profile-name").textContent = profile.display_name || "Athlete";
+  el("profile-email").textContent = currentSession.user.email ?? "";
+
+  const level = profile.level ?? levelForXp(profile.total_xp ?? 0);
+  el("profile-level-chip").textContent = `LV ${level}`;
+  el("profile-tier").textContent = statusTierFor(level).toUpperCase();
+
+  const totalXp = profile.total_xp ?? 0;
+  const { fraction, floor, ceiling } = progressWithinLevel(totalXp);
+  el("profile-xp-fill").style.width = Math.round(fraction * 100) + "%";
+  el("profile-xp-label").textContent = ceiling > floor
+    ? `${totalXp - floor} / ${ceiling - floor} XP to level ${level + 1}`
+    : `${totalXp} XP total`;
+
+  const streak = profile.current_streak ?? 0;
+  el("profile-streak").textContent = streak === 1 ? "1 day" : `${streak} days`;
+  el("profile-longest-streak").textContent = `${profile.longest_streak ?? 0} days`;
+  el("profile-gems").textContent = profile.gems ?? 0;
+  el("profile-multiplier").textContent = multiplierForStreak(streak).toFixed(2) + "x";
+
+  const isPremiumNow = profile.premium_until && new Date(profile.premium_until) > new Date();
+  if (isPremiumNow) {
+    show("profile-freeze-row");
+    el("profile-freezes").textContent = profile.streak_freezes_available ?? 0;
+  } else {
+    hide("profile-freeze-row");
+  }
+  renderMembershipCard(profile.premium_until);
+}
+
+function renderMembershipCard(premiumUntil) {
+  const card = el("membership-card");
+  const title = el("membership-title");
+  const desc = el("membership-desc");
+  const everPremium = !!premiumUntil;
+  const isActive = everPremium && new Date(premiumUntil) > new Date();
+
+  card.classList.toggle("is-active", isActive);
+  if (isActive) {
+    const daysLeft = Math.max(0, Math.ceil((new Date(premiumUntil) - new Date()) / 86400000));
+    title.textContent = "Premium active";
+    desc.textContent = `${daysLeft} day${daysLeft === 1 ? "" : "s"} left. Manage or extend from the KeepUp Android app, or redeem another code below.`;
+  } else if (everPremium) {
+    title.textContent = "Premium expired";
+    desc.textContent = "Your trial or subscription has ended — private clubs, streak freezes, nudges and club leaderboards need Premium. Redeem a code below, or upgrade from the app.";
+  } else {
+    title.textContent = "Free plan";
+    desc.textContent = "Upgrade from the KeepUp Android app, or redeem a promo code below.";
+  }
+}
+
+// Same RPC + validation Android's SubscriptionScreen.kt uses (fn_redeem_promo_code,
+// 0018_promo_codes.sql) — the one premium lever that's actually usable from the web, since Play
+// Billing doesn't exist here.
+el("promo-redeem-btn").addEventListener("click", async () => {
+  const btn = el("promo-redeem-btn");
+  const input = el("promo-input");
+  const code = input.value.trim();
+  const msg = el("promo-message");
+
+  if (!code) {
+    msg.textContent = "Enter a code first";
+    msg.style.color = "var(--danger)";
+    show("promo-message");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const { data, error } = await supabase.rpc("fn_redeem_promo_code", { p_code: code }).single();
+    if (error) throw error;
+    msg.textContent = data.message;
+    msg.style.color = data.success ? "var(--success)" : "var(--danger)";
+    show("promo-message");
+    if (data.success) {
+      input.value = "";
+      await loadProfile();
+    }
+  } catch (err) {
+    msg.textContent = err.message || "Something went wrong — try again.";
+    msg.style.color = "var(--danger)";
+    show("promo-message");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Redeem";
+  }
+});
+
+// ---------- Submit flow (expand/collapse in place on the Dashboard) ----------
+
+el("open-submit-btn").addEventListener("click", () => {
+  hide("open-submit-btn");
+  hide("workouts-card");
+  show("submit-flow");
+  resetToUploadStep();
+});
+
+function collapseSubmitFlow({ refresh = true } = {}) {
+  hide("submit-flow");
+  show("open-submit-btn");
+  show("workouts-card");
+  if (refresh) loadDashboard();
+}
+
+el("cancel-submit-btn").addEventListener("click", () => collapseSubmitFlow({ refresh: false }));
+el("done-submit-btn").addEventListener("click", () => collapseSubmitFlow());
+el("log-another-btn").addEventListener("click", resetToUploadStep);
+
+function resetToUploadStep() {
+  currentParse = null;
+  currentPhotoDataUrl = null;
+  el("photo-input").value = "";
+  show("upload-step");
+  hide("parsing-step");
+  hide("confirm-step");
+  hide("saved-step");
+}
+
+el("retake-btn").addEventListener("click", resetToUploadStep);
+
+// ---------- Photo capture + downscale ----------
+
+// Downscale to a reasonable max dimension before sending — keeps the payload small (faster
+// upload on a phone connection, cheaper/faster Claude vision call) with no accuracy loss at this
+// resolution; a fitness-screen photo doesn't need more than ~1600px on the long edge to read.
+function downscaleImage(file, maxDimension = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      img.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+el("photo-input").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  hide("upload-step");
+  show("parsing-step");
+
+  try {
+    const dataUrl = await downscaleImage(file);
+    currentPhotoDataUrl = dataUrl;
+    const base64 = dataUrl.split(",")[1];
+
+    const res = await fetch(PARSE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${currentSession.access_token}`,
+      },
+      body: JSON.stringify({ image_base64: base64, media_type: "image/jpeg" }),
+    });
+    const result = await res.json();
+
+    if (!res.ok || !result.success) {
+      throw new Error(result.message || "Couldn't read this photo.");
+    }
+
+    currentParse = result;
+    populateConfirmStep(result);
+    hide("parsing-step");
+    show("confirm-step");
+  } catch (err) {
+    hide("parsing-step");
+    show("confirm-step");
+    el("photo-preview").src = currentPhotoDataUrl ?? "";
+    el("parse-error").textContent = err.message || "Something went wrong reading that photo — you can still enter the stats yourself.";
+    show("parse-error");
+    el("confidence-row").innerHTML = "";
+  }
+});
+
+function populateConfirmStep(result) {
+  el("photo-preview").src = currentPhotoDataUrl;
+  hide("parse-error");
+
+  const badgeClass = { high: "badge-high", medium: "badge-medium", low: "badge-low" }[result.confidence] || "badge-medium";
+  el("confidence-row").innerHTML =
+    `<span class="badge ${badgeClass}">${result.confidence} confidence</span>` +
+    (result.notes ? `<p class="muted" style="margin-top:8px;">${escapeHtml(result.notes)}</p>` : "");
+
+  el("activity-select").value = result.activity_label in activityOptionsSet() ? result.activity_label : "other_workout";
+  el("duration-input").value = result.duration_minutes ?? "";
+  el("calories-input").value = result.calories ?? "";
+  el("hr-input").value = result.avg_heart_rate ?? "";
+}
+
+function activityOptionsSet() {
+  return Object.fromEntries(
+    Array.from(el("activity-select").options).map((o) => [o.value, true]),
+  );
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ---------- Save ----------
+
+// Mirrors Health Connect's own EXERCISE_TYPE_* int constants (see parse-workout-photo/index.ts's
+// own copy of this table and its comment for provenance) so a workout saved here labels
+// identically to one synced from Health Connect on Android.
+const ACTIVITY_TO_CODE = {
+  running: 56, walking: 79, cycling: 8, swimming: 74, strength_training: 70,
+  hiking: 37, yoga: 83, rowing: 53, elliptical: 25, stair_climbing: 68,
+  boxing: 11, dancing: 16, other_workout: 0,
+};
+
+el("save-btn").addEventListener("click", async () => {
+  const saveBtn = el("save-btn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+
+  try {
+    const activity = el("activity-select").value;
+    const duration = parseInt(el("duration-input").value, 10);
+    const calories = parseInt(el("calories-input").value, 10);
+    const hr = parseInt(el("hr-input").value, 10);
+
+    if (!duration || duration < 1 || !calories || calories < 0 || !hr || hr < 1) {
+      throw new Error("Fill in duration, calories, and heart rate first.");
+    }
+
+    // Device's LOCAL calendar date — same reasoning as WorkoutEntry.local_date's doc comment in
+    // the Android app: a workout just after local midnight must land on the right streak day.
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    // workouts.id has no server-side default — the Android app always generates this client-side
+    // too (NewWorkout.id, Models.kt), which is exactly why this insert failed without it ("null
+    // value in column 'id'... violates not-null constraint").
+    const { error } = await supabase.from("workouts").insert({
+      id: safeRandomUUID(),
+      user_id: currentSession.user.id,
+      calories,
+      duration_mins: duration,
+      avg_heart_rate: hr,
+      image_uri: null,
+      exercise_type: ACTIVITY_TO_CODE[activity] ?? 0,
+      local_date: localDate,
+      source: "web_photo",
+    });
+    if (error) throw error;
+
+    await showSavedStep(duration, calories);
+  } catch (err) {
+    alert(err.message || "Couldn't save this workout — try again.");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save workout";
+  }
+});
+
+async function showSavedStep(duration, calories) {
+  hide("confirm-step");
+  show("saved-step");
+  el("saved-summary").textContent = `${duration} min · ${calories} cal logged.`;
+
+  // Best-effort transparency: which of the user's own clubs currently count web uploads. Non-
+  // fatal if this read fails for any reason (e.g. RLS) — the workout is already saved either way.
+  try {
+    const { data: memberships } = await supabase
+      .from("group_members")
+      .select("group_id, groups!inner(name, allow_score_uploads)")
+      .eq("user_id", currentSession.user.id)
+      .eq("groups.allow_score_uploads", true);
+
+    const list = el("saved-clubs-list");
+    list.innerHTML = "";
+    if (memberships && memberships.length > 0) {
+      memberships.forEach((m) => {
+        const li = document.createElement("li");
+        li.textContent = m.groups.name;
+        list.appendChild(li);
+      });
+      show("saved-clubs-wrap");
+    } else {
+      hide("saved-clubs-wrap");
+    }
+  } catch {
+    hide("saved-clubs-wrap");
+  }
+}
+
+// ---------- Workout list (view all sources; edit / delete own web uploads only) ----------
+
+const CODE_TO_LABEL = Object.fromEntries(
+  Array.from(el("activity-select").options).map((o) => [Number(ACTIVITY_TO_CODE[o.value]), o.textContent]),
+);
+
+async function loadHistory() {
+  // Every workout this account has, any source — same as the app's own Dashboard list (user
+  // request 08-21: "show the submitted workouts, with their details and score, similar to the
+  // app"). Only source = 'web_photo' rows get Edit/Delete below; a Health-Connect-synced row is
+  // shown for visibility only, same reasoning the original Workouts tab already documented for
+  // why this page shouldn't touch those.
+  const { data, error } = await supabase
+    .from("workouts")
+    .select("id, exercise_type, duration_mins, calories, avg_heart_rate, local_date, created_at, points_earned, rejected_at, rejected_reason, source")
+    .eq("user_id", currentSession.user.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  const list = el("history-list");
+  list.innerHTML = "";
+
+  if (error || !data || data.length === 0) {
+    hide("history-list");
+    show("history-empty");
+    if (error) console.error("Couldn't load workouts:", error);
+    return;
+  }
+
+  hide("history-empty");
+  show("history-list");
+  data.forEach((w) => list.appendChild(renderHistoryRow(w)));
+}
+
+el("refresh-history-btn").addEventListener("click", loadHistory);
+
+function renderHistoryRow(w) {
+  const li = document.createElement("li");
+  li.className = "history-row";
+
+  const label = CODE_TO_LABEL[w.exercise_type] || "Workout";
+  const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
+  const isWebUpload = w.source === "web_photo";
+  const isRejected = !!w.rejected_at;
+
+  // Score/status readout — mirrors LeaderboardScreen.kt's formatPoints (2 decimals) for a scored
+  // workout, or a plain "Rejected" badge + reason for one that isn't counted (see
+  // 0084_fair_scoring_formula.sql / 0085_workout_rejection.sql).
+  const scoreHtml = isRejected
+    ? `<span class="badge badge-low">Rejected</span>`
+    : `<span class="badge badge-high">+${Number(w.points_earned ?? 0).toFixed(2)}</span>`;
+
+  const main = document.createElement("div");
+  main.className = "history-row-main";
+  main.innerHTML = `
+    <div style="min-width:0;">
+      <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
+      <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
+      ${isRejected && w.rejected_reason ? `<div class="rejected-reason">${escapeHtml(w.rejected_reason)}</div>` : ""}
+    </div>
+    <div class="history-row-score">${scoreHtml}</div>
+  `;
+  li.appendChild(main);
+
+  // Only a web-submitted workout can be edited/deleted from here — see this function's own doc
+  // comment above for why a Health-Connect-synced row doesn't get these actions.
+  if (!isWebUpload) return li;
+
+  const actions = document.createElement("div");
+  actions.className = "history-row-actions";
+  actions.innerHTML = `
+    <button class="btn-secondary history-edit-btn" type="button">Edit</button>
+    <button class="btn-secondary history-delete-btn" type="button" style="color:var(--danger);">Delete</button>
+  `;
+  li.appendChild(actions);
+
+  const editForm = document.createElement("div");
+  editForm.className = "history-edit-form hidden";
+  editForm.innerHTML = `
+    <div class="field">
+      <label>Activity</label>
+      <select class="edit-activity">${el("activity-select").innerHTML}</select>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Duration (min)</label>
+        <input type="number" class="edit-duration" min="1" max="600" inputmode="numeric" value="${w.duration_mins}" />
+      </div>
+      <div class="field">
+        <label>Calories</label>
+        <input type="number" class="edit-calories" min="0" max="5000" inputmode="numeric" value="${w.calories}" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Avg heart rate (bpm)</label>
+      <input type="number" class="edit-hr" min="30" max="220" inputmode="numeric" value="${w.avg_heart_rate}" />
+    </div>
+    <div class="history-edit-actions">
+      <button class="btn-primary edit-save-btn" type="button">Save changes</button>
+      <button class="btn-secondary edit-cancel-btn" type="button">Cancel</button>
+    </div>
+  `;
+  editForm.querySelector(".edit-activity").value =
+    Object.keys(ACTIVITY_TO_CODE).find((k) => ACTIVITY_TO_CODE[k] === w.exercise_type) || "other_workout";
+  li.appendChild(editForm);
+
+  actions.querySelector(".history-edit-btn").addEventListener("click", () => {
+    editForm.classList.toggle("hidden");
+  });
+  editForm.querySelector(".edit-cancel-btn").addEventListener("click", () => {
+    editForm.classList.add("hidden");
+  });
+  editForm.querySelector(".edit-save-btn").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const activity = editForm.querySelector(".edit-activity").value;
+      const duration = parseInt(editForm.querySelector(".edit-duration").value, 10);
+      const calories = parseInt(editForm.querySelector(".edit-calories").value, 10);
+      const hr = parseInt(editForm.querySelector(".edit-hr").value, 10);
+
+      // Recomputes points_earned/xp_earned/total_xp/level server-side — see
+      // 0069_web_workout_edit.sql for why this can't be a plain client-side UPDATE.
+      const { error } = await supabase.rpc("fn_edit_web_workout", {
+        p_workout_id: w.id,
+        p_duration_mins: duration,
+        p_calories: calories,
+        p_avg_heart_rate: hr,
+        p_exercise_type: ACTIVITY_TO_CODE[activity] ?? 0,
+      });
+      if (error) throw error;
+      await loadDashboard();
+    } catch (err) {
+      alert(err.message || "Couldn't save changes.");
+      btn.disabled = false;
+      btn.textContent = "Save changes";
+    }
+  });
+
+  actions.querySelector(".history-delete-btn").addEventListener("click", async () => {
+    if (!confirm(`Delete this ${label.toLowerCase()} workout? This can't be undone.`)) return;
+    const { error } = await supabase
+      .from("workouts")
+      .delete()
+      .eq("id", w.id)
+      .eq("user_id", currentSession.user.id)
+      .eq("source", "web_photo");
+    if (error) {
+      alert(error.message || "Couldn't delete this workout.");
+      return;
+    }
+    await loadDashboard();
+  });
+
+  return li;
+}
+
+// ---------- Boot ----------
+
+refreshSession();
+initGoogleSignIn();
+</script>
+</body>
+</html>
