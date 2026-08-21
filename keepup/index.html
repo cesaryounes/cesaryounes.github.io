@@ -1053,6 +1053,46 @@ Array.from(el("signed-in-view").querySelectorAll(".tab-nav button")).forEach((bt
   }, { passive: true });
 })();
 
+// ---------- Back button closes open overlays instead of leaving the page (user report 08-21:
+// "the web closes when the back arrow is clicked") ----------
+//
+// This page has no real navigation of its own — a single static file, tab switches are just DOM
+// class toggles — so without this, the device/browser back button had nothing of ours to step
+// back through, and fell straight through to whatever was open before this page, which read as
+// "the page just closes". Same idea as DashboardScreen.kt's BackHandler(enabled =
+// showAllWorkouts) — only overlay-like states (the submit flow, the create-club form) get a real
+// back-stack entry; switching between the 4 main tabs deliberately does NOT push history, same as
+// the Android app's own back button treats its bottom-nav tabs as peers, not a stack.
+
+let overlayCloser = null;
+
+function openOverlay(closer) {
+  overlayCloser = closer;
+  history.pushState({ keepupOverlay: true }, "");
+}
+
+// Every manual "close this overlay" control (Cancel/Done/etc.) calls this instead of closing
+// directly — routing every close through history.back() -> popstate -> the stored closer is what
+// keeps the pushed history entry and the visible state from ever drifting apart, so a later real
+// back-press can never land on an already-closed, stale entry. Falls back to calling closer
+// directly only if somehow nothing was pushed (defensive — openOverlay() is always called right
+// before an overlay is shown, so this shouldn't normally trigger).
+function closeOverlay(closer) {
+  if (overlayCloser) {
+    history.back();
+  } else if (closer) {
+    closer();
+  }
+}
+
+window.addEventListener("popstate", () => {
+  if (overlayCloser) {
+    const closer = overlayCloser;
+    overlayCloser = null;
+    closer();
+  }
+});
+
 // ---------- Gamification math ----------
 //
 // Client-side mirrors of Models.kt's XpCurve/StreakCurve/StatusTier — kept in sync manually with
@@ -1576,6 +1616,11 @@ function renderDirectoryRow(group) {
 // GroupsScreen.kt's own create dialog (see this tab's own doc comment above for why: a club made
 // on this page exists specifically to accept web-submitted workouts).
 
+function closeCreateClubFlow() {
+  hide("create-club-flow");
+  show("open-create-club-btn");
+}
+
 el("open-create-club-btn").addEventListener("click", () => {
   hide("open-create-club-btn");
   show("create-club-flow");
@@ -1583,11 +1628,11 @@ el("open-create-club-btn").addEventListener("click", () => {
   el("new-club-public").checked = true;
   el("new-club-gear-bonus").checked = false;
   hide("create-club-message");
+  openOverlay(closeCreateClubFlow);
 });
-el("cancel-create-club-btn").addEventListener("click", () => {
-  hide("create-club-flow");
-  show("open-create-club-btn");
-});
+// Routes through closeOverlay() (see its own doc comment) so the back button closes this the same
+// way Cancel does.
+el("cancel-create-club-btn").addEventListener("click", () => closeOverlay(closeCreateClubFlow));
 
 el("save-create-club-btn").addEventListener("click", async () => {
   const btn = el("save-create-club-btn");
@@ -1611,8 +1656,9 @@ el("save-create-club-btn").addEventListener("click", async () => {
     });
     if (error) throw error;
 
-    hide("create-club-flow");
-    show("open-create-club-btn");
+    // Consumes the history entry openOverlay() pushed when this flow opened, same as a manual
+    // Cancel would — a successful create is also "this overlay is done", not just a cancel.
+    closeOverlay(closeCreateClubFlow);
     await loadClubDirectory();
   } catch (err) {
     msg.textContent = err.message || "Couldn't create this club — try again.";
@@ -1907,6 +1953,7 @@ el("open-submit-btn").addEventListener("click", () => {
   hide("workouts-card");
   show("submit-flow");
   resetSubmitFlow();
+  openOverlay(() => collapseSubmitFlow({ refresh: false }));
 });
 
 function collapseSubmitFlow({ refresh = true } = {}) {
@@ -1919,8 +1966,10 @@ function collapseSubmitFlow({ refresh = true } = {}) {
   }
 }
 
-el("cancel-submit-btn").addEventListener("click", () => collapseSubmitFlow({ refresh: false }));
-el("done-submit-btn").addEventListener("click", () => collapseSubmitFlow());
+// Both route through closeOverlay() (see its own doc comment) instead of calling
+// collapseSubmitFlow() directly, so the back button closes this the exact same way Cancel/Done do.
+el("cancel-submit-btn").addEventListener("click", () => closeOverlay(() => collapseSubmitFlow({ refresh: false })));
+el("done-submit-btn").addEventListener("click", () => closeOverlay(() => collapseSubmitFlow()));
 el("log-another-btn").addEventListener("click", resetSubmitFlow);
 
 // Back to "how do you want to log this?" — used opening the flow fresh and after "Log another"
