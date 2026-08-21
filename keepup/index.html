@@ -210,7 +210,7 @@
   }
   .period-pill.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
-  .lb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .lb-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
   .lb-row:last-child { border-bottom: none; }
   .lb-row.is-me { background: rgba(204,255,0,0.06); margin: 0 -20px; padding: 10px 20px; border-radius: 8px; }
   .lb-rank { width: 24px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
@@ -253,6 +253,41 @@
     background: var(--accent-soft); color: var(--accent); border-radius: 6px;
     padding: 2px 6px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
   }
+
+  /* ---- Dashboard: level + XP card (user request 08-21 — "XP should be dashboard and not
+     profile", "are we able to show the level too") — mirrors DashboardScreen.kt's
+     GamificationCard: a ring with the level number in the center, XP + progress bar, tier badge.
+     Moved off the Profile tab entirely, not duplicated there. ---- */
+  .gami-row { display: flex; align-items: center; gap: 16px; }
+  .gami-ring { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+  .gami-ring svg { transform: rotate(-90deg); }
+  .gami-ring #gami-ring-progress { transition: stroke-dashoffset 0.5s ease; }
+  .gami-ring span {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; color: var(--text-main);
+  }
+  .gami-mid { flex: 1; min-width: 0; }
+  .gami-xp-row { display: flex; align-items: baseline; gap: 4px; }
+  .gami-xp-row span:first-child { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .gami-xp-label { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; }
+  .gami-tier { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; width: 44px; }
+  .tier-badge { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .gami-tier span {
+    font-size: 8.5px; font-weight: 800; color: var(--accent); letter-spacing: 0.03em;
+    text-align: center; line-height: 1.2;
+  }
+
+  /* ---- Workout list: activity icon tile (user request 08-21, "align" pass — mirrors
+     DashboardScreen.kt's WorkoutRow, which puts an accent-soft icon tile before the label). ---- */
+  .workout-icon-tile {
+    width: 38px; height: 38px; border-radius: 12px; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    color: var(--accent); font-weight: 800; font-size: 11px;
+  }
+
+  /* ---- Leaderboard: avatars (user request 08-21 — "show the profile picture/avatar in the
+     leaderboard"), same avatar-or-initials treatment Profile/Dashboard already use. ---- */
+  .podium-avatar-wrap { margin-bottom: 6px; }
 
   /* ---- Profile tab ---- */
   .profile-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -322,12 +357,6 @@
   .rank-delta { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex-shrink: 0; }
   .podium { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 18px; }
   .podium-slot { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
-  .podium-slot .podium-avatar {
-    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center;
-    justify-content: center; font-weight: 800; font-size: 15px; margin-bottom: 6px;
-    background: var(--card-raised); color: var(--accent); border: 2px solid var(--hairline);
-  }
-  .podium-slot.first .podium-avatar { width: 56px; height: 56px; font-size: 18px; border-color: var(--amber); }
   .podium-slot .podium-name { font-size: 12.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .podium-slot .podium-points { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
   .podium-slot .podium-bar {
@@ -409,6 +438,32 @@
            cluster that used to open this tab now lives in the top banner instead (see header
            above) — visible on every tab, not just this one. -->
       <div id="tab-dashboard" class="tab-view">
+        <!-- FIX (user request 08-21: "XP should be dashboard and not in the profile... are we
+             able to show the level too") — mirrors DashboardScreen.kt's GamificationCard: level
+             as the ring's center number (not a separate "LV" label — the ring itself is the level
+             indicator, same as the app), total XP + progress bar, tier badge. Filled by
+             loadGamificationCard(), called from loadDashboard(). -->
+        <div class="card" id="gamification-card">
+          <div class="gami-row">
+            <div class="gami-ring">
+              <svg viewBox="0 0 64 64" width="64" height="64">
+                <circle cx="32" cy="32" r="27" fill="none" stroke="var(--card-raised)" stroke-width="6" />
+                <circle id="gami-ring-progress" cx="32" cy="32" r="27" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" />
+              </svg>
+              <span id="gami-level">1</span>
+            </div>
+            <div class="gami-mid">
+              <div class="gami-xp-row"><span id="gami-xp">0</span><span class="gami-xp-label">XP</span></div>
+              <div class="xp-track"><div class="xp-fill" id="gami-xp-fill"></div></div>
+              <p class="muted" id="gami-xp-remaining" style="margin-top: 6px; font-size: 12px;">0 XP to level 2</p>
+            </div>
+            <div class="gami-tier">
+              <div class="tier-badge"></div>
+              <span id="gami-tier-name">ROOKIE</span>
+            </div>
+          </div>
+        </div>
+
         <button class="btn-primary" id="open-submit-btn" style="margin-bottom:16px;">+ Log a workout</button>
 
         <!-- Submit flow — hidden until "Log a workout" is tapped. -->
@@ -590,8 +645,10 @@
       <!-- ============ PROFILE ============
            Mirrors HomeScreen.kt's AccountTab (avatar, name, level) plus the streak/freeze/gems/
            multiplier readout it doesn't carry itself (that lives in TopBanner on Android, which
-           has no equivalent persistent header here — folded into Dashboard's stat-cluster
-           instead, this tab shows the level/XP/membership side). Sign out lives here now instead
+           has no equivalent persistent header here — folded into the top banner instead). The
+           full XP/tier detail card moved to Dashboard (user request 08-21: "XP should be
+           dashboard and not in the profile") — same split Android itself has (GamificationCard on
+           Dashboard, AccountTab keeps only a small "LV N" chip). Sign out lives here now instead
            of a separate top bar. -->
       <div id="tab-profile" class="tab-view hidden">
         <div class="card">
@@ -605,12 +662,6 @@
             </div>
             <div class="level-chip" id="profile-level-chip">LV 1</div>
           </div>
-        </div>
-
-        <div class="card">
-          <p class="section-label" id="profile-tier">ROOKIE</p>
-          <div class="xp-track"><div class="xp-fill" id="profile-xp-fill"></div></div>
-          <p class="muted" id="profile-xp-label">0 / 0 XP to next level</p>
         </div>
 
         <div class="card">
@@ -933,7 +984,36 @@ async function loadHeaderStats() {
 }
 
 async function loadDashboard() {
-  await loadHistory();
+  await Promise.all([loadHistory(), loadGamificationCard()]);
+}
+
+// Feeds the Dashboard's level/XP card (GamificationCard's equivalent — user request 08-21:
+// "XP should be dashboard and not in the profile"). Separate from loadHeaderStats() since this
+// only needs to run when the Dashboard tab itself is open, not on every tab switch.
+const GAMI_RING_CIRCUMFERENCE = 2 * Math.PI * 27;
+async function loadGamificationCard() {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("total_xp, level")
+    .eq("id", currentSession.user.id)
+    .single();
+  if (error || !profile) return;
+
+  const totalXp = profile.total_xp ?? 0;
+  const level = profile.level ?? levelForXp(totalXp);
+  const { fraction, floor, ceiling } = progressWithinLevel(totalXp);
+
+  el("gami-level").textContent = level;
+  el("gami-xp").textContent = totalXp.toLocaleString();
+  el("gami-xp-fill").style.width = Math.round(fraction * 100) + "%";
+  el("gami-xp-remaining").textContent = ceiling > floor
+    ? `${ceiling - totalXp} XP to level ${level + 1}`
+    : `${totalXp} XP total`;
+  el("gami-tier-name").textContent = statusTierFor(level).toUpperCase();
+
+  const ring = el("gami-ring-progress");
+  ring.style.strokeDasharray = GAMI_RING_CIRCUMFERENCE;
+  ring.style.strokeDashoffset = GAMI_RING_CIRCUMFERENCE * (1 - fraction);
 }
 
 // ---------- Clubs + leaderboard ----------
@@ -1087,6 +1167,19 @@ function initialsFor(name) {
   return (name || "?").trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 }
 
+// Inline-HTML version of renderAvatar() (Profile tab) — img-or-initials, same fallback rule —
+// used wherever an avatar is built via a template string (leaderboard rows/podium) rather than
+// appendChild (user request 08-21: "show the profile picture/avatar in the leaderboard").
+// get_leaderboard() already returns avatar_url per row (0088_leaderboard_push_token_flag.sql's
+// SELECT list), so this needed no server-side change.
+function avatarHtml(name, avatarUrl, sizePx, borderColor) {
+  const border = borderColor ? `border:2px solid ${borderColor};` : "";
+  if (avatarUrl) {
+    return `<img src="${avatarUrl}" alt="" style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;object-fit:cover;flex-shrink:0;${border}" />`;
+  }
+  return `<div class="avatar-initials" style="width:${sizePx}px;height:${sizePx}px;font-size:${Math.round(sizePx * 0.4)}px;${border}">${escapeHtml(initialsFor(name))}</div>`;
+}
+
 async function loadClubLeaderboard() {
   const params = { p_period: currentPeriod, p_group_id: null, p_region_code: null };
   if (currentScope.type === "club") params.p_group_id = currentScope.id;
@@ -1144,7 +1237,7 @@ function renderLeaderboardRows(rows) {
       const slot = document.createElement("div");
       slot.className = "podium-slot " + slotNames[i];
       slot.innerHTML = `
-        <div class="podium-avatar">${escapeHtml(initialsFor(r.display_name))}</div>
+        <div class="podium-avatar-wrap">${avatarHtml(r.display_name, r.avatar_url, i === 0 ? 56 : 44, i === 0 ? "var(--amber)" : "var(--hairline)")}</div>
         <div class="podium-name">${escapeHtml(r.display_name || "Member")}</div>
         <div class="podium-points">${Number(r.period_points ?? 0).toFixed(2)}${rankDeltaHtml(r._delta)}</div>
         <div class="podium-bar">${i + 1}</div>
@@ -1173,6 +1266,7 @@ function renderLeaderboardRows(rows) {
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
+      ${avatarHtml(r.display_name, r.avatar_url, 28)}
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
@@ -1365,16 +1459,10 @@ async function loadProfile() {
   el("profile-name").textContent = profile.display_name || "Athlete";
   el("profile-email").textContent = currentSession.user.email ?? "";
 
+  // Level chip only — the full XP/tier detail lives on the Dashboard's GamificationCard-
+  // equivalent now (loadGamificationCard), not here. See this tab's own doc comment.
   const level = profile.level ?? levelForXp(profile.total_xp ?? 0);
   el("profile-level-chip").textContent = `LV ${level}`;
-  el("profile-tier").textContent = statusTierFor(level).toUpperCase();
-
-  const totalXp = profile.total_xp ?? 0;
-  const { fraction, floor, ceiling } = progressWithinLevel(totalXp);
-  el("profile-xp-fill").style.width = Math.round(fraction * 100) + "%";
-  el("profile-xp-label").textContent = ceiling > floor
-    ? `${totalXp - floor} / ${ceiling - floor} XP to level ${level + 1}`
-    : `${totalXp} XP total`;
 
   const streak = profile.current_streak ?? 0;
   el("profile-streak").textContent = streak === 1 ? "1 day" : `${streak} days`;
@@ -1738,6 +1826,16 @@ const ACTIVITY_TO_CODE = {
   boxing: 11, dancing: 16, other_workout: 0,
 };
 
+// Short fallback glyph for the workout list's icon tile (user request 08-21, "align" pass) —
+// mirrors WorkoutRow's accent-soft icon tile (DashboardScreen.kt), which shows a real icon image
+// when one's on file and a short text code otherwise; this page only has the fallback available
+// (no icon-asset hosting wired up here), so every activity always renders as its code.
+const ACTIVITY_CODE_ABBR = {
+  running: "RUN", walking: "WLK", cycling: "CYC", swimming: "SWM", strength_training: "STR",
+  hiking: "HIK", yoga: "YGA", rowing: "ROW", elliptical: "ELL", stair_climbing: "STC",
+  boxing: "BOX", dancing: "DNC", other_workout: "OTH",
+};
+
 el("save-btn").addEventListener("click", async () => {
   const saveBtn = el("save-btn");
   saveBtn.disabled = true;
@@ -1855,6 +1953,7 @@ function renderHistoryRow(w) {
   li.className = "history-row";
 
   const label = CODE_TO_LABEL[w.exercise_type] || "Workout";
+  const activityKey = Object.keys(ACTIVITY_TO_CODE).find((k) => ACTIVITY_TO_CODE[k] === w.exercise_type) || "other_workout";
   const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
   const isWebUpload = w.source === "web_photo";
   const isRejected = !!w.rejected_at;
@@ -1869,7 +1968,8 @@ function renderHistoryRow(w) {
   const main = document.createElement("div");
   main.className = "history-row-main";
   main.innerHTML = `
-    <div style="min-width:0;">
+    <div class="workout-icon-tile">${ACTIVITY_CODE_ABBR[activityKey] || "OTH"}</div>
+    <div style="min-width:0; flex:1;">
       <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
       <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
       ${isRejected && w.rejected_reason ? `<div class="rejected-reason">${escapeHtml(w.rejected_reason)}</div>` : ""}
@@ -1916,8 +2016,7 @@ function renderHistoryRow(w) {
       <button class="btn-secondary edit-cancel-btn" type="button">Cancel</button>
     </div>
   `;
-  editForm.querySelector(".edit-activity").value =
-    Object.keys(ACTIVITY_TO_CODE).find((k) => ACTIVITY_TO_CODE[k] === w.exercise_type) || "other_workout";
+  editForm.querySelector(".edit-activity").value = activityKey;
   li.appendChild(editForm);
 
   actions.querySelector(".history-edit-btn").addEventListener("click", () => {
