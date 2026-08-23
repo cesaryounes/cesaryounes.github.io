@@ -1277,11 +1277,30 @@ function renderAuthState() {
     show("stat-cluster");
     collapseSubmitFlow({ refresh: false });
     switchTab(lastActiveTab());
+    prefetchOtherTabs(lastActiveTab());
   } else {
     show("signed-out-view");
     hide("signed-in-view");
     hide("stat-cluster");
   }
+}
+
+// FIX (user report 08-24: "swiping left lags... then the values gets populated") — each tab's data
+// used to only start fetching the moment you actually switched to it, so swiping there on a cold
+// page (competing with the just-active tab's own still-in-flight requests) meant a real, visible
+// pause before real numbers appeared — not a rendering issue, a genuine "hasn't fetched yet" one.
+// This quietly loads the OTHER tabs' data in the background once the browser is idle (so it never
+// competes with or slows down the active tab's own critical-path load), so by the time you actually
+// swipe there the data's often already sitting ready. loadMyClubs()/loadClubDirectory()/
+// loadProfile() are all safe to call while hidden (they populate fixed DOM ids regardless of which
+// tab is currently showing) and idempotent (switchTab() calling the same one again on arrival is
+// harmless, just a redundant re-fetch if the prefetch hadn't finished yet).
+function prefetchOtherTabs(activeTab) {
+  const loaders = { leaderboard: loadMyClubs, club: loadClubDirectory, profile: loadProfile };
+  const runIdle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
+  TAB_ORDER.filter((t) => t !== activeTab && loaders[t]).forEach((t) => {
+    runIdle(() => loaders[t]());
+  });
 }
 
 el("sign-out-btn").addEventListener("click", async () => {
