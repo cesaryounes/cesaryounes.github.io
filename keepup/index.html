@@ -227,6 +227,19 @@
     background: transparent; color: var(--text-muted); border-radius: 8px;
   }
   .tab-nav button.active { background: var(--accent); color: #0B0E14; }
+  .nav-more-btn { flex: 0 0 auto; width: 40px; padding: 9px 0; font-size: 16px; letter-spacing: 1px; }
+  .more-menu {
+    position: relative; margin: -14px 0 20px; background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .more-menu-row {
+    width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+    background: transparent; color: var(--text-main); font-size: 14px; font-weight: 700;
+    text-align: left; border-radius: 0;
+  }
+  .more-menu-row:active { background: var(--card-raised); }
+  .more-menu-row svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+  .more-menu-row + .more-menu-row { border-top: 1px solid var(--hairline); }
   .tab-view.hidden { display: none !important; }
 
   .directory-row {
@@ -271,7 +284,12 @@
   .gami-xp-row span:first-child { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .gami-xp-label { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; }
   .gami-tier { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; width: 44px; }
-  .tier-badge { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .tier-badge { width: 32px; height: 32px; }
+  .tier-legend-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin: -6px 0 16px; }
+  .tier-legend-item { flex-shrink: 0; width: 62px; text-align: center; }
+  .tier-legend-badge { width: 36px; height: 36px; margin: 0 auto 4px; }
+  .tier-legend-name { font-size: 10px; font-weight: 800; color: var(--text-main); }
+  .tier-legend-range { font-size: 9px; color: var(--text-muted); font-family: monospace; }
   .gami-tier span {
     font-size: 8.5px; font-weight: 800; color: var(--accent); letter-spacing: 0.03em;
     text-align: center; line-height: 1.2;
@@ -331,6 +349,72 @@
   .membership-title { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
   .membership-card.is-active .membership-title { color: var(--accent); }
   .membership-desc { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+
+  /* ---- Full-screen overlays (Membership/Settings/Shop) — same "pushed on top of a tab" role
+     SubscriptionScreen.kt/SettingsScreen.kt/RewardsShopScreen.kt play in the app, none of them
+     part of the persistent tab bar. Shared header shape: back arrow + title, everything below
+     scrolls independently of whatever tab is still sitting underneath. ---- */
+  .screen-overlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 40;
+    overflow-y: auto; padding: 16px;
+  }
+  .screen-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .screen-back-btn {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--card);
+    border: 1px solid var(--hairline); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .screen-back-btn svg { width: 18px; height: 18px; }
+  .screen-title { font-size: 19px; font-weight: 800; margin: 0; }
+
+  /* ---- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt's own table) ---- */
+  .compare-table { border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
+  .compare-head, .compare-row {
+    display: flex; align-items: center; padding: 11px 16px; gap: 8px;
+  }
+  .compare-head { background: var(--card-raised); border-bottom: 1px solid var(--hairline); }
+  .compare-row + .compare-row { border-top: 1px solid var(--hairline); }
+  .compare-feature { flex: 1; font-size: 13px; color: var(--text-main); }
+  .compare-col { width: 64px; text-align: center; flex-shrink: 0; }
+  .compare-head .compare-col { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; color: var(--text-muted); }
+  .compare-head .compare-col.premium-col { color: var(--accent); }
+  .compare-check { display: inline-flex; width: 18px; height: 18px; }
+  .compare-check.yes { color: var(--accent); }
+  .compare-check.no { color: var(--text-muted); opacity: 0.35; }
+
+  /* ---- Appearance theme picker (Settings) ---- */
+  .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .theme-swatch {
+    border: 2px solid var(--hairline); border-radius: 14px; padding: 14px; text-align: left;
+    background: var(--card); cursor: pointer;
+  }
+  .theme-swatch.active { border-color: var(--theme-accent-preview); }
+  .theme-swatch-dot { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; background: var(--theme-accent-preview); }
+  .theme-swatch-name { font-size: 13px; font-weight: 800; color: var(--text-main); }
+  .theme-swatch-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ---- Shop (Gear/Boosts/Frames) ---- */
+  .shop-tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--card); border: 1px solid var(--hairline); border-radius: 12px; padding: 5px; }
+  .shop-tabs button { flex: 1; min-height: 36px; padding: 8px 2px; font-size: 12px; font-weight: 700; background: transparent; color: var(--text-muted); border-radius: 8px; }
+  .shop-tabs button.active { background: var(--accent); color: #0B0E14; }
+  .gear-group-pills { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px; }
+  .gear-group-pill { flex-shrink: 0; padding: 9px 16px; border-radius: 24px; background: transparent; border: 1px solid var(--hairline); color: var(--text-muted); font-size: 13px; font-weight: 700; }
+  .gear-group-pill.active { background: var(--text-main); color: var(--bg); border-color: var(--text-main); }
+  .gear-row, .frame-card {
+    display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px;
+    background: var(--card); border: 1px solid var(--hairline); margin-bottom: 10px;
+  }
+  .gear-row.equipped, .frame-card.equipped { border-color: var(--accent); }
+  .gear-art-tile { width: 92px; height: 66px; border-radius: 11px; background: #0E1218; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .gear-art-tile svg, .gear-art-tile img { width: 86px; height: 54px; }
+  .gear-info { flex: 1; min-width: 0; }
+  .gear-tier-label { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .gear-name { font-size: 14px; font-weight: 700; color: var(--text-main); margin: 2px 0; }
+  .gear-material { font-size: 11px; color: var(--text-muted); }
+  .gear-action { flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 800; }
+  .gear-action.owned { color: var(--text-muted); }
+  .gear-action.equipped-label { color: var(--accent); }
+  .gear-action.cost { color: var(--amber); }
+  .frame-swatch { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 3px solid; flex-shrink: 0; }
 
   /* ---- Profile: avatar picker + danger zone (user request 08-21, item 1/5) ---- */
   .avatar-edit-wrap {
@@ -447,7 +531,29 @@
         <button id="nav-club" data-tab="club">Club</button>
         <button id="nav-leaderboard" data-tab="leaderboard">Leaderboard</button>
         <button id="nav-profile" data-tab="profile">Profile</button>
+        <!-- FIX (user request 08-23): "•••" More button — same role as HomeScreen.kt's bottom-nav
+             More tab, opening a small menu to destinations that aren't part of the persistent tab
+             bar (Membership/Settings/Shop are all modal overlays in the app too, pushed on top of
+             a tab rather than being tabs themselves — see #more-menu and the 3 #screen-* overlays
+             below). Deliberately excludes "Profile" from the menu list itself since that's already
+             its own real tab here, unlike on Android where it's folded into this same menu. -->
+        <button id="nav-more" class="nav-more-btn" aria-label="More" aria-haspopup="true">•••</button>
       </nav>
+
+      <div class="more-menu hidden" id="more-menu">
+        <button class="more-menu-row" id="more-menu-membership">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.5-6.3 4.5 2.3-7.2-6-4.6h7.6z"/></svg>
+          Membership
+        </button>
+        <button class="more-menu-row" id="more-menu-shop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
+          Shop
+        </button>
+        <button class="more-menu-row" id="more-menu-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </button>
+      </div>
 
       <!-- ============ DASHBOARD ============
            A "Log a workout" entry point that expands the same photo -> parse -> confirm -> save
@@ -481,6 +587,12 @@
             </div>
           </div>
         </div>
+
+        <!-- Tier legend (user request 08-23: "use the same legends for the status: Rookie,
+             Warrior... all of these") — same 9 tiers/level ranges as StatusTier.kt, same badge
+             glyphs as TierBadge.kt (tierBadgeSvg() below), just laid out as a horizontal-scroll
+             reference strip instead of one badge for your own current tier. -->
+        <div class="tier-legend-scroll" id="tier-legend-row"></div>
 
         <!-- FIX (user request 08-21: "show the points too") — mirrors DashboardScreen.kt's
              Activity Summary card: a period switcher (same Week/Month/Year/All the Leaderboard
@@ -804,16 +916,10 @@
           <p class="muted hidden" id="profile-save-message" style="margin-top:10px;"></p>
         </div>
 
-        <div class="card membership-card" id="membership-card">
-          <p class="membership-title" id="membership-title">Standard plan</p>
-          <p class="membership-desc" id="membership-desc">Upgrade from the KeepUp Android app, or redeem a promo code below.</p>
-          <div class="field" style="margin-bottom:10px;">
-            <input type="text" id="promo-input" placeholder="Promo code" style="text-transform:uppercase;" />
-          </div>
-          <button class="btn-primary" id="promo-redeem-btn">Redeem</button>
-          <p class="muted hidden" id="promo-message" style="margin-top:10px;"></p>
-        </div>
-
+        <!-- FIX (user request 08-23): membership status + promo code moved out to its own
+             "Membership" overlay (see #screen-membership below), same split the app itself uses
+             (SubscriptionScreen.kt is its own destination, not part of AccountTab) — reached from
+             the new ••• menu next to the tab bar instead of living inline on this tab. -->
         <button class="btn-text" id="sign-out-btn">Sign out</button>
 
         <!-- FIX (user request 08-21, item 5) — was no way to delete a web account at all. Same
@@ -833,6 +939,93 @@
     </div>
   </div>
 
+  <!-- ============ MEMBERSHIP (user request 08-23) ============
+       Own destination reached from the ••• menu, matching SubscriptionScreen.kt's own separation
+       from AccountTab — status/promo code (moved out of the Profile tab, same elements/ids just
+       relocated) plus the Standard-vs-Premium comparison table (PREMIUM_FEATURES,
+       SubscriptionScreen.kt), populated by JS below from the exact same feature list. -->
+  <div class="screen-overlay hidden" id="screen-membership">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-membership">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title">Membership</p>
+    </div>
+    <div class="card membership-card" id="membership-card">
+      <p class="membership-title" id="membership-title">Standard plan</p>
+      <p class="membership-desc" id="membership-desc">Upgrade from the KeepUp Android app, or redeem a promo code below.</p>
+      <div class="field" style="margin-bottom:10px;">
+        <input type="text" id="promo-input" placeholder="Promo code" style="text-transform:uppercase;" />
+      </div>
+      <button class="btn-primary" id="promo-redeem-btn">Redeem</button>
+      <p class="muted hidden" id="promo-message" style="margin-top:10px;"></p>
+    </div>
+    <p class="section-label" style="margin: 20px 0 10px;">What's included</p>
+    <div class="compare-table" id="compare-table"></div>
+    <p class="muted" style="font-size:12px;">Upgrading itself happens through the KeepUp Android app's own subscription flow (Play Billing) — this page can only show what each plan includes and redeem a promo code.</p>
+  </div>
+
+  <!-- ============ SETTINGS (user request 08-23) ============
+       Scoped to what actually applies on a browser per this conversation: Appearance only —
+       notification toggles are meaningless here (no service worker/push infrastructure on this
+       page at all, confirmed by grepping for one), and theme/Health-Connect-setup are Android-only
+       concepts. Theme choice is local-only (localStorage), matching how AppViewModel.loadPreferences
+       already treats it as a per-device preference on Android too, not a synced profiles column. -->
+  <div class="screen-overlay hidden" id="screen-settings">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title">Settings</p>
+    </div>
+    <p class="section-label" style="margin-bottom:10px;">Appearance</p>
+    <div class="theme-grid" id="theme-grid"></div>
+  </div>
+
+  <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
+       Gear/Boosts/Frames, same 3 tabs and same buy-then-equip-separately flow RewardsShopScreen.kt
+       uses (0095_shop_buy_equip_separation_and_leaderboard_cosmetics.sql) — fully functional, same
+       RPCs (fn_unlock_gear/fn_set_gear_showcase/fn_unlock_avatar_frame/fn_equip_avatar_frame/
+       fn_redeem_streak_freeze_with_gems), so gems/ownership/equipped state stay in sync with the
+       app since it's the same account either way. -->
+  <div class="screen-overlay hidden" id="screen-shop">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-shop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title" style="flex:1;">Shop</p>
+      <div class="stat-cell" style="color:var(--amber);">
+        <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
+        <span id="shop-gems" style="color:var(--text-main);">0</span>
+      </div>
+    </div>
+    <div class="shop-tabs" id="shop-tabs">
+      <button data-shop-tab="gear" class="active">Gear</button>
+      <button data-shop-tab="boosts">Boosts</button>
+      <button data-shop-tab="frames">Frames</button>
+    </div>
+    <div id="shop-tab-gear">
+      <div class="gear-group-pills" id="gear-group-pills"></div>
+      <div id="gear-list"></div>
+    </div>
+    <div id="shop-tab-boosts" class="hidden">
+      <div class="card">
+        <p class="gear-name" style="margin-top:0;">Streak Freeze</p>
+        <p class="muted" style="margin-bottom:14px;">Protects your streak for one missed day. Used automatically the next time you'd otherwise lose it.</p>
+        <div class="btn-row">
+          <span class="muted" id="freeze-owned-count" style="align-self:center;">0 owned</span>
+          <button class="btn-primary" id="buy-freeze-btn">40 <svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px;"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div id="shop-tab-frames" class="hidden"></div>
+  </div>
+
+<!-- Real per-item SVG path/gradient data for the Gear shop — same source GearArt.kt renders from
+     (gear/scripts/parsed_gear.json, the Claude Design handoff), just emitted as SVG instead of
+     Compose Canvas calls. Loaded as a plain global (window.GEAR_ART) rather than inlined into the
+     module script below, purely to keep this already-large file's own source easier to scroll. -->
+<script src="gear-art-data.js"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -1147,14 +1340,130 @@ function multiplierForStreak(streak) {
   return Math.min(1.5, 1 + Math.max(0, streak - 1) * (0.5 / 14));
 }
 const STATUS_TIERS = [
-  { name: "Rookie", min: 1 }, { name: "Grinder", min: 6 }, { name: "Athlete", min: 11 },
-  { name: "Warrior", min: 21 }, { name: "Elite", min: 31 }, { name: "Champion", min: 41 },
-  { name: "Master", min: 51 }, { name: "Titan", min: 71 }, { name: "Legend", min: 91 },
+  { id: "rookie", name: "Rookie", min: 1, max: 5 }, { id: "grinder", name: "Grinder", min: 6, max: 10 },
+  { id: "athlete", name: "Athlete", min: 11, max: 20 }, { id: "warrior", name: "Warrior", min: 21, max: 30 },
+  { id: "elite", name: "Elite", min: 31, max: 40 }, { id: "champion", name: "Champion", min: 41, max: 50 },
+  { id: "master", name: "Master", min: 51, max: 70 }, { id: "titan", name: "Titan", min: 71, max: 90 },
+  { id: "legend", name: "Legend", min: 91, max: Infinity },
 ];
-function statusTierFor(level) {
+function statusTierObjFor(level) {
   let tier = STATUS_TIERS[0];
   for (const t of STATUS_TIERS) if (level >= t.min) tier = t;
-  return tier.name;
+  return tier;
+}
+function statusTierFor(level) {
+  return statusTierObjFor(level).name;
+}
+
+// ---------- Tier badges (user request 08-23: "use the same legends for the status... all of
+// these") — faithful port of TierBadge.kt's own Canvas drawing (same fillAlpha/ringCount/icon
+// logic per tier, ported to real SVG once already this session for a design-handoff export), not
+// a redrawn approximation. Colors are read live off the current theme's CSS custom properties
+// (getComputedStyle) rather than hardcoded, so a tier badge stays correct if Appearance changes
+// the active theme — TierBadge.kt itself reads Amber/TextMuted/TextMain/CardBg the same
+// theme-driven way, not fixed hex values. ----------
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+const TIER_FILL_ALPHA = { rookie: 0, grinder: 0.12, athlete: 0.18, warrior: 0.30, elite: 0.42, champion: 0.58, master: 0.72, titan: 0.85, legend: 0.18 };
+const TIER_RING_COUNT = { rookie: 0, grinder: 0, athlete: 1, warrior: 1, elite: 2, champion: 2, master: 2, titan: 3, legend: 3 };
+
+function tierBadgeSvg(tierId, size) {
+  const isLegend = tierId === "legend";
+  const amber = cssVar("--amber") || "#FFC400";
+  const textMuted = cssVar("--text-muted") || "#8B949E";
+  const textMain = cssVar("--text-main") || "#F0F6FC";
+  const cardBg = cssVar("--card") || "#161B22";
+  const ringColor = isLegend ? amber : hexToRgba(textMuted, 0.5);
+  const fillColor = isLegend ? amber : textMain;
+  const fillAlpha = TIER_FILL_ALPHA[tierId];
+  const iconColor = isLegend ? amber : (fillAlpha > 0.45 ? cardBg : textMuted);
+  const ringCount = TIER_RING_COUNT[tierId];
+  const cx = size / 2, cy = size / 2, minDim = size;
+  const badgeRadius = (minDim / 2) * 0.86;
+  let els = "";
+  for (let r = 0; r < ringCount; r++) {
+    const radius = badgeRadius + (r + 1) * (minDim * 0.06);
+    els += `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${ringColor}" stroke-width="${minDim * 0.035}"/>`;
+  }
+  if (fillAlpha > 0) {
+    els += `<circle cx="${cx}" cy="${cy}" r="${badgeRadius}" fill="${fillColor}" fill-opacity="${fillAlpha}"/>`;
+  } else {
+    els += `<circle cx="${cx}" cy="${cy}" r="${badgeRadius}" fill="none" stroke="${ringColor}" stroke-width="${minDim * 0.035}"/>`;
+  }
+  const boxSize = minDim * 0.56;
+  const boxOrigin = { x: cx - boxSize / 2, y: cy - boxSize / 2 };
+  const vb = (x, y) => ({ x: boxOrigin.x + (x / 24) * boxSize, y: boxOrigin.y + (y / 24) * boxSize });
+  const strokeWidth = boxSize * 0.11;
+  function chevron(top, bottom, alpha) {
+    alpha = alpha == null ? 1 : alpha;
+    const a = vb(5, bottom), b = vb(12, top), c = vb(19, bottom);
+    const w = strokeWidth * Math.max(alpha, 0.6);
+    els += `<path d="M ${a.x} ${a.y} L ${b.x} ${b.y} L ${c.x} ${c.y}" fill="none" stroke="${iconColor}" stroke-opacity="${alpha}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  function line(p1, p2, alpha, widthMul) {
+    const a = vb(p1[0], p1[1]), b = vb(p2[0], p2[1]);
+    els += `<path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" fill="none" stroke="${iconColor}" stroke-opacity="${alpha}" stroke-width="${strokeWidth * widthMul}" stroke-linecap="round"/>`;
+  }
+  function polyline(points, alpha, widthMul) {
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${vb(p[0], p[1]).x} ${vb(p[0], p[1]).y}`).join(" ");
+    els += `<path d="${d}" fill="none" stroke="${iconColor}" stroke-opacity="${alpha}" stroke-width="${strokeWidth * widthMul}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  function closedShape(points, alpha, widthMul) {
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${vb(p[0], p[1]).x} ${vb(p[0], p[1]).y}`).join(" ") + " Z";
+    els += `<path d="${d}" fill="none" stroke="${iconColor}" stroke-opacity="${alpha}" stroke-width="${strokeWidth * widthMul}" stroke-linejoin="round"/>`;
+  }
+  function dot(p, radiusMul, alpha) {
+    const c = vb(p[0], p[1]);
+    els += `<circle cx="${c.x}" cy="${c.y}" r="${boxSize * radiusMul}" fill="${iconColor}" fill-opacity="${alpha}"/>`;
+  }
+  switch (tierId) {
+    case "rookie": chevron(6, 15, 1); dot([12, 18.5], 0.06, 1); break;
+    case "grinder": chevron(6, 13.5, 1); chevron(12, 18, 0.6); break;
+    case "athlete":
+      line([2, 17], [7, 17], 0.35, 0.8); line([3, 13.5], [8.5, 13.5], 0.55, 0.8); line([5, 10], [10.5, 10], 0.8, 0.8);
+      polyline([[8, 18], [15.5, 8.5], [21, 18]], 1, 1);
+      break;
+    case "warrior": closedShape([[12, 3.5], [19, 6.5], [19, 12], [12, 21], [5, 12], [5, 6.5]], 0.7, 0.55); chevron(8, 13, 1); break;
+    case "elite": closedShape([[12, 3], [19, 9], [12, 21], [5, 9]], 0.7, 0.5); chevron(8, 11.5, 1); break;
+    case "champion": {
+      const p1 = vb(4, 8), c1 = vb(4, 12), c2 = vb(5, 15), p2 = vb(12, 15), c3 = vb(19, 15), c4 = vb(20, 12), p3 = vb(20, 8);
+      els += `<path d="M ${p1.x} ${p1.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${p2.x} ${p2.y} C ${c3.x} ${c3.y} ${c4.x} ${c4.y} ${p3.x} ${p3.y}" fill="none" stroke="${iconColor}" stroke-opacity="0.55" stroke-width="${strokeWidth * 0.45}" stroke-linecap="round"/>`;
+      dot([4.5, 7.5], 0.055, 0.55); dot([19.5, 7.5], 0.055, 0.55);
+      chevron(6.5, 15, 1);
+      polyline([[9.5, 19], [12, 15.5], [14.5, 19]], 0.7, 0.8);
+      break;
+    }
+    case "master": closedShape([[12, 2.5], [20.5, 7.25], [20.5, 16.75], [12, 21.5], [3.5, 16.75], [3.5, 7.25]], 0.7, 0.5); chevron(8, 15, 1); break;
+    case "titan": case "legend":
+      polyline([[6, 16], [12, 6.5], [18, 16]], 1, 1.15);
+      polyline([[8.5, 20], [12, 15], [15.5, 20]], 0.75, 0.85);
+      break;
+  }
+  if (isLegend) {
+    const sparkRadius = minDim * 0.045;
+    const offset = badgeRadius + ringCount * (minDim * 0.06) + sparkRadius;
+    [-1, 1].forEach((sx) => [-1, 1].forEach((sy) => {
+      els += `<circle cx="${cx + sx * offset * 0.74}" cy="${cy + sy * offset * 0.74}" r="${sparkRadius}" fill="${amber}"/>`;
+    }));
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${els}</svg>`;
+}
+function hexToRgba(hex, alpha) {
+  if (!hex || !hex.startsWith("#")) return hex;
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function renderTierLegend() {
+  const row = el("tier-legend-row");
+  if (!row) return;
+  row.innerHTML = STATUS_TIERS.map((t) => `
+    <div class="tier-legend-item">
+      <div class="tier-legend-badge">${tierBadgeSvg(t.id, 36)}</div>
+      <div class="tier-legend-name">${t.name}</div>
+      <div class="tier-legend-range">${t.max === Infinity ? `Lv ${t.min}+` : `Lv ${t.min}–${t.max}`}</div>
+    </div>`).join("");
 }
 
 // ---------- Top banner stats + Dashboard workout list ----------
@@ -1284,7 +1593,11 @@ async function loadGamificationCard() {
   el("gami-xp-remaining").textContent = ceiling > floor
     ? `${ceiling - totalXp} XP to level ${level + 1}`
     : `${totalXp} XP total`;
-  el("gami-tier-name").textContent = statusTierFor(level).toUpperCase();
+  const tierObj = statusTierObjFor(level);
+  el("gami-tier-name").textContent = tierObj.name.toUpperCase();
+  const badgeEl = document.querySelector("#tab-dashboard .tier-badge");
+  if (badgeEl) badgeEl.innerHTML = tierBadgeSvg(tierObj.id, 32);
+  renderTierLegend();
 
   const ring = el("gami-ring-progress");
   ring.style.strokeDasharray = GAMI_RING_CIRCUMFERENCE;
@@ -2481,8 +2794,361 @@ function renderHistoryRow(w) {
   return li;
 }
 
+// ---------- ••• More menu + Membership/Settings/Shop overlays (user request 08-23) ----------
+// Same role as HomeScreen.kt's bottom-nav More tab — reaches destinations that are pushed on top
+// of a tab, not tabs themselves, matching how SubscriptionScreen/SettingsScreen/RewardsShopScreen
+// aren't part of the app's own bottom nav either. Reuses openOverlay/closeOverlay above (the same
+// back-button-closes-overlays mechanism the Create Club flow already uses) so the device back
+// button closes these too instead of leaving the page.
+el("nav-more").addEventListener("click", (e) => {
+  e.stopPropagation();
+  el("more-menu").classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+  if (!el("more-menu").classList.contains("hidden") && e.target.id !== "nav-more" && !e.target.closest("#more-menu")) {
+    el("more-menu").classList.add("hidden");
+  }
+});
+
+function openScreen(id) {
+  el("more-menu").classList.add("hidden");
+  show(id);
+  openOverlay(() => hide(id));
+}
+Array.from(document.querySelectorAll("[data-close-screen]")).forEach((btn) => {
+  btn.addEventListener("click", () => closeOverlay(() => hide(btn.dataset.closeScreen)));
+});
+
+el("more-menu-membership").addEventListener("click", () => {
+  openScreen("screen-membership");
+  renderCompareTable();
+  // renderMembershipCard() (status text) only ever gets called from inside loadProfile() — fine
+  // when Profile's already been visited this session, stale otherwise (opening Membership
+  // straight from a fresh sign-in, before ever touching the Profile tab). Call it explicitly here
+  // too so the status is always fresh regardless of tab-visit history.
+  loadProfile();
+});
+el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); renderThemeGrid(); });
+el("more-menu-shop").addEventListener("click", () => { openScreen("screen-shop"); loadShop(); });
+
+// ---------- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt) ----------
+const PREMIUM_FEATURES = [
+  { label: "Global leaderboard", free: true },
+  { label: "Create and join public clubs (up to 3)", free: true },
+  { label: "Create and join private clubs", free: false },
+  { label: "Club leaderboards", free: false },
+  { label: "Streak freezes (4/month)", free: false },
+  { label: "Nudge your clubmates", free: false },
+  { label: "Ad-free", free: false },
+];
+function compareCheckIcon(yes) {
+  return yes
+    ? '<svg class="compare-check yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+    : '<svg class="compare-check no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+}
+function renderCompareTable() {
+  let html = `<div class="compare-head"><span class="compare-feature"></span><span class="compare-col">STANDARD</span><span class="compare-col premium-col">PREMIUM</span></div>`;
+  PREMIUM_FEATURES.forEach((f) => {
+    html += `<div class="compare-row"><span class="compare-feature">${escapeHtml(f.label)}</span><span class="compare-col">${compareCheckIcon(f.free)}</span><span class="compare-col">${compareCheckIcon(true)}</span></div>`;
+  });
+  el("compare-table").innerHTML = html;
+}
+
+// ---------- Appearance (Settings) — theme picker, local-only (localStorage), matching
+// AppViewModel.loadPreferences() treating theme as a per-device preference on Android too, not a
+// synced profiles column. Same 4 themes + dark-variant hex values as AppTheme.kt's own palettes. ----------
+const THEMES = {
+  neon:   { label: "Neon",   desc: "The original — neon yellow-green on near-black", bg: "#0B0E14", card: "#161B22", accent: "#CCFF00", amber: "#FFC400", textMain: "#F0F6FC", textMuted: "#8B949E" },
+  ember:  { label: "Ember",  desc: "Warm orange glow", bg: "#100C0A", card: "#1A1411", accent: "#FF6B2C", amber: "#FFC94D", textMain: "#F5EDE8", textMuted: "#9A8B82" },
+  signal: { label: "Signal", desc: "Cool cyan on deep blue-black", bg: "#080C12", card: "#111823", accent: "#3FE0FF", amber: "#A6B6FF", textMain: "#EAF2FB", textMuted: "#7C8B9E" },
+  chalk:  { label: "Chalk",  desc: "Light, editorial, ink green", bg: "#100F0C", card: "#1A1916", accent: "#34D399", amber: "#E0954A", textMain: "#EDEBE4", textMuted: "#8F8C82" },
+};
+const THEME_KEY = "keepup_theme";
+function lightenHex(hex, amount) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const l = (c) => Math.min(255, Math.round(c + (255 - c) * amount));
+  return `rgb(${l(r)}, ${l(g)}, ${l(b)})`;
+}
+function savedThemeId() {
+  try { return THEMES[localStorage.getItem(THEME_KEY)] ? localStorage.getItem(THEME_KEY) : "neon"; } catch { return "neon"; }
+}
+function applyTheme(id) {
+  const t = THEMES[id] || THEMES.neon;
+  const root = document.documentElement.style;
+  root.setProperty("--bg", t.bg);
+  root.setProperty("--card", t.card);
+  root.setProperty("--card-raised", lightenHex(t.card, 0.12));
+  root.setProperty("--accent", t.accent);
+  root.setProperty("--accent-soft", hexToRgba(t.accent, 0.12));
+  root.setProperty("--amber", t.amber);
+  root.setProperty("--text-main", t.textMain);
+  root.setProperty("--text-muted", t.textMuted);
+  try { localStorage.setItem(THEME_KEY, id); } catch {}
+  // Tier badges/legend pull their colors live off these same CSS vars — re-render so an open
+  // Dashboard reflects the new theme immediately instead of only on the next loadGamificationCard().
+  renderTierLegend();
+  if (currentSession) loadGamificationCard();
+}
+function renderThemeGrid() {
+  const current = savedThemeId();
+  el("theme-grid").innerHTML = Object.entries(THEMES).map(([id, t]) => `
+    <button class="theme-swatch ${id === current ? "active" : ""}" data-theme-id="${id}" style="--theme-accent-preview:${t.accent};">
+      <div class="theme-swatch-dot"></div>
+      <div class="theme-swatch-name">${t.label}</div>
+      <div class="theme-swatch-desc">${escapeHtml(t.desc)}</div>
+    </button>`).join("");
+  Array.from(el("theme-grid").querySelectorAll(".theme-swatch")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyTheme(btn.dataset.themeId);
+      Array.from(el("theme-grid").querySelectorAll(".theme-swatch")).forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
+}
+
+// ---------- Shop (user request 08-23: "add the shop, exactly similar to the app") ----------
+// Gear/Boosts/Frames, fully functional — same RPCs RewardsShopScreen.kt uses, so gems/ownership/
+// equipped state stay in sync with the app since it's the same account. Buy and equip are
+// deliberately separate actions (0095_shop_buy_equip_separation_and_leaderboard_cosmetics.sql) —
+// buying only unlocks, a second tap on an owned-but-unequipped item equips it, matching the app's
+// own "Tap to equip" affordance exactly.
+const GEAR_TIER_META = {
+  common:    { label: "Common",    cost: 100,  color: "#8B949E", material: "Flat canvas construction", bonus: 1.0 },
+  rare:      { label: "Rare",      cost: 400,  color: "#4EA8FF", material: "Flat leather, two-tone",    bonus: 1.5 },
+  elite:     { label: "Elite",     cost: 1200, color: "#A78BFA", material: "Carbon weave, 45° pattern", bonus: 2.0 },
+  pro:       { label: "Pro",       cost: 3000, color: "#FF8A3D", material: "Chrome gradient, sheen",    bonus: 2.5 },
+  legendary: { label: "Legendary", cost: 8000, color: "#7DF9FF", material: "Iridescent gradient, sheen", bonus: 3.0 },
+};
+const GEAR_TIER_ORDER = ["common", "rare", "elite", "pro", "legendary"];
+const GEAR_LINES = [
+  { id: "football",       displayName: "Keep Up Football",  itemNoun: "Football Boot" },
+  { id: "basketball",     displayName: "Keep Up Basketball", itemNoun: "Basketball Hightop" },
+  { id: "running",        displayName: "Keep Up Running",    itemNoun: "Running Trainer" },
+  { id: "crossfit",       displayName: "Keep Up CrossFit",   itemNoun: "CrossFit Trainer" },
+  { id: "padel_shoes",    displayName: "Keep Up Padel",      itemNoun: "Padel Court Shoe" },
+  { id: "tennis_shoes",   displayName: "Keep Up Tennis",     itemNoun: "Tennis Court Shoe" },
+  { id: "global_a",       displayName: "Keep Up Global",     itemNoun: "Low Sneaker" },
+  { id: "global_b",       displayName: "Keep Up Global",     itemNoun: "High Sneaker" },
+  { id: "swimming",       displayName: "Keep Up Swimming · Goggles", itemNoun: "Swim Goggles" },
+  { id: "padel_rackets",  displayName: "Keep Up Padel · Rackets", itemNoun: "Padel Racket" },
+  { id: "tennis_rackets", displayName: "Keep Up Tennis · Rackets", itemNoun: "Tennis Racket" },
+  { id: "headwear",       displayName: "Keep Up Headwear",   itemNoun: "Cap" },
+];
+const GEAR_ITEMS = GEAR_LINES.flatMap((line) => GEAR_TIER_ORDER.map((tierId) => ({
+  id: `gear_${line.id}_${tierId}`, groupName: line.displayName, itemNoun: line.itemNoun, tierId, tier: GEAR_TIER_META[tierId],
+})));
+const GEAR_GROUPS = [...new Set(GEAR_LINES.map((l) => l.displayName))];
+const AVATAR_FRAMES = [
+  { id: "frame_gold", label: "Gold", cost: 30, color: "#C9A227", bonus: 0.5 },
+  { id: "frame_neon", label: "Neon", cost: 30, color: "#CCFF00", bonus: 0.5 },
+  { id: "frame_ember", label: "Ember", cost: 30, color: "#FF5722", bonus: 0.5 },
+  { id: "frame_diamond", label: "Diamond", cost: 60, color: "#B9E4F4", bonus: 1.0 },
+];
+
+// Renders GearArt.kt's own draw loop as real SVG instead of Compose Canvas calls — same source
+// data (window.GEAR_ART, from gear/scripts/parsed_gear.json), so this is the actual designed art,
+// not a redrawn approximation. SVG's own default gradientUnits (objectBoundingBox) does the
+// per-shape bounding-box math natively, which is exactly what GearArt.kt had to compute by hand
+// (bounds.left + gradient.x1 * bounds.width, etc.) since Compose's Brush has no equivalent — the
+// web version needs none of that, the browser just does it.
+function gearArtSvg(itemId, w, h) {
+  const art = window.GEAR_ART && window.GEAR_ART[itemId];
+  if (!art) return "";
+  let defs = "", body = "";
+  (art.gradients || []).forEach((g) => {
+    defs += `<linearGradient id="ga_${itemId}_${g.id}" x1="${g.x1}" y1="${g.y1}" x2="${g.x2}" y2="${g.y2}">` +
+      g.stops.map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join("") + `</linearGradient>`;
+  });
+  (art.paths || []).forEach((p) => {
+    let fillAttr = "none";
+    if (p.fill && p.fill !== "none") {
+      if (p.fill.startsWith("url(#")) {
+        const refId = p.fill.slice(5, -1);
+        const pattern = (art.patterns || []).find((pt) => pt.id === refId);
+        if (pattern) {
+          // SVG pattern-fill approximation — same "soft diagonal tint" GearArt.kt itself falls
+          // back to for the Elite tier's carbon-weave texture (Compose has no tiled-pattern
+          // primitive either), same opacity formula (strokeOpacity * 3, capped at 0.35).
+          const tintId = `gp_${itemId}_${refId}`;
+          const opacity = Math.min(pattern.strokeOpacity * 3, 0.35);
+          defs += `<linearGradient id="${tintId}" x1="0" y1="0" x2="1" y2="1">` +
+            `<stop offset="0" stop-color="${pattern.strokeColor}" stop-opacity="0"/>` +
+            `<stop offset="0.5" stop-color="${pattern.strokeColor}" stop-opacity="${opacity}"/>` +
+            `<stop offset="1" stop-color="${pattern.strokeColor}" stop-opacity="0"/></linearGradient>`;
+          fillAttr = `url(#${tintId})`;
+        } else {
+          fillAttr = `url(#ga_${itemId}_${refId})`;
+        }
+      } else fillAttr = p.fill;
+    }
+    const strokeAttrs = p.stroke
+      ? `stroke="${p.stroke}" stroke-width="${p.strokeWidth || 0}" stroke-opacity="${p.strokeOpacity != null ? p.strokeOpacity : 1}" stroke-linecap="${p.strokeLinecap || "butt"}" stroke-linejoin="${p.strokeLinejoin || "miter"}"`
+      : "";
+    body += `<path d="${p.d}" fill="${fillAttr}" ${strokeAttrs}/>`;
+  });
+  (art.ellipses || []).forEach((e) => {
+    const strokeAttrs = e.stroke ? `stroke="${e.stroke}" stroke-width="${e.strokeWidth || 0}"` : "";
+    body += `<ellipse cx="${e.cx}" cy="${e.cy}" rx="${e.rx}" ry="${e.ry}" fill="${e.fill || "none"}" ${strokeAttrs}/>`;
+  });
+  (art.circles || []).forEach((c) => { body += `<circle cx="${c.cx}" cy="${c.cy}" r="${c.r}" fill="${c.fill}"/>`; });
+  const g = art.groupTransform ? `<g transform="${art.groupTransform}">${body}</g>` : body;
+  return `<svg viewBox="0 0 ${art.viewBoxWidth} ${art.viewBoxHeight}" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${g}</svg>`;
+}
+
+let shopOwned = [];
+let shopProfile = {};
+let shopSelectedGroup = GEAR_GROUPS[0];
+
+async function loadShop() {
+  const [{ data: owned }, { data: prof }] = await Promise.all([
+    supabase.from("unlocked_rewards").select("reward_id").eq("user_id", currentSession.user.id),
+    supabase.from("profiles").select("gems, gear_showcase_1, gear_showcase_2, gear_showcase_3, equipped_avatar_frame, streak_freezes_available").eq("id", currentSession.user.id).single(),
+  ]);
+  shopOwned = (owned || []).map((r) => r.reward_id);
+  shopProfile = prof || {};
+  el("shop-gems").textContent = shopProfile.gems || 0;
+  el("freeze-owned-count").textContent = `${shopProfile.streak_freezes_available || 0} owned`;
+  renderGearGroupPills();
+  renderGearList();
+  renderFrames();
+}
+
+function renderGearGroupPills() {
+  el("gear-group-pills").innerHTML = GEAR_GROUPS.map((g) =>
+    `<button class="gear-group-pill ${g === shopSelectedGroup ? "active" : ""}" data-group="${escapeHtml(g)}">${escapeHtml(g.replace("Keep Up ", ""))}</button>`
+  ).join("");
+  Array.from(el("gear-group-pills").querySelectorAll("button")).forEach((btn) => {
+    btn.addEventListener("click", () => { shopSelectedGroup = btn.dataset.group; renderGearGroupPills(); renderGearList(); });
+  });
+}
+
+function renderGearList() {
+  const items = GEAR_ITEMS.filter((it) => it.groupName === shopSelectedGroup);
+  el("gear-list").innerHTML = items.map((it) => {
+    const isOwned = shopOwned.includes(it.id);
+    const isEquipped = [shopProfile.gear_showcase_1, shopProfile.gear_showcase_2, shopProfile.gear_showcase_3].includes(it.id);
+    const actionHtml = isEquipped ? `<span class="gear-action equipped-label">Equipped</span>`
+      : isOwned ? `<span class="gear-action owned">Tap to<br>equip</span>`
+      : `<span class="gear-action cost">${it.tier.cost}<br>gems</span>`;
+    return `
+      <div class="gear-row ${isEquipped ? "equipped" : ""}" data-item-id="${it.id}">
+        <div class="gear-art-tile">${gearArtSvg(it.id, 86, 54)}</div>
+        <div class="gear-info">
+          <div class="gear-tier-label" style="color:${it.tier.color};">${it.tier.label}</div>
+          <div class="gear-name">${escapeHtml(it.itemNoun)}</div>
+          <div class="gear-material">${escapeHtml(it.tier.material)}</div>
+        </div>
+        ${actionHtml}
+      </div>`;
+  }).join("");
+  Array.from(el("gear-list").querySelectorAll(".gear-row")).forEach((row) => {
+    row.addEventListener("click", () => onGearRowClick(row.dataset.itemId));
+  });
+}
+
+async function onGearRowClick(itemId) {
+  const item = GEAR_ITEMS.find((it) => it.id === itemId);
+  const isOwned = shopOwned.includes(itemId);
+  if (!isOwned) {
+    if ((shopProfile.gems || 0) < item.tier.cost) {
+      alert(`Need ${item.tier.cost - (shopProfile.gems || 0)} more gems for this item`);
+      return;
+    }
+    if (!confirm(`Buy ${item.itemNoun} (${item.tier.label}) for ${item.tier.cost} gems?`)) return;
+    const { error } = await supabase.rpc("fn_unlock_gear", { p_item_id: itemId, p_cost: item.tier.cost });
+    if (error) { alert(error.message); return; }
+    await loadShop();
+    loadHeaderStats();
+    return;
+  }
+  const slots = [shopProfile.gear_showcase_1, shopProfile.gear_showcase_2, shopProfile.gear_showcase_3];
+  const isEquipped = slots.includes(itemId);
+  let newSlots;
+  if (isEquipped) {
+    newSlots = slots.map((s) => (s === itemId ? null : s));
+  } else {
+    const freeIndex = slots.findIndex((s) => !s);
+    if (freeIndex === -1) {
+      // Showcase full — same "pick a slot to replace" moment RewardsShopScreen.kt's own dialog
+      // handles, via a lighter native prompt() instead of a custom picker (smaller than building
+      // a full replacement-chooser modal for this one edge case).
+      const names = slots.map((s, i) => `${i + 1}. ${s || "(empty)"}`).join("\n");
+      const choice = prompt(`Showcase is full. Enter 1, 2, or 3 to replace that slot with ${item.itemNoun}:\n${names}`);
+      const idx = parseInt(choice, 10) - 1;
+      if (![0, 1, 2].includes(idx)) return;
+      newSlots = [...slots];
+      newSlots[idx] = itemId;
+    } else {
+      newSlots = [...slots];
+      newSlots[freeIndex] = itemId;
+    }
+  }
+  const { error } = await supabase.rpc("fn_set_gear_showcase", { p_slot_1: newSlots[0], p_slot_2: newSlots[1], p_slot_3: newSlots[2] });
+  if (error) { alert(error.message); return; }
+  await loadShop();
+}
+
+function renderFrames() {
+  el("shop-tab-frames").innerHTML = AVATAR_FRAMES.map((f) => {
+    const isOwned = shopOwned.includes(f.id);
+    const isEquipped = shopProfile.equipped_avatar_frame === f.id;
+    const actionHtml = isEquipped ? `<span class="gear-action equipped-label">Equipped</span>`
+      : isOwned ? `<span class="gear-action owned">Tap to<br>equip</span>`
+      : `<span class="gear-action cost">${f.cost}<br>gems</span>`;
+    return `
+      <div class="frame-card ${isEquipped ? "equipped" : ""}" data-frame-id="${f.id}">
+        <div class="frame-swatch" style="border-color:${f.color};"></div>
+        <div class="gear-info">
+          <div class="gear-name" style="margin-top:0;">${f.label}</div>
+          <div class="gear-material">+${f.bonus}% score bonus</div>
+        </div>
+        ${actionHtml}
+      </div>`;
+  }).join("");
+  Array.from(el("shop-tab-frames").querySelectorAll(".frame-card")).forEach((card) => {
+    card.addEventListener("click", () => onFrameCardClick(card.dataset.frameId));
+  });
+}
+
+async function onFrameCardClick(frameId) {
+  const frame = AVATAR_FRAMES.find((f) => f.id === frameId);
+  const isOwned = shopOwned.includes(frameId);
+  const isEquipped = shopProfile.equipped_avatar_frame === frameId;
+  if (!isOwned) {
+    if ((shopProfile.gems || 0) < frame.cost) {
+      alert(`Need ${frame.cost - (shopProfile.gems || 0)} more gems for this frame`);
+      return;
+    }
+    if (!confirm(`Buy ${frame.label} frame for ${frame.cost} gems?`)) return;
+    const { error } = await supabase.rpc("fn_unlock_avatar_frame", { p_frame_id: frameId, p_cost: frame.cost });
+    if (error) { alert(error.message); return; }
+  } else {
+    const { error } = await supabase.rpc("fn_equip_avatar_frame", { p_frame_id: isEquipped ? null : frameId });
+    if (error) { alert(error.message); return; }
+  }
+  await loadShop();
+  loadHeaderStats();
+}
+
+el("buy-freeze-btn").addEventListener("click", async () => {
+  if ((shopProfile.gems || 0) < 40) { alert("Need more gems for a streak freeze"); return; }
+  if (!confirm("Redeem 40 gems for one streak freeze?")) return;
+  const { error } = await supabase.rpc("fn_redeem_streak_freeze_with_gems");
+  if (error) { alert(error.message); return; }
+  await loadShop();
+  loadHeaderStats();
+});
+
+Array.from(el("shop-tabs").querySelectorAll("button")).forEach((btn) => {
+  btn.addEventListener("click", () => {
+    Array.from(el("shop-tabs").querySelectorAll("button")).forEach((b) => b.classList.toggle("active", b === btn));
+    ["gear", "boosts", "frames"].forEach((t) => el(`shop-tab-${t}`).classList.toggle("hidden", t !== btn.dataset.shopTab));
+  });
+});
+
 // ---------- Boot ----------
 
+applyTheme(savedThemeId());
 refreshSession();
 initGoogleSignIn();
 </script>
