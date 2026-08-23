@@ -78,7 +78,9 @@
   }
   body {
     display: flex; flex-direction: column; align-items: center;
-    padding: 24px 16px 64px;
+    /* Bottom padding cleared for the fixed bottom nav bar (user request 08-23) — enough room for
+       its own height plus a device's safe-area inset, so page content never sits underneath it. */
+    padding: 24px 16px calc(84px + env(safe-area-inset-bottom, 0px));
   }
   .wrap { width: 100%; max-width: 420px; }
 
@@ -218,18 +220,33 @@
   .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
+  /* Bottom nav bar (user request 08-23) — fixed to the viewport bottom, icon+label per tab, same
+     44x26dp accent-soft pill behind the selected icon HomeScreen.kt's own NavigationBar uses
+     (see .nav-icon-wrap.active below), instead of the old text-only row that used to sit right
+     under the header. */
   .tab-nav {
-    display: flex; gap: 4px; margin-bottom: 20px; background: var(--card);
-    border: 1px solid var(--hairline); border-radius: 12px; padding: 5px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: flex; width: 100%; max-width: 420px; margin: 0 auto;
+    background: var(--card); border-top: 1px solid var(--hairline);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
   }
   .tab-nav button {
-    flex: 1; width: auto; min-height: 40px; padding: 9px 2px; font-size: 13px; font-weight: 700;
-    background: transparent; color: var(--text-muted); border-radius: 8px;
+    flex: 1; width: auto; min-height: auto; padding: 4px 2px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: transparent; color: var(--text-muted); font-size: 10px; font-weight: 600; border-radius: 10px;
   }
-  .tab-nav button.active { background: var(--accent); color: #0B0E14; }
-  .nav-more-btn { flex: 0 0 auto; width: 40px; padding: 9px 0; font-size: 16px; letter-spacing: 1px; }
+  .tab-nav button.active { color: var(--accent); font-weight: 700; }
+  .nav-icon-wrap {
+    width: 44px; height: 26px; border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tab-nav button.active .nav-icon-wrap { background: var(--accent-soft); }
+  .nav-icon-wrap svg { width: 22px; height: 22px; }
+  .nav-more-dot svg { width: 20px; height: 20px; }
   .more-menu {
-    position: relative; margin: -14px 0 20px; background: var(--card); border: 1px solid var(--hairline);
+    position: fixed; left: 16px; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    max-width: 388px; margin: 0 auto; z-index: 31;
+    background: var(--card); border: 1px solid var(--hairline);
     border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   }
   .more-menu-row {
@@ -526,18 +543,40 @@
 
     <!-- Signed in -->
     <div id="signed-in-view" class="hidden">
+      <!-- FIX (user request 08-23: "have the main panel at the bottom and not at the top") — was a
+           text-only row right under the header; now a real bottom nav bar (fixed to the viewport
+           bottom) with icon+label per tab, mirroring HomeScreen.kt's own NavigationBar as closely
+           as a browser allows: same 44x26dp accent-at-14%-opacity pill behind the selected icon
+           (.nav-icon-wrap), same icon choices where Android has a direct equivalent (Home,
+           Leaderboard, Groups), same circular "•••" More glyph. Android has no "Profile" bottom-
+           nav item (it's folded into More there) — kept as its own tab here since it already was
+           one before this pass, just given a matching icon treatment now. -->
       <nav class="tab-nav">
-        <button id="nav-dashboard" class="active" data-tab="dashboard">Dashboard</button>
-        <button id="nav-club" data-tab="club">Club</button>
-        <button id="nav-leaderboard" data-tab="leaderboard">Leaderboard</button>
-        <button id="nav-profile" data-tab="profile">Profile</button>
-        <!-- FIX (user request 08-23): "•••" More button — same role as HomeScreen.kt's bottom-nav
-             More tab, opening a small menu to destinations that aren't part of the persistent tab
-             bar (Membership/Settings/Shop are all modal overlays in the app too, pushed on top of
-             a tab rather than being tabs themselves — see #more-menu and the 3 #screen-* overlays
-             below). Deliberately excludes "Profile" from the menu list itself since that's already
-             its own real tab here, unlike on Android where it's folded into this same menu. -->
-        <button id="nav-more" class="nav-more-btn" aria-label="More" aria-haspopup="true">•••</button>
+        <button id="nav-dashboard" class="active" data-tab="dashboard">
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>
+          <span>Dashboard</span>
+        </button>
+        <button id="nav-club" data-tab="club">
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 21v-1.3C2 16.8 5 15 9 15s7 1.8 7 4.7V21"/><path d="M15.3 15.2c2.9.4 5.7 1.8 5.7 4.5V21"/></svg></span>
+          <span>Club</span>
+        </button>
+        <button id="nav-leaderboard" data-tab="leaderboard">
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><rect x="7" y="4" width="10" height="10" rx="5"/><path d="M7 6H4.5A1.5 1.5 0 0 0 3 7.5 3.5 3.5 0 0 0 6.5 11H7"/><path d="M17 6h2.5A1.5 1.5 0 0 1 21 7.5 3.5 3.5 0 0 1 17.5 11H17"/></svg></span>
+          <span>Leaders</span>
+        </button>
+        <button id="nav-profile" data-tab="profile">
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.2 3.6-7.5 8-7.5s8 3.3 8 7.5"/></svg></span>
+          <span>Profile</span>
+        </button>
+        <!-- Same role as HomeScreen.kt's bottom-nav More tab — opens a small menu to destinations
+             that aren't part of the persistent tab bar (Membership/Settings/Shop are all modal
+             overlays in the app too, pushed on top of a tab rather than being tabs themselves —
+             see #more-menu and the 3 #screen-* overlays below). Deliberately excludes "Profile"
+             from the menu list since that's already its own real tab here. -->
+        <button id="nav-more" class="nav-more-btn" aria-label="More" aria-haspopup="true">
+          <span class="nav-icon-wrap nav-more-dot"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>
+          <span>More</span>
+        </button>
       </nav>
 
       <div class="more-menu hidden" id="more-menu">
@@ -723,19 +762,6 @@
           </div>
         </div>
 
-        <!-- Workout list — every workout this account has (any source), same as the app's
-             Dashboard list. Score shown for scored ones; rejected ones show why instead. Edit/
-             Delete only apply to workouts submitted from this page (source = 'web_photo') — a
-             Health-Connect-synced entry is shown for visibility only, same reasoning the old
-             Workouts tab already documented. -->
-        <div class="card" id="workouts-card">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-            <p class="section-label">Your workouts</p>
-            <button class="btn-text" id="refresh-history-btn" style="width:auto; padding:4px 8px;">Refresh</button>
-          </div>
-          <p class="muted" id="history-empty">No workouts yet — log one above and it'll show up here.</p>
-          <ul class="history-list hidden" id="history-list"></ul>
-        </div>
       </div>
 
       <!-- ============ CLUB ============
@@ -937,6 +963,25 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ============ WORKOUT HISTORY (user request 08-23: "in the Dashboard, dont show the logged
+       workout... only when clicking on the activity summary, show the history") ============
+       Was always visible inline on the Dashboard tab; now only reached by tapping "See all" on
+       the Activity Summary card, matching AllWorkoutsScreen.kt's own relationship to
+       DashboardScreen.kt — the app dropped its own inline "last 5" preview as redundant with
+       tapping through to this same list, same reasoning applies here. Loaded lazily (loadHistory()
+       only fires when this screen actually opens), not as part of every Dashboard visit. -->
+  <div class="screen-overlay hidden" id="screen-history">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title" style="flex:1;">Your workouts</p>
+      <button class="btn-text" id="refresh-history-btn" style="width:auto; padding:4px 8px;">Refresh</button>
+    </div>
+    <p class="muted" id="history-empty">No workouts yet — log one from the Dashboard and it'll show up here.</p>
+    <ul class="history-list hidden" id="history-list"></ul>
   </div>
 
   <!-- ============ MEMBERSHIP (user request 08-23) ============
@@ -1495,16 +1540,19 @@ async function loadHeaderStats() {
 }
 
 async function loadDashboard() {
-  await Promise.all([loadHistory(), loadGamificationCard(), loadActivitySummary()]);
+  // FIX (user request 08-23): loadHistory() no longer runs eagerly on every Dashboard visit — the
+  // workout list moved to its own lazily-opened screen (see #screen-history / the activity-see-all
+  // handler below), matching "don't fetch what isn't shown yet" already documented elsewhere on
+  // this page for the other tabs.
+  await Promise.all([loadGamificationCard(), loadActivitySummary()]);
 }
 
 // ---------- Activity Summary (user request 08-21: "show the points too") ----------
 //
-// Mirrors DashboardScreen.kt's own period-scoped sums exactly, including matching its choice to
-// NOT exclude rejected workouts from these totals (LeaderboardScreen.kt's ranking does exclude
-// them via get_leaderboard's own join filter, but this card sums the raw workout list the same
-// way DashboardScreen.kt's periodPoints does — matching the app's real behavior here, not a
-// "more correct" version that would disagree with what the app itself shows).
+// Mirrors DashboardScreen.kt's own period-scoped sums — including its 08-23 fix (user report
+// "why is the score different", Leaderboard 87.64 vs Dashboard 87.71): a rejected workout is
+// excluded here too now, matching get_leaderboard()'s own exclusion and DashboardScreen.kt's
+// periodWorkouts filter, so this card can't show a number the Leaderboard would disagree with.
 
 let currentActivityPeriod = "weekly";
 
@@ -1545,13 +1593,14 @@ Array.from(el("activity-period-pills").children).forEach((pill, i) => {
 });
 
 el("activity-see-all").addEventListener("click", () => {
-  el("workouts-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  openScreen("screen-history");
+  loadHistory();
 });
 
 async function loadActivitySummary() {
   const { data, error } = await supabase
     .from("workouts")
-    .select("points_earned, duration_mins, calories, created_at")
+    .select("points_earned, duration_mins, calories, created_at, rejected_at")
     .eq("user_id", currentSession.user.id);
   if (error || !data) {
     console.error("Couldn't load activity summary:", error);
@@ -1559,7 +1608,9 @@ async function loadActivitySummary() {
   }
 
   const start = periodStartMs(currentActivityPeriod);
-  const inPeriod = start === null ? data : data.filter((w) => w.created_at && new Date(w.created_at).getTime() >= start);
+  const inPeriod = data
+    .filter((w) => !w.rejected_at)
+    .filter((w) => start === null || (w.created_at && new Date(w.created_at).getTime() >= start));
 
   const points = inPeriod.reduce((sum, w) => sum + Number(w.points_earned ?? 0), 0);
   const duration = inPeriod.reduce((sum, w) => sum + Number(w.duration_mins ?? 0), 0);
@@ -2669,12 +2720,31 @@ async function loadHistory() {
 
 el("refresh-history-btn").addEventListener("click", loadHistory);
 
+// Real workout icons per exercise type (user request 08-23: "try to match logo per workout, as
+// much as possible") — same hosted SVGs and same mapping ExerciseTypeDisplay.iconUrlFor()
+// (Models.kt) uses, not a redrawn set. This list covers all 60 Health Connect exercise types (this
+// history shows every workout regardless of source, including ones synced from the app that the
+// web's own limited manual-log activity list doesn't cover) — integer values confirmed against the
+// real compiled androidx.health.connect:connect-client:1.1.0 class, same way Models.kt's own
+// comment says its version was verified, not guessed from the public docs.
+const EXERCISE_ICON_FILES = {
+  56: "run", 57: "run", 79: "walk", 37: "hike", 8: "cycle", 9: "cycle", 74: "swim", 73: "swim",
+  70: "lift", 81: "lift", 11: "box", 44: "kick", 83: "yoga", 71: "stretch", 53: "row", 54: "row",
+  61: "ski", 76: "tennis", 75: "tennis", 5: "ball", 64: "foot", 16: "dance", 51: "climb",
+  60: "skate", 39: "skate", 72: "surf",
+};
+function workoutIconUrl(exerciseType) {
+  const file = EXERCISE_ICON_FILES[exerciseType];
+  return file ? `https://cesaryounes.github.io/avatars/basic/${file}.svg` : null;
+}
+
 function renderHistoryRow(w) {
   const li = document.createElement("li");
   li.className = "history-row";
 
   const label = CODE_TO_LABEL[w.exercise_type] || "Workout";
   const activityKey = Object.keys(ACTIVITY_TO_CODE).find((k) => ACTIVITY_TO_CODE[k] === w.exercise_type) || "other_workout";
+  const iconUrl = workoutIconUrl(w.exercise_type);
   const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
   const isWebUpload = w.source === "web_photo";
   const isRejected = !!w.rejected_at;
@@ -2689,7 +2759,7 @@ function renderHistoryRow(w) {
   const main = document.createElement("div");
   main.className = "history-row-main";
   main.innerHTML = `
-    <div class="workout-icon-tile">${ACTIVITY_CODE_ABBR[activityKey] || "OTH"}</div>
+    <div class="workout-icon-tile">${iconUrl ? `<img src="${iconUrl}" alt="" width="24" height="24"/>` : (ACTIVITY_CODE_ABBR[activityKey] || "OTH")}</div>
     <div style="min-width:0; flex:1;">
       <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
       <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
