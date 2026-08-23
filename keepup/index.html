@@ -430,6 +430,21 @@
   .compare-check.yes { color: var(--accent); }
   .compare-check.no { color: var(--text-muted); opacity: 0.35; }
 
+  /* ---- Category picker (Log a workout — user request 08-24: "logos for the 6 categories") ----
+     Grid, not the flex-row .gear-group-pill/.club-pill scroller pattern elsewhere on this page —
+     6 fixed options that should all be visible at once, not scrolled through. Grid items are
+     naturally fine with the global button{width:100%} rule (a grid cell's width IS what a button
+     should fill), unlike that flex-scroller bug fixed earlier this session. */
+  .category-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .category-pick-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 4px; border: 2px solid var(--hairline); border-radius: 14px;
+    background: var(--card); color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: center;
+  }
+  .category-pick-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .category-pick-icon { width: 26px; height: 26px; }
+  .category-pick-icon svg { width: 100%; height: 100%; }
+
   /* ---- Appearance theme picker (Settings) ---- */
   .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .theme-swatch {
@@ -765,15 +780,25 @@
             </div>
 
             <div class="field">
-              <label for="activity-select">Activity</label>
+              <label>Activity</label>
               <!-- FIX (user request 08-24: "we should only see" the 6 scoring categories, not
                    every individual sport) — picking a specific sport no longer changes scoring
                    (0096_category_based_scoring_formula.sql scores by category, not by exact
                    exercise_type), so exposing 13 individual sports here was granularity the
                    formula itself doesn't use. Each option stores one representative exercise_type
                    for its category (CATEGORY_TO_CODE below) — which specific type doesn't matter
-                   scoring-wise since every type in a category shares the same curve. -->
-              <select id="activity-select">
+                   scoring-wise since every type in a category shares the same curve.
+                   FIX (user request 08-24: "logos for the 6 categories, same for app and web") —
+                   #category-picker (below, rendered by renderCategoryPicker()) is the real visible
+                   control now, showing each category's own mark (categoryIconSvg(), same six
+                   shapes CategoryIcon in AppTheme.kt draws on Android) — a native <select> can't
+                   show custom icons per option at all. The <select> itself stays in the DOM as the
+                   actual source of truth (hidden, not removed): save/edit/photo-parse-autoselect
+                   all still just read/write its .value exactly as before, so none of that logic
+                   needed to change — the picker is a view layer on top of it, not a replacement
+                   for it. -->
+              <div class="category-picker" id="category-picker"></div>
+              <select id="activity-select" class="hidden">
                 <option value="cardio">Cardio/HIIT</option>
                 <option value="weight">Weight training</option>
                 <option value="circuit">Circuit</option>
@@ -2598,6 +2623,7 @@ function showManualEntryStep() {
   hide("parse-error");
   el("confidence-row").innerHTML = "";
   el("activity-select").value = "cardio";
+  renderCategoryPicker();
   el("duration-input").value = "";
   el("calories-input").value = "";
   el("hr-input").value = "";
@@ -2700,6 +2726,7 @@ function populateConfirmStep(result) {
   // goes through PARSED_LABEL_TO_CATEGORY first. Falls back to "cardio" (the parser's own
   // "other_workout" already maps there too) rather than a dead value the select can't select.
   el("activity-select").value = PARSED_LABEL_TO_CATEGORY[result.activity_label] || "cardio";
+  renderCategoryPicker();
   el("duration-input").value = result.duration_minutes ?? "";
   el("calories-input").value = result.calories ?? "";
   el("hr-input").value = result.avg_heart_rate ?? "";
@@ -2748,6 +2775,48 @@ const PARSED_LABEL_TO_CATEGORY = {
 const CATEGORY_ABBR = {
   cardio: "CIO", weight: "WGT", circuit: "CIR", racket: "RKT", swim: "SWM", recovery: "RCV",
 };
+
+// FIX (user request 08-24: "logos for the 6 categories, same for the app and web") — same six
+// shapes CategoryIcon (AppTheme.kt) draws on Android via Canvas, ported to SVG path/primitive
+// coordinates (0-24 viewBox here vs. Compose's 0-1 fraction-of-width there, same proportions) so
+// both platforms show the identical mark per category rather than two different interpretations.
+// Pulse line (Cardio/HIIT, also the default for any unrecognized key), dumbbell (Weight training),
+// stopwatch (Circuit), racket (Racket sport), two wave lines (Swimming), leaf (Recovery).
+const CATEGORY_ICON_LABEL = {
+  cardio: "Cardio/HIIT", weight: "Weight training", circuit: "Circuit",
+  racket: "Racket sport", swim: "Swimming", recovery: "Recovery",
+};
+function categoryIconSvg(key) {
+  const shapes = {
+    weight: `<line x1="8.4" y1="12" x2="15.6" y2="12" stroke-width="2.16"/><line x1="1.92" y1="9.12" x2="1.92" y2="14.88" stroke-width="3.36"/><line x1="22.08" y1="9.12" x2="22.08" y2="14.88" stroke-width="3.36"/><line x1="5.28" y1="10.08" x2="5.28" y2="13.92" stroke-width="2.64"/><line x1="18.72" y1="10.08" x2="18.72" y2="13.92" stroke-width="2.64"/>`,
+    swim: `<path d="M1.92 13.92C6 10.08 10.08 10.08 12 13.92C13.92 17.76 18 17.76 22.08 13.92" stroke-width="2.16"/><path d="M1.92 18.72C6 14.88 10.08 14.88 12 18.72C13.92 22.56 18 22.56 22.08 18.72" stroke-width="2.16"/>`,
+    circuit: `<circle cx="12" cy="13.44" r="8.16" stroke-width="2.16"/><line x1="12" y1="13.44" x2="12" y2="8.16" stroke-width="2.16"/><line x1="12" y1="13.44" x2="15.84" y2="15.84" stroke-width="2.16"/><line x1="10.08" y1="1.92" x2="13.92" y2="1.92" stroke-width="2.16"/>`,
+    racket: `<ellipse cx="12" cy="7.92" rx="6" ry="6.96" stroke-width="2.16"/><line x1="12" y1="14.88" x2="12" y2="22.56" stroke-width="2.16"/><line x1="7.92" y1="7.92" x2="16.08" y2="7.92" stroke-width="1.2"/><line x1="12" y1="1.92" x2="12" y2="13.92" stroke-width="1.2"/>`,
+    recovery: `<path d="M12 1.44C19.68 6.72 22.08 13.44 22.08 16.32C22.08 21.12 17.76 23.52 12 23.52C6.24 23.52 1.92 21.12 1.92 16.32C1.92 13.44 4.32 6.72 12 1.44Z" stroke-width="2.16"/>`,
+    cardio: `<path d="M1.44 12L6.72 12L9.12 5.28L13.2 19.68L15.6 12L22.56 12" stroke-width="2.16"/>`,
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${shapes[key] || shapes.cardio}</svg>`;
+}
+
+// Renders #category-picker from the hidden #activity-select's current value, and re-renders on
+// every subsequent call — cheap (6 buttons), so every place that programmatically sets
+// activity-select.value (showManualEntryStep, populateConfirmStep's photo-parse auto-select) just
+// calls this again afterward rather than needing its own separate highlight-sync logic.
+function renderCategoryPicker() {
+  const current = el("activity-select").value;
+  el("category-picker").innerHTML = Object.entries(CATEGORY_ICON_LABEL).map(([key, label]) => `
+    <button type="button" class="category-pick-btn ${key === current ? "active" : ""}" data-cat="${key}">
+      <span class="category-pick-icon">${categoryIconSvg(key)}</span>
+      <span>${escapeHtml(label)}</span>
+    </button>`).join("");
+  Array.from(el("category-picker").querySelectorAll(".category-pick-btn")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      el("activity-select").value = btn.dataset.cat;
+      renderCategoryPicker();
+    });
+  });
+}
+renderCategoryPicker();
 
 el("save-btn").addEventListener("click", async () => {
   const saveBtn = el("save-btn");
