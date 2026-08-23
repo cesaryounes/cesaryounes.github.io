@@ -675,6 +675,14 @@
         <div class="card">
           <p class="section-label" style="margin-bottom:4px;">Clubs open to web uploads</p>
           <p class="muted" style="margin-bottom:14px;">Only clubs whose owner turned on "Allow score uploads" show up here — the same setting from the app's create-club screen.</p>
+          <div class="field club-directory-search">
+            <input type="text" id="club-directory-search-input" placeholder="Search clubs…" />
+          </div>
+          <div class="period-pills" id="club-directory-visibility-pills">
+            <div class="period-pill active" data-visibility="all">All</div>
+            <div class="period-pill" data-visibility="public">Public</div>
+            <div class="period-pill" data-visibility="private">Private</div>
+          </div>
           <p class="muted" id="club-directory-empty">No clubs currently accept web uploads.</p>
           <ul class="history-list hidden" id="club-directory-list"></ul>
         </div>
@@ -1565,6 +1573,14 @@ function renderLeaderboardRows(rows) {
 // is just this page choosing what's relevant to show, not a new permission — every one of these
 // rows was already readable.
 
+// Search + quick public/private filter (user request 08-23: "can add to both search in the
+// clubs, with a quick filter private/public") — same shape as the Leaderboard's own search
+// (lbSearchQuery/lb-search-input above): the full list is fetched once and cached here, search/
+// filter changes just re-render from clubDirectoryData rather than re-querying every keystroke.
+let clubDirectoryData = [];
+let clubSearchQuery = "";
+let clubVisibilityFilter = "all"; // "all" | "public" | "private"
+
 async function loadClubDirectory() {
   myClubs = await fetchMyClubs(); // refresh membership so Join/Joined state below is current
 
@@ -1574,19 +1590,55 @@ async function loadClubDirectory() {
     .eq("allow_score_uploads", true)
     .order("name");
 
+  if (error) {
+    console.error("Couldn't load club directory:", error);
+    clubDirectoryData = [];
+    renderClubDirectory();
+    return;
+  }
+  clubDirectoryData = data || [];
+  renderClubDirectory();
+}
+
+function renderClubDirectory() {
   const list = el("club-directory-list");
   list.innerHTML = "";
 
-  if (error || !data || data.length === 0) {
+  const filtered = clubDirectoryData
+    .filter((g) => clubVisibilityFilter === "all" || (clubVisibilityFilter === "public") === !!g.is_public)
+    .filter((g) => !clubSearchQuery || g.name.toLowerCase().includes(clubSearchQuery));
+
+  if (clubDirectoryData.length === 0) {
     hide("club-directory-list");
     show("club-directory-empty");
-    if (error) console.error("Couldn't load club directory:", error);
+    el("club-directory-empty").textContent = "No clubs currently accept web uploads.";
+    return;
+  }
+  if (filtered.length === 0) {
+    hide("club-directory-list");
+    show("club-directory-empty");
+    el("club-directory-empty").textContent = clubSearchQuery
+      ? `No clubs matching "${clubSearchQuery}".`
+      : "No clubs match this filter.";
     return;
   }
   hide("club-directory-empty");
   show("club-directory-list");
-  data.forEach((group) => list.appendChild(renderDirectoryRow(group)));
+  filtered.forEach((group) => list.appendChild(renderDirectoryRow(group)));
 }
+
+el("club-directory-search-input").addEventListener("input", (e) => {
+  clubSearchQuery = e.target.value.trim().toLowerCase();
+  renderClubDirectory();
+});
+
+Array.from(el("club-directory-visibility-pills").children).forEach((pill) => {
+  pill.addEventListener("click", () => {
+    clubVisibilityFilter = pill.dataset.visibility;
+    Array.from(el("club-directory-visibility-pills").children).forEach((p) => p.classList.toggle("active", p === pill));
+    renderClubDirectory();
+  });
+});
 
 function renderDirectoryRow(group) {
   const li = document.createElement("li");
