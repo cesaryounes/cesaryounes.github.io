@@ -2491,9 +2491,15 @@ el("promo-redeem-btn").addEventListener("click", async () => {
 
 let currentEntryMode = "photo";
 
+// FIX (user report 08-24: "clicking log workout did nothing... the button disappeared") —
+// hide("workouts-card") / show("workouts-card") below were left over from before workout history
+// moved to its own lazy #screen-history overlay (user request 08-23); that card doesn't exist in
+// the DOM anymore, so el("workouts-card") returned null and .classList threw — right after the
+// button was already hidden, so the handler died mid-way: button gone, form never shown, no error
+// visible to the user. hide()/show() have no null-guard by design (a typo'd id should fail loudly
+// during development), so the fix is removing the stale calls, not guarding them.
 el("open-submit-btn").addEventListener("click", () => {
   hide("open-submit-btn");
-  hide("workouts-card");
   show("submit-flow");
   resetSubmitFlow();
   openOverlay(() => collapseSubmitFlow({ refresh: false }));
@@ -2502,7 +2508,6 @@ el("open-submit-btn").addEventListener("click", () => {
 function collapseSubmitFlow({ refresh = true } = {}) {
   hide("submit-flow");
   show("open-submit-btn");
-  show("workouts-card");
   if (refresh) {
     loadDashboard();
     loadHeaderStats(); // a new workout can bump streak/gems — keep the banner in sync too
