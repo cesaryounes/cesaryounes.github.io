@@ -947,7 +947,7 @@ function renderAuthState() {
     show("signed-in-view");
     show("stat-cluster");
     collapseSubmitFlow({ refresh: false });
-    switchTab("dashboard");
+    switchTab(lastActiveTab());
   } else {
     show("signed-out-view");
     hide("signed-in-view");
@@ -972,16 +972,38 @@ supabase.auth.onAuthStateChange((_event, session) => {
 // every switch, not just one tab, since the top banner it feeds is visible regardless of tab.
 const TAB_ORDER = ["dashboard", "club", "leaderboard", "profile"];
 
+// Remembers the last tab you had open (user request 08-23: "make sure the refresh stays in the
+// same page") — a plain page refresh used to always land back on Dashboard regardless of which
+// tab you were actually on, since renderAuthState() unconditionally called switchTab("dashboard")
+// on every load. Same localStorage-persistence shape as RANK_SNAPSHOT_KEY below (try/catch, same
+// "storage full/disabled just means this one nicety doesn't work" fallback).
+const LAST_TAB_KEY = "keepup_last_tab";
+
 function switchTab(tab) {
   TAB_ORDER.forEach((t) => {
     el(`tab-${t}`).classList.toggle("hidden", t !== tab);
     el(`nav-${t}`).classList.toggle("active", t === tab);
   });
+  try {
+    localStorage.setItem(LAST_TAB_KEY, tab);
+  } catch {
+    // Storage full/disabled (private browsing, etc.) — just won't restore next load.
+  }
   loadHeaderStats();
   if (tab === "dashboard") loadDashboard();
   if (tab === "club") loadClubDirectory();
   if (tab === "leaderboard") loadMyClubs();
   if (tab === "profile") loadProfile();
+}
+
+function lastActiveTab() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(LAST_TAB_KEY);
+  } catch {
+    // Fall through to the default below.
+  }
+  return TAB_ORDER.includes(saved) ? saved : "dashboard";
 }
 
 Array.from(el("signed-in-view").querySelectorAll(".tab-nav button")).forEach((btn) => {
