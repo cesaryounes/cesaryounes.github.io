@@ -1779,11 +1779,26 @@ async function loadProfile() {
     return;
   }
 
+  // Google-metadata name fallback (user report 08-23 — "not picking up name, family... " for a
+  // brand-new web-only account): OnboardingScreen.kt's own onboarding already does exactly this
+  // on Android (profile.first_name ?: googleProfile.givenName ?: metadata.given_name ?: split the
+  // combined name) since a fresh signup's profiles row genuinely has nothing in these columns yet
+  // — there was no equivalent here at all, so a web-only signup's name fields just started empty
+  // with nothing to fall back to, unlike the app. DOB is deliberately NOT given the same
+  // treatment — Google's basic sign-in scope never exposes a birthdate on either platform, same
+  // as OnboardingScreen.kt's own doc comment on that field. Region has no fallback source on web
+  // either (no device locale to read, per this card's own comment above) — manual entry only,
+  // same as it's always been.
+  const googleMeta = currentSession.user.user_metadata || {};
+  const googleNameParts = (googleMeta.name || "").trim().split(" ");
+  const googleGivenName = googleMeta.given_name || googleNameParts[0] || "";
+  const googleFamilyName = googleMeta.family_name || (googleNameParts.length > 1 ? googleNameParts.slice(1).join(" ") : "");
+
   // Edit-profile form (user request 08-21, item 1) — only re-populated when the field isn't
   // currently focused, so a save-in-flight refresh (loadProfile() is called again right after a
   // successful save) can't stomp on something the person started typing in the meantime.
-  if (document.activeElement !== el("edit-first-name")) el("edit-first-name").value = profile.first_name || "";
-  if (document.activeElement !== el("edit-family-name")) el("edit-family-name").value = profile.family_name || "";
+  if (document.activeElement !== el("edit-first-name")) el("edit-first-name").value = profile.first_name || googleGivenName;
+  if (document.activeElement !== el("edit-family-name")) el("edit-family-name").value = profile.family_name || googleFamilyName;
   if (document.activeElement !== el("edit-display-name")) el("edit-display-name").value = profile.display_name || "";
   if (document.activeElement !== el("edit-dob")) el("edit-dob").value = profile.date_of_birth || "";
   if (document.activeElement !== el("edit-region")) el("edit-region").value = profile.region_code || "";
