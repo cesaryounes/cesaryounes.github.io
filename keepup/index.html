@@ -24,6 +24,22 @@
 <meta name="twitter:description" content="Your streak, XP, and workouts — from any browser.">
 <meta name="twitter:image" content="https://cesaryounes.github.io/og-image.png">
 
+<!-- FIX (user request 08-24: "add this as a desktop shortcut, is there a way to have the KeepUp
+     logo") — same real icon the Android app itself uses (ic_launcher_foreground.xml /
+     ic_launcher_background.xml: dark canvas, the chevron+spark mark, exact same gradient/colors),
+     not a redrawn approximation. Inline data: URIs rather than separate hosted files — this page
+     deploys into a different repo (cesaryounes.github.io) whose file layout isn't something edits
+     here can reach, so anything the browser needs for the tab icon / desktop shortcut has to be
+     self-contained in this one file.
+       - rel="icon": the browser tab favicon.
+       - rel="apple-touch-icon": iOS/Safari "Add to Home Screen".
+       - rel="manifest": what Chrome/Edge's "Install app"/"Create shortcut" actually reads for the
+         desktop shortcut icon specifically, which is the literal thing that was asked for — a
+         favicon alone doesn't drive that on any browser this was checked against. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDggMTA4Ij48cmVjdCB3aWR0aD0iMTA4IiBoZWlnaHQ9IjEwOCIgcng9IjIyIiBmaWxsPSIjMEIwRTE0Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2cpIiBzdHJva2Utd2lkdGg9IjExIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGQ9Ik0zNiw3MCBMNTQsNDYgTDcyLDcwIi8+PGNpcmNsZSBjeD0iNTQiIGN5PSIzMiIgcj0iNS41IiBmaWxsPSIjRkZDNDAwIi8+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iNTQiIHkxPSI3MCIgeDI9IjU0IiB5Mj0iNDYiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM3QTlFMDAiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNDQ0ZGMDAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48L3N2Zz4=">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDggMTA4Ij48cmVjdCB3aWR0aD0iMTA4IiBoZWlnaHQ9IjEwOCIgcng9IjIyIiBmaWxsPSIjMEIwRTE0Ii8+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2cpIiBzdHJva2Utd2lkdGg9IjExIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGQ9Ik0zNiw3MCBMNTQsNDYgTDcyLDcwIi8+PGNpcmNsZSBjeD0iNTQiIGN5PSIzMiIgcj0iNS41IiBmaWxsPSIjRkZDNDAwIi8+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iNTQiIHkxPSI3MCIgeDI9IjU0IiB5Mj0iNDYiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM3QTlFMDAiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNDQ0ZGMDAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48L3N2Zz4=">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiS2VlcFVwIiwic2hvcnRfbmFtZSI6IktlZXBVcCIsInN0YXJ0X3VybCI6Imh0dHBzOi8vY2VzYXJ5b3VuZXMuZ2l0aHViLmlvL2tlZXB1cC8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMEIwRTE0IiwidGhlbWVfY29sb3IiOiIjMEIwRTE0IiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2Uvc3ZnK3htbDtiYXNlNjQsUEhOMlp5QjRiV3h1Y3owaWFIUjBjRG92TDNkM2R5NTNNeTV2Y21jdk1qQXdNQzl6ZG1jaUlIWnBaWGRDYjNnOUlqQWdNQ0F4TURnZ01UQTRJajQ4Y21WamRDQjNhV1IwYUQwaU1UQTRJaUJvWldsbmFIUTlJakV3T0NJZ2NuZzlJakl5SWlCbWFXeHNQU0lqTUVJd1JURTBJaTgrUEhCaGRHZ2dabWxzYkQwaWJtOXVaU0lnYzNSeWIydGxQU0oxY213b0kyY3BJaUJ6ZEhKdmEyVXRkMmxrZEdnOUlqRXhJaUJ6ZEhKdmEyVXRiR2x1WldOaGNEMGljbTkxYm1RaUlITjBjbTlyWlMxc2FXNWxhbTlwYmowaWNtOTFibVFpSUdROUlrMHpOaXczTUNCTU5UUXNORFlnVERjeUxEY3dJaTgrUEdOcGNtTnNaU0JqZUQwaU5UUWlJR041UFNJek1pSWdjajBpTlM0MUlpQm1hV3hzUFNJalJrWkROREF3SWk4K1BHUmxabk0rUEd4cGJtVmhja2R5WVdScFpXNTBJR2xrUFNKbklpQjRNVDBpTlRRaUlIa3hQU0kzTUNJZ2VESTlJalUwSWlCNU1qMGlORFlpSUdkeVlXUnBaVzUwVlc1cGRITTlJblZ6WlhKVGNHRmpaVTl1VlhObElqNDhjM1J2Y0NCdlptWnpaWFE5SWpBaUlITjBiM0F0WTI5c2IzSTlJaU0zUVRsRk1EQWlMejQ4YzNSdmNDQnZabVp6WlhROUlqRWlJSE4wYjNBdFkyOXNiM0k5SWlORFEwWkdNREFpTHo0OEwyeHBibVZoY2tkeVlXUnBaVzUwUGp3dlpHVm1jejQ4TDNOMlp6ND0iLCJzaXplcyI6ImFueSIsInR5cGUiOiJpbWFnZS9zdmcreG1sIiwicHVycG9zZSI6ImFueSJ9XX0=">
+
 <!-- hl=en pins the rendered button/prompt text to English regardless of the visitor's browser
      locale (Google's default is to auto-localize, which is why it showed Greek before). -->
 <script src="https://accounts.google.com/gsi/client?hl=en" async defer></script>
@@ -258,6 +274,18 @@
   .more-menu-row svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
   .more-menu-row + .more-menu-row { border-top: 1px solid var(--hairline); }
   .tab-view.hidden { display: none !important; }
+  /* FIX (user request 08-24: "sliding between tabs, is it possible to make it smoother") — tab
+     switches (nav click or the swipe gesture below) used to be an instant display:none/block cut,
+     no transition at all. going from display:none to visible naturally replays a CSS animation
+     (no JS reflow trick needed — unlike toggling a class on an already-visible element), so this
+     alone covers every switchTab() call site. */
+  @media (prefers-reduced-motion: no-preference) {
+    .tab-view:not(.hidden) { animation: tabFadeSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+  }
+  @keyframes tabFadeSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
   .directory-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -414,7 +442,12 @@
   .shop-tabs button { flex: 1; min-height: 36px; padding: 8px 2px; font-size: 12px; font-weight: 700; background: transparent; color: var(--text-muted); border-radius: 8px; }
   .shop-tabs button.active { background: var(--accent); color: #0B0E14; }
   .gear-group-pills { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px; }
-  .gear-group-pill { flex-shrink: 0; padding: 9px 16px; border-radius: 24px; background: transparent; border: 1px solid var(--hairline); color: var(--text-muted); font-size: 13px; font-weight: 700; }
+  /* FIX (user report 08-24: "category buttons are too big, taking all the screen") — the global
+     `button { width: 100% }` rule was never overridden here. flex-shrink:0 alone doesn't stop a
+     flex item's own width:100% from being its preferred size (flex-basis defaults to auto, which
+     still reads width) — each pill was stretching to the full row's width, one per screen. `flex`
+     shorthand fixes it the same way .shop-tabs button already avoids this same bug via flex:1. */
+  .gear-group-pill { flex: 0 0 auto; width: auto; padding: 9px 16px; border-radius: 24px; background: transparent; border: 1px solid var(--hairline); color: var(--text-muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
   .gear-group-pill.active { background: var(--text-main); color: var(--bg); border-color: var(--text-main); }
   .gear-row, .frame-card {
     display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px;
@@ -427,10 +460,14 @@
   .gear-tier-label { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
   .gear-name { font-size: 14px; font-weight: 700; color: var(--text-main); margin: 2px 0; }
   .gear-material { font-size: 11px; color: var(--text-muted); }
-  .gear-action { flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 800; }
-  .gear-action.owned { color: var(--text-muted); }
-  .gear-action.equipped-label { color: var(--accent); }
-  .gear-action.cost { color: var(--amber); }
+  /* FIX (user report 08-24: "I also can't find Buy/Equipped buttons") — the whole row is already
+     tappable (onGearRowClick), but the action area was plain colored text with no background/
+     border, so nothing signaled it was interactive. Real pill styling now, same treatment
+     .gear-group-pill/.club-pill already use elsewhere on this page for a tappable chip. */
+  .gear-action { flex-shrink: 0; text-align: center; font-size: 11px; font-weight: 800; line-height: 1.3; padding: 7px 12px; border-radius: 20px; white-space: nowrap; }
+  .gear-action.owned { color: var(--text-main); background: var(--card-raised); border: 1px solid var(--hairline); }
+  .gear-action.equipped-label { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); }
+  .gear-action.cost { color: var(--amber); background: rgba(255,196,0,0.14); border: 1px solid rgba(255,196,0,0.35); }
   .frame-swatch { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 3px solid; flex-shrink: 0; }
 
   /* ---- Profile: avatar picker + danger zone (user request 08-21, item 1/5) ---- */
@@ -449,6 +486,9 @@
   .toggle-row:last-of-type { border-bottom: none; }
   .toggle-row .toggle-label { font-size: 14px; }
   .toggle-row .toggle-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  /* Settings' manual Dark-mode row while Follow system is on — same "inert, here's why" signal as
+     SettingsScreen.kt's own `enabled = !followSystem` on the equivalent control. */
+  .toggle-row.row-disabled { opacity: 0.45; pointer-events: none; }
   .switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
   .switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; margin: 0; }
   .switch .track {
@@ -560,19 +600,18 @@
           <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 21v-1.3C2 16.8 5 15 9 15s7 1.8 7 4.7V21"/><path d="M15.3 15.2c2.9.4 5.7 1.8 5.7 4.5V21"/></svg></span>
           <span>Club</span>
         </button>
+        <!-- FIX (user request 08-24: "match the android app... as much as possible") — HomeScreen.kt's
+             own Leaderboard icon is Icons.Default.Leaderboard, a 3-bar ascending chart, not the
+             podium-with-arms shape this used to draw. -->
         <button id="nav-leaderboard" data-tab="leaderboard">
-          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><rect x="7" y="4" width="10" height="10" rx="5"/><path d="M7 6H4.5A1.5 1.5 0 0 0 3 7.5 3.5 3.5 0 0 0 6.5 11H7"/><path d="M17 6h2.5A1.5 1.5 0 0 1 21 7.5 3.5 3.5 0 0 1 17.5 11H17"/></svg></span>
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="16" y="4" width="4" height="17" rx="1"/></svg></span>
           <span>Leaders</span>
         </button>
-        <button id="nav-profile" data-tab="profile">
-          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.2 3.6-7.5 8-7.5s8 3.3 8 7.5"/></svg></span>
-          <span>Profile</span>
-        </button>
         <!-- Same role as HomeScreen.kt's bottom-nav More tab — opens a small menu to destinations
-             that aren't part of the persistent tab bar (Membership/Settings/Shop are all modal
-             overlays in the app too, pushed on top of a tab rather than being tabs themselves —
-             see #more-menu and the 3 #screen-* overlays below). Deliberately excludes "Profile"
-             from the menu list since that's already its own real tab here. -->
+             that aren't part of the persistent tab bar. FIX (user request 08-24): Profile moved in
+             here too, matching HomeScreen.kt's own MoreMenuRow list exactly (Profile, Settings,
+             Membership, Shop, Admin) — it used to be its own bottom-nav tab here, which the real
+             app never does since Profile isn't part of its persistent 3-tab bar either. -->
         <button id="nav-more" class="nav-more-btn" aria-label="More" aria-haspopup="true">
           <span class="nav-icon-wrap nav-more-dot"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>
           <span>More</span>
@@ -580,6 +619,14 @@
       </nav>
 
       <div class="more-menu hidden" id="more-menu">
+        <button class="more-menu-row" id="more-menu-profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.2 3.6-7.5 8-7.5s8 3.3 8 7.5"/></svg>
+          Profile
+        </button>
+        <button class="more-menu-row" id="more-menu-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </button>
         <button class="more-menu-row" id="more-menu-membership">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.5-6.3 4.5 2.3-7.2-6-4.6h7.6z"/></svg>
           Membership
@@ -587,10 +634,6 @@
         <button class="more-menu-row" id="more-menu-shop">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
           Shop
-        </button>
-        <button class="more-menu-row" id="more-menu-settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Settings
         </button>
       </div>
 
@@ -627,11 +670,13 @@
           </div>
         </div>
 
-        <!-- Tier legend (user request 08-23: "use the same legends for the status: Rookie,
-             Warrior... all of these") — same 9 tiers/level ranges as StatusTier.kt, same badge
-             glyphs as TierBadge.kt (tierBadgeSvg() below), just laid out as a horizontal-scroll
-             reference strip instead of one badge for your own current tier. -->
-        <div class="tier-legend-scroll" id="tier-legend-row"></div>
+        <!-- FIX (user request 08-24: "Dashboard, it does not have to show all levels") — removed
+             the horizontal-scroll strip of all 9 tiers (Rookie→...→Diamond) that used to sit here.
+             The gamification card above already shows YOUR current tier (badge + name) — the full
+             reference legend was extra detail nobody asked for, matching the app's own Dashboard
+             which doesn't show one either. renderTierLegend()/STATUS_TIERS stay defined (still
+             used for statusTierObjFor()'s tier lookup, and tierBadgeSvg() itself), just no longer
+             rendered here. -->
 
         <!-- FIX (user request 08-21: "show the points too") — mirrors DashboardScreen.kt's
              Activity Summary card: a period switcher (same Week/Month/Year/All the Leaderboard
@@ -712,20 +757,20 @@
 
             <div class="field">
               <label for="activity-select">Activity</label>
+              <!-- FIX (user request 08-24: "we should only see" the 6 scoring categories, not
+                   every individual sport) — picking a specific sport no longer changes scoring
+                   (0096_category_based_scoring_formula.sql scores by category, not by exact
+                   exercise_type), so exposing 13 individual sports here was granularity the
+                   formula itself doesn't use. Each option stores one representative exercise_type
+                   for its category (CATEGORY_TO_CODE below) — which specific type doesn't matter
+                   scoring-wise since every type in a category shares the same curve. -->
               <select id="activity-select">
-                <option value="running">Running</option>
-                <option value="walking">Walking</option>
-                <option value="cycling">Cycling</option>
-                <option value="swimming">Swimming</option>
-                <option value="strength_training">Strength Training</option>
-                <option value="hiking">Hiking</option>
-                <option value="yoga">Yoga</option>
-                <option value="rowing">Rowing</option>
-                <option value="elliptical">Elliptical</option>
-                <option value="stair_climbing">Stair Climbing</option>
-                <option value="boxing">Boxing</option>
-                <option value="dancing">Dancing</option>
-                <option value="other_workout">Other</option>
+                <option value="cardio">Cardio/HIIT</option>
+                <option value="weight">Weight training</option>
+                <option value="circuit">Circuit</option>
+                <option value="racket">Racket sport</option>
+                <option value="swim">Swimming</option>
+                <option value="recovery">Recovery</option>
               </select>
             </div>
             <div class="row">
@@ -1025,6 +1070,35 @@
     </div>
     <p class="section-label" style="margin-bottom:10px;">Appearance</p>
     <div class="theme-grid" id="theme-grid"></div>
+
+    <!-- FIX (user request 08-24: "Dark vs Light mode to be added") — same real light mode the app
+         already has (SettingsScreen.kt's Follow System / manual Dark switches), just not exposed
+         here until now. Reuses the .switch/.toggle-row component new-club-public etc. already use. -->
+    <div class="toggle-row" style="margin-top:20px;">
+      <div>
+        <div class="toggle-label">Follow system</div>
+        <div class="toggle-sub">Match your device's light/dark setting automatically.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="settings-follow-system" />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
+    <div class="toggle-row" id="settings-dark-mode-row">
+      <div>
+        <div class="toggle-label">Dark mode</div>
+        <div class="toggle-sub">Turn off for a light background.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="settings-dark-mode" checked />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
+
+    <!-- FIX (user request 08-24: "changing the setting should have an apply") — hidden until a
+         swatch/switch is actually changed (updateApplyButtonState); nothing takes visual effect
+         until this is pressed. -->
+    <button class="btn-primary hidden" id="settings-apply-btn" style="margin-top:18px;">Apply</button>
   </div>
 
   <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
@@ -1225,10 +1299,22 @@ const TAB_ORDER = ["dashboard", "club", "leaderboard", "profile"];
 // "storage full/disabled just means this one nicety doesn't work" fallback).
 const LAST_TAB_KEY = "keepup_last_tab";
 
+// Tracked separately from ".tab-nav button.active" — FIX (introduced by moving Profile off the
+// persistent nav bar into #more-menu, user request 08-24): the swipe handler below used to read
+// the current tab from the active nav button, which silently broke for Profile the moment it
+// stopped having one. This is the actual source of truth switchTab() itself updates.
+let currentTabId = "dashboard";
+
 function switchTab(tab) {
+  currentTabId = tab;
   TAB_ORDER.forEach((t) => {
     el(`tab-${t}`).classList.toggle("hidden", t !== tab);
-    el(`nav-${t}`).classList.toggle("active", t === tab);
+    // FIX (user request 08-24: "match the android app... profile to be added to the three dots
+    // menu") — Profile no longer has a persistent bottom-nav icon (moved into #more-menu, same as
+    // HomeScreen.kt's own MoreMenuRow list), so `nav-profile` no longer exists. Still a real,
+    // switchable tab in TAB_ORDER/#tab-profile — just reached a different way now.
+    const navBtn = el(`nav-${t}`);
+    if (navBtn) navBtn.classList.toggle("active", t === tab);
   });
   try {
     localStorage.setItem(LAST_TAB_KEY, tab);
@@ -1309,8 +1395,7 @@ Array.from(el("signed-in-view").querySelectorAll(".tab-nav button")).forEach((bt
     const dx = e.changedTouches[0].clientX - startX;
     if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
 
-    const activeBtn = document.querySelector(".tab-nav button.active");
-    const currentIndex = activeBtn ? TAB_ORDER.indexOf(activeBtn.dataset.tab) : -1;
+    const currentIndex = TAB_ORDER.indexOf(currentTabId);
     if (currentIndex === -1) return;
     // Swipe left (dx negative) -> next tab; swipe right (dx positive) -> previous tab — same
     // direction convention as a HorizontalPager. Clamped at both ends, no wraparound.
@@ -1632,7 +1717,12 @@ async function loadGamificationCard() {
     .select("total_xp, level")
     .eq("id", currentSession.user.id)
     .single();
-  if (error || !profile) return;
+  if (error || !profile) {
+    // Used to fail completely silently — no way to tell "this ran and found nothing" apart from
+    // "this never ran" from the console. See the boot-time race fixed above for why that mattered.
+    console.error("Couldn't load gamification card:", error);
+    return;
+  }
 
   const totalXp = profile.total_xp ?? 0;
   const level = profile.level ?? levelForXp(totalXp);
@@ -2471,7 +2561,7 @@ function showManualEntryStep() {
   hide("retake-btn");
   hide("parse-error");
   el("confidence-row").innerHTML = "";
-  el("activity-select").value = "running";
+  el("activity-select").value = "cardio";
   el("duration-input").value = "";
   el("calories-input").value = "";
   el("hr-input").value = "";
@@ -2569,16 +2659,14 @@ function populateConfirmStep(result) {
     `<span class="badge ${badgeClass}">${result.confidence} confidence</span>` +
     (result.notes ? `<p class="muted" style="margin-top:8px;">${escapeHtml(result.notes)}</p>` : "");
 
-  el("activity-select").value = result.activity_label in activityOptionsSet() ? result.activity_label : "other_workout";
+  // FIX (user request 08-24, category-only picker) — was a direct match against the select's own
+  // options; the select no longer speaks the photo-parser's specific-sport vocabulary, so this
+  // goes through PARSED_LABEL_TO_CATEGORY first. Falls back to "cardio" (the parser's own
+  // "other_workout" already maps there too) rather than a dead value the select can't select.
+  el("activity-select").value = PARSED_LABEL_TO_CATEGORY[result.activity_label] || "cardio";
   el("duration-input").value = result.duration_minutes ?? "";
   el("calories-input").value = result.calories ?? "";
   el("hr-input").value = result.avg_heart_rate ?? "";
-}
-
-function activityOptionsSet() {
-  return Object.fromEntries(
-    Array.from(el("activity-select").options).map((o) => [o.value, true]),
-  );
 }
 
 function escapeHtml(s) {
@@ -2589,23 +2677,40 @@ function escapeHtml(s) {
 
 // ---------- Save ----------
 
-// Mirrors Health Connect's own EXERCISE_TYPE_* int constants (see parse-workout-photo/index.ts's
-// own copy of this table and its comment for provenance) so a workout saved here labels
-// identically to one synced from Health Connect on Android.
-const ACTIVITY_TO_CODE = {
-  running: 56, walking: 79, cycling: 8, swimming: 74, strength_training: 70,
-  hiking: 37, yoga: 83, rowing: 53, elliptical: 25, stair_climbing: 68,
-  boxing: 11, dancing: 16, other_workout: 0,
+// FIX (user request 08-24: category-only picker, see activity-select's own comment above) — was
+// ACTIVITY_TO_CODE, 13 individual sports each mapping to their own Health Connect exercise_type.
+// Now one representative exercise_type per scoring category (0096_category_based_scoring_formula.sql
+// / fn_scoring_category_label()) — which specific type within a category gets stored doesn't
+// affect points, every type in the same category scores identically.
+const CATEGORY_TO_CODE = {
+  cardio: 56,   // Running — representative Cardio/HIIT type
+  weight: 70,   // Strength Training
+  circuit: 36,  // HIGH_INTENSITY_INTERVAL_TRAINING ("HIIT / Circuit")
+  racket: 50,   // Racquetball
+  swim: 74,     // Swimming (pool)
+  recovery: 83, // Yoga
+};
+
+// The photo-parser (parse-workout-photo/index.ts) still detects specific sports from a screenshot
+// (more accurate than asking it to guess a category directly) — this maps its 13-label vocabulary
+// down to the category the reduced picker above actually offers, so populateConfirmStep() can
+// still auto-select the right option. Circuit/Racket sport have no representative among the
+// parser's labels, so a photo can never auto-land on those — a user can still pick either by hand.
+const PARSED_LABEL_TO_CATEGORY = {
+  running: "cardio", walking: "cardio", cycling: "cardio", hiking: "cardio",
+  rowing: "cardio", elliptical: "cardio", stair_climbing: "cardio", boxing: "cardio",
+  dancing: "cardio", other_workout: "cardio",
+  swimming: "swim",
+  strength_training: "weight",
+  yoga: "recovery",
 };
 
 // Short fallback glyph for the workout list's icon tile (user request 08-21, "align" pass) —
 // mirrors WorkoutRow's accent-soft icon tile (DashboardScreen.kt), which shows a real icon image
-// when one's on file and a short text code otherwise; this page only has the fallback available
-// (no icon-asset hosting wired up here), so every activity always renders as its code.
-const ACTIVITY_CODE_ABBR = {
-  running: "RUN", walking: "WLK", cycling: "CYC", swimming: "SWM", strength_training: "STR",
-  hiking: "HIK", yoga: "YGA", rowing: "ROW", elliptical: "ELL", stair_climbing: "STC",
-  boxing: "BOX", dancing: "DNC", other_workout: "OTH",
+// when one's on file and a short text code otherwise; used only when workoutIconUrl() below has no
+// real hosted icon for that exercise_type.
+const CATEGORY_ABBR = {
+  cardio: "CIO", weight: "WGT", circuit: "CIR", racket: "RKT", swim: "SWM", recovery: "RCV",
 };
 
 el("save-btn").addEventListener("click", async () => {
@@ -2638,7 +2743,7 @@ el("save-btn").addEventListener("click", async () => {
       duration_mins: duration,
       avg_heart_rate: hr,
       image_uri: null,
-      exercise_type: ACTIVITY_TO_CODE[activity] ?? 0,
+      exercise_type: CATEGORY_TO_CODE[activity] ?? 0,
       local_date: localDate,
       source: "web_photo",
     });
@@ -2686,9 +2791,30 @@ async function showSavedStep(duration, calories) {
 
 // ---------- Workout list (view all sources; edit / delete own web uploads only) ----------
 
-const CODE_TO_LABEL = Object.fromEntries(
-  Array.from(el("activity-select").options).map((o) => [Number(ACTIVITY_TO_CODE[o.value]), o.textContent]),
-);
+// FIX (user request 08-24, category-only picker) — was derived from activity-select's own options,
+// which covered 13 types even before the picker shrank to 6 categories, so a history row for
+// anything else (a real Health-Connect-synced sport like Soccer or Tennis) already silently fell
+// back to "Workout". Full 60-type label list instead, same source/verification as
+// EXERCISE_ICON_FILES above (real compiled androidx.health.connect:connect-client:1.1.0 class) —
+// this history shows every workout regardless of source, so it needs the full vocabulary, not just
+// what the manual-log picker offers.
+const EXERCISE_TYPE_LABELS = {
+  0: "Workout", 2: "Badminton", 4: "Baseball", 5: "Basketball", 8: "Cycling",
+  9: "Stationary Bike", 10: "Boot Camp", 11: "Boxing", 13: "Calisthenics", 14: "Cricket",
+  16: "Dancing", 25: "Elliptical", 26: "Exercise Class", 27: "Fencing",
+  28: "American Football", 29: "Australian Football", 31: "Frisbee", 32: "Golf",
+  33: "Guided Breathing", 34: "Gymnastics", 35: "Handball",
+  36: "HIIT / Circuit", 37: "Hiking", 38: "Ice Hockey", 39: "Ice Skating",
+  44: "Martial Arts", 46: "Paddling", 47: "Paragliding", 48: "Pilates",
+  50: "Racquetball", 51: "Rock Climbing", 52: "Roller Hockey", 53: "Rowing",
+  54: "Rowing Machine", 55: "Rugby", 56: "Running", 57: "Treadmill Run",
+  58: "Sailing", 59: "Scuba Diving", 60: "Skating", 61: "Skiing", 62: "Snowboarding",
+  63: "Snowshoeing", 64: "Soccer", 65: "Softball", 66: "Squash", 68: "Stair Climbing",
+  69: "Stair Machine", 70: "Strength Training", 71: "Stretching", 72: "Surfing",
+  73: "Open Water Swim", 74: "Swimming", 75: "Table Tennis", 76: "Tennis",
+  78: "Volleyball", 79: "Walking", 80: "Water Polo", 81: "Weightlifting",
+  82: "Wheelchair", 83: "Yoga",
+};
 
 async function loadHistory() {
   // Every workout this account has, any source — same as the app's own Dashboard list (user
@@ -2738,12 +2864,28 @@ function workoutIconUrl(exerciseType) {
   return file ? `https://cesaryounes.github.io/avatars/basic/${file}.svg` : null;
 }
 
+// Reverse of CATEGORY_TO_CODE, but for every real exercise_type rather than just the 6
+// representative codes — used to pick a sensible default in the edit form (a logged Yoga session
+// should default back to "Recovery" when you go to edit it, not silently become "Cardio/HIIT")
+// and for the icon-tile abbreviation fallback. Recovery types are their own branch here even
+// though fn_scoring_category_label() (0096_category_based_scoring_formula.sql) folds them into
+// Cardio/HIIT for scoring — this is a "what did you probably mean to log" mapping, not a scoring
+// one, so it's allowed to disagree.
+function categoryKeyForExerciseType(type) {
+  if (type === 70 || type === 81) return "weight";
+  if (type === 73 || type === 74) return "swim";
+  if ([36, 13, 10, 34, 51].includes(type)) return "circuit";
+  if ([2, 50, 66, 75, 76].includes(type)) return "racket";
+  if ([33, 48, 71, 83].includes(type)) return "recovery";
+  return "cardio";
+}
+
 function renderHistoryRow(w) {
   const li = document.createElement("li");
   li.className = "history-row";
 
-  const label = CODE_TO_LABEL[w.exercise_type] || "Workout";
-  const activityKey = Object.keys(ACTIVITY_TO_CODE).find((k) => ACTIVITY_TO_CODE[k] === w.exercise_type) || "other_workout";
+  const label = EXERCISE_TYPE_LABELS[w.exercise_type] || "Workout";
+  const activityKey = categoryKeyForExerciseType(w.exercise_type);
   const iconUrl = workoutIconUrl(w.exercise_type);
   const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
   const isWebUpload = w.source === "web_photo";
@@ -2759,7 +2901,7 @@ function renderHistoryRow(w) {
   const main = document.createElement("div");
   main.className = "history-row-main";
   main.innerHTML = `
-    <div class="workout-icon-tile">${iconUrl ? `<img src="${iconUrl}" alt="" width="24" height="24"/>` : (ACTIVITY_CODE_ABBR[activityKey] || "OTH")}</div>
+    <div class="workout-icon-tile">${iconUrl ? `<img src="${iconUrl}" alt="" width="24" height="24"/>` : (CATEGORY_ABBR[activityKey] || "CIO")}</div>
     <div style="min-width:0; flex:1;">
       <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
       <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
@@ -2833,7 +2975,7 @@ function renderHistoryRow(w) {
         p_duration_mins: duration,
         p_calories: calories,
         p_avg_heart_rate: hr,
-        p_exercise_type: ACTIVITY_TO_CODE[activity] ?? 0,
+        p_exercise_type: CATEGORY_TO_CODE[activity] ?? 0,
       });
       if (error) throw error;
       await loadDashboard();
@@ -2898,7 +3040,14 @@ el("more-menu-membership").addEventListener("click", () => {
   // too so the status is always fresh regardless of tab-visit history.
   loadProfile();
 });
-el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); renderThemeGrid(); });
+el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); openAppearanceSettings(); });
+// Profile is a real tab (#tab-profile, part of TAB_ORDER), not an overlay like Membership/Shop/
+// Settings — so this closes the popover and switches to it directly, rather than going through
+// openScreen()'s overlay machinery.
+el("more-menu-profile").addEventListener("click", () => {
+  el("more-menu").classList.add("hidden");
+  switchTab("profile");
+});
 el("more-menu-shop").addEventListener("click", () => { openScreen("screen-shop"); loadShop(); });
 
 // ---------- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt) ----------
@@ -2909,7 +3058,6 @@ const PREMIUM_FEATURES = [
   { label: "Club leaderboards", free: false },
   { label: "Streak freezes (4/month)", free: false },
   { label: "Nudge your clubmates", free: false },
-  { label: "Ad-free", free: false },
 ];
 function compareCheckIcon(yes) {
   return yes
@@ -2924,55 +3072,174 @@ function renderCompareTable() {
   el("compare-table").innerHTML = html;
 }
 
-// ---------- Appearance (Settings) — theme picker, local-only (localStorage), matching
+// ---------- Appearance (Settings) — theme + dark/light, local-only (localStorage), matching
 // AppViewModel.loadPreferences() treating theme as a per-device preference on Android too, not a
-// synced profiles column. Same 4 themes + dark-variant hex values as AppTheme.kt's own palettes. ----------
+// synced profiles column. Same 4 themes as AppTheme.kt's own KeepUpThemeId, and — FIX (user
+// request 08-24: "Dark vs Light mode to be added") — now the app's own REAL light variant per
+// theme too (AppTheme.kt's neonVariants/emberVariants/signalVariants/chalkVariants `.light`),
+// not invented: the Android app already has a full light mode (SettingsScreen.kt's Follow
+// System / manual Dark toggle, AppViewModel.followSystemTheme/isDarkTheme) that just hadn't been
+// ported here yet.
 const THEMES = {
-  neon:   { label: "Neon",   desc: "The original — neon yellow-green on near-black", bg: "#0B0E14", card: "#161B22", accent: "#CCFF00", amber: "#FFC400", textMain: "#F0F6FC", textMuted: "#8B949E" },
-  ember:  { label: "Ember",  desc: "Warm orange glow", bg: "#100C0A", card: "#1A1411", accent: "#FF6B2C", amber: "#FFC94D", textMain: "#F5EDE8", textMuted: "#9A8B82" },
-  signal: { label: "Signal", desc: "Cool cyan on deep blue-black", bg: "#080C12", card: "#111823", accent: "#3FE0FF", amber: "#A6B6FF", textMain: "#EAF2FB", textMuted: "#7C8B9E" },
-  chalk:  { label: "Chalk",  desc: "Light, editorial, ink green", bg: "#100F0C", card: "#1A1916", accent: "#34D399", amber: "#E0954A", textMain: "#EDEBE4", textMuted: "#8F8C82" },
+  neon: {
+    label: "Neon", desc: "The original — neon yellow-green on near-black",
+    dark:  { bg: "#0B0E14", card: "#161B22", accent: "#CCFF00", amber: "#FFC400", textMain: "#F0F6FC", textMuted: "#8B949E" },
+    light: { bg: "#F5F7FA", card: "#FFFFFF", accent: "#6B8F00", amber: "#B8860B", textMain: "#1A1D23", textMuted: "#5B6572" },
+  },
+  ember: {
+    label: "Ember", desc: "Warm orange glow",
+    dark:  { bg: "#100C0A", card: "#1A1411", accent: "#FF6B2C", amber: "#FFC94D", textMain: "#F5EDE8", textMuted: "#9A8B82" },
+    light: { bg: "#FBF7F4", card: "#FFFFFF", accent: "#B84A17", amber: "#A8730F", textMain: "#241A14", textMuted: "#7A6B60" },
+  },
+  signal: {
+    label: "Signal", desc: "Cool cyan on deep blue-black",
+    dark:  { bg: "#080C12", card: "#111823", accent: "#3FE0FF", amber: "#A6B6FF", textMain: "#EAF2FB", textMuted: "#7C8B9E" },
+    light: { bg: "#F4F7FB", card: "#FFFFFF", accent: "#0E7490", amber: "#5A67D8", textMain: "#121821", textMuted: "#64748B" },
+  },
+  chalk: {
+    label: "Chalk", desc: "Light, editorial, ink green",
+    dark:  { bg: "#100F0C", card: "#1A1916", accent: "#34D399", amber: "#E0954A", textMain: "#EDEBE4", textMuted: "#8F8C82" },
+    light: { bg: "#F4F2EC", card: "#FFFFFF", accent: "#0E6B3F", amber: "#C97A16", textMain: "#17181C", textMuted: "#6C6F78" },
+  },
 };
 const THEME_KEY = "keepup_theme";
+const DARK_KEY = "keepup_dark_mode"; // "1"/"0" — manual choice, read only when follow-system is off
+const FOLLOW_SYSTEM_KEY = "keepup_follow_system"; // "1"/"0" — mirrors AppViewModel.followSystemTheme
 function lightenHex(hex, amount) {
   const h = hex.replace("#", "");
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
   const l = (c) => Math.min(255, Math.round(c + (255 - c) * amount));
   return `rgb(${l(r)}, ${l(g)}, ${l(b)})`;
 }
+// New alongside lightenHex — light mode's "raised" card needs to go the other direction (a card
+// already at #FFFFFF has nowhere lighter to go).
+function darkenHex(hex, amount) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const d = (c) => Math.max(0, Math.round(c * (1 - amount)));
+  return `rgb(${d(r)}, ${d(g)}, ${d(b)})`;
+}
 function savedThemeId() {
   try { return THEMES[localStorage.getItem(THEME_KEY)] ? localStorage.getItem(THEME_KEY) : "neon"; } catch { return "neon"; }
 }
-function applyTheme(id) {
+function savedDarkMode() {
+  try { const v = localStorage.getItem(DARK_KEY); return v === null ? true : v === "1"; } catch { return true; }
+}
+function savedFollowSystem() {
+  try { return localStorage.getItem(FOLLOW_SYSTEM_KEY) === "1"; } catch { return false; }
+}
+function systemPrefersDark() {
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+// Same resolution AppViewModel/MainActivity's `resolvedDark` uses: follow-system wins whenever
+// it's on, otherwise the manual choice.
+function resolvedDark(followSystem, manualDark) {
+  return followSystem ? systemPrefersDark() : manualDark;
+}
+
+function applyTheme(id, isDark) {
   const t = THEMES[id] || THEMES.neon;
+  const variant = isDark ? t.dark : t.light;
   const root = document.documentElement.style;
-  root.setProperty("--bg", t.bg);
-  root.setProperty("--card", t.card);
-  root.setProperty("--card-raised", lightenHex(t.card, 0.12));
-  root.setProperty("--accent", t.accent);
-  root.setProperty("--accent-soft", hexToRgba(t.accent, 0.12));
-  root.setProperty("--amber", t.amber);
-  root.setProperty("--text-main", t.textMain);
-  root.setProperty("--text-muted", t.textMuted);
-  try { localStorage.setItem(THEME_KEY, id); } catch {}
+  root.setProperty("--bg", variant.bg);
+  root.setProperty("--card", variant.card);
+  root.setProperty("--card-raised", isDark ? lightenHex(variant.card, 0.12) : darkenHex(variant.card, 0.04));
+  root.setProperty("--accent", variant.accent);
+  // AppTheme.kt's KeepUpPalette.accentSoft: 0.12 alpha dark, 0.14 light — same asymmetry here.
+  root.setProperty("--accent-soft", hexToRgba(variant.accent, isDark ? 0.12 : 0.14));
+  root.setProperty("--amber", variant.amber);
+  root.setProperty("--text-main", variant.textMain);
+  root.setProperty("--text-muted", variant.textMuted);
+  // AppTheme.kt's KeepUpPalette.hairline: 0x16FFFFFF dark (~8.6% white) / 0x1A000000 light (~10.2%
+  // black) — this used to be a fixed value on this page since every theme here was dark-only;
+  // real light mode means it now actually needs to flip.
+  root.setProperty("--hairline", isDark ? "rgba(255,255,255,0.086)" : "rgba(0,0,0,0.102)");
+  try {
+    localStorage.setItem(THEME_KEY, id);
+    localStorage.setItem(DARK_KEY, isDark ? "1" : "0");
+  } catch {}
   // Tier badges/legend pull their colors live off these same CSS vars — re-render so an open
   // Dashboard reflects the new theme immediately instead of only on the next loadGamificationCard().
   renderTierLegend();
   if (currentSession) loadGamificationCard();
 }
+
+// FIX (user request 08-24: "changing the setting should have an apply") — a swatch/switch click
+// only updates this pending state and the visual selection; nothing about the live page changes
+// until Apply is pressed. Reset to the currently-committed values every time Settings opens, so a
+// stale pending diff from a previous visit can't linger.
+let pendingThemeId = savedThemeId();
+let pendingFollowSystem = savedFollowSystem();
+let pendingManualDark = savedDarkMode();
+
+function openAppearanceSettings() {
+  pendingThemeId = savedThemeId();
+  pendingFollowSystem = savedFollowSystem();
+  pendingManualDark = savedDarkMode();
+  renderThemeGrid();
+  renderAppearanceControls();
+  updateApplyButtonState();
+}
+
+function updateApplyButtonState() {
+  const dirty = pendingThemeId !== savedThemeId()
+    || pendingFollowSystem !== savedFollowSystem()
+    || (!pendingFollowSystem && pendingManualDark !== savedDarkMode());
+  el("settings-apply-btn").classList.toggle("hidden", !dirty);
+}
+
 function renderThemeGrid() {
-  const current = savedThemeId();
   el("theme-grid").innerHTML = Object.entries(THEMES).map(([id, t]) => `
-    <button class="theme-swatch ${id === current ? "active" : ""}" data-theme-id="${id}" style="--theme-accent-preview:${t.accent};">
+    <button class="theme-swatch ${id === pendingThemeId ? "active" : ""}" data-theme-id="${id}" style="--theme-accent-preview:${t.dark.accent};">
       <div class="theme-swatch-dot"></div>
       <div class="theme-swatch-name">${t.label}</div>
       <div class="theme-swatch-desc">${escapeHtml(t.desc)}</div>
     </button>`).join("");
   Array.from(el("theme-grid").querySelectorAll(".theme-swatch")).forEach((btn) => {
     btn.addEventListener("click", () => {
-      applyTheme(btn.dataset.themeId);
+      pendingThemeId = btn.dataset.themeId;
       Array.from(el("theme-grid").querySelectorAll(".theme-swatch")).forEach((b) => b.classList.toggle("active", b === btn));
+      updateApplyButtonState();
     });
+  });
+}
+
+// Follow-system / manual-dark switches — same reused .switch component new-club-public etc.
+// already use. Manual dark row is greyed out (not hidden — same "Check" pattern as elsewhere on
+// this page for "here's a control, here's why it's currently inert") whenever follow-system is on,
+// matching SettingsScreen.kt's own `enabled = !followSystem` on its manual toggle.
+function renderAppearanceControls() {
+  el("settings-follow-system").checked = pendingFollowSystem;
+  el("settings-dark-mode").checked = pendingFollowSystem ? systemPrefersDark() : pendingManualDark;
+  el("settings-dark-mode").disabled = pendingFollowSystem;
+  el("settings-dark-mode-row").classList.toggle("row-disabled", pendingFollowSystem);
+}
+el("settings-follow-system").addEventListener("change", (e) => {
+  pendingFollowSystem = e.target.checked;
+  renderAppearanceControls();
+  updateApplyButtonState();
+});
+el("settings-dark-mode").addEventListener("change", (e) => {
+  pendingManualDark = e.target.checked;
+  updateApplyButtonState();
+});
+el("settings-apply-btn").addEventListener("click", () => {
+  applyTheme(pendingThemeId, resolvedDark(pendingFollowSystem, pendingManualDark));
+  try {
+    localStorage.setItem(FOLLOW_SYSTEM_KEY, pendingFollowSystem ? "1" : "0");
+  } catch {}
+  updateApplyButtonState();
+});
+
+// System theme changing while "Follow system" is active re-renders immediately, same as the real
+// app's reactive `systemDark` state — this is the OS telling the page something changed, not a
+// user choice sitting in a form, so it bypasses the Apply gate entirely (nothing to confirm).
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (savedFollowSystem()) {
+      applyTheme(savedThemeId(), systemPrefersDark());
+      if (!el("screen-settings").classList.contains("hidden")) renderAppearanceControls();
+    }
   });
 }
 
@@ -3099,7 +3366,7 @@ function renderGearList() {
     const isEquipped = [shopProfile.gear_showcase_1, shopProfile.gear_showcase_2, shopProfile.gear_showcase_3].includes(it.id);
     const actionHtml = isEquipped ? `<span class="gear-action equipped-label">Equipped</span>`
       : isOwned ? `<span class="gear-action owned">Tap to<br>equip</span>`
-      : `<span class="gear-action cost">${it.tier.cost}<br>gems</span>`;
+      : `<span class="gear-action cost">Buy · ${it.tier.cost}<br>gems</span>`;
     return `
       <div class="gear-row ${isEquipped ? "equipped" : ""}" data-item-id="${it.id}">
         <div class="gear-art-tile">${gearArtSvg(it.id, 86, 54)}</div>
@@ -3164,7 +3431,7 @@ function renderFrames() {
     const isEquipped = shopProfile.equipped_avatar_frame === f.id;
     const actionHtml = isEquipped ? `<span class="gear-action equipped-label">Equipped</span>`
       : isOwned ? `<span class="gear-action owned">Tap to<br>equip</span>`
-      : `<span class="gear-action cost">${f.cost}<br>gems</span>`;
+      : `<span class="gear-action cost">Buy · ${f.cost}<br>gems</span>`;
     return `
       <div class="frame-card ${isEquipped ? "equipped" : ""}" data-frame-id="${f.id}">
         <div class="frame-swatch" style="border-color:${f.color};"></div>
@@ -3218,8 +3485,17 @@ Array.from(el("shop-tabs").querySelectorAll("button")).forEach((btn) => {
 
 // ---------- Boot ----------
 
-applyTheme(savedThemeId());
-refreshSession();
+applyTheme(savedThemeId(), resolvedDark(savedFollowSystem(), savedDarkMode()));
+// FIX (user report: "refresh and I lose the dashboard values, changing Appearance brings them
+// back") — this used to also call refreshSession() directly here. supabase-js v2's
+// onAuthStateChange (registered above) already fires once on subscribe with whatever session is
+// restored from storage (event INITIAL_SESSION), which calls renderAuthState() → switchTab() →
+// loadDashboard() on its own. Having BOTH fire on every cold load meant two independent,
+// uncoordinated calls to loadDashboard() racing each other — whichever profiles/workouts fetch
+// happened to resolve last silently overwrote the other's (correct) DOM update. Manually changing
+// Appearance "fixed" it because that's a single, isolated loadGamificationCard() call with nothing
+// else racing it. One source of truth for initial load now; refreshSession() is still called
+// explicitly after actions that actually change the session (sign-in, account deletion) above.
 initGoogleSignIn();
 </script>
 </body>
