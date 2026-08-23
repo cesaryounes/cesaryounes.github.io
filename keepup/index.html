@@ -237,9 +237,13 @@
   .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
   /* Bottom nav bar (user request 08-23) — fixed to the viewport bottom, icon+label per tab, same
-     44x26dp accent-soft pill behind the selected icon HomeScreen.kt's own NavigationBar uses
-     (see .nav-icon-wrap.active below), instead of the old text-only row that used to sit right
-     under the header. */
+     accent-soft pill behind the selected icon HomeScreen.kt's own NavigationBar uses (Material3's
+     real NavigationBarItem indicator, see .nav-icon-wrap.active below), instead of the old
+     text-only row that used to sit right under the header.
+     FIX (user request 08-24, real-app screenshot comparison) — was sized 44x26dp, a rough
+     approximation; the real indicator reads noticeably larger and taller than that on an actual
+     device, closer to Material3's actual default (~64dp wide). Bumped from a photo comparison
+     rather than guessing again. */
   .tab-nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
     display: flex; width: 100%; max-width: 420px; margin: 0 auto;
@@ -248,16 +252,16 @@
   }
   .tab-nav button {
     flex: 1; width: auto; min-height: auto; padding: 4px 2px 6px;
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    background: transparent; color: var(--text-muted); font-size: 10px; font-weight: 600; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 600; border-radius: 10px;
   }
   .tab-nav button.active { color: var(--accent); font-weight: 700; }
   .nav-icon-wrap {
-    width: 44px; height: 26px; border-radius: 13px;
+    width: 64px; height: 32px; border-radius: 16px;
     display: flex; align-items: center; justify-content: center;
   }
   .tab-nav button.active .nav-icon-wrap { background: var(--accent-soft); }
-  .nav-icon-wrap svg { width: 22px; height: 22px; }
+  .nav-icon-wrap svg { width: 24px; height: 24px; }
   .nav-more-dot svg { width: 20px; height: 20px; }
   .more-menu {
     position: fixed; left: 16px; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px));
@@ -596,16 +600,18 @@
           <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>
           <span>Dashboard</span>
         </button>
-        <button id="nav-club" data-tab="club">
-          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 21v-1.3C2 16.8 5 15 9 15s7 1.8 7 4.7V21"/><path d="M15.3 15.2c2.9.4 5.7 1.8 5.7 4.5V21"/></svg></span>
-          <span>Club</span>
-        </button>
         <!-- FIX (user request 08-24: "match the android app... as much as possible") — HomeScreen.kt's
-             own Leaderboard icon is Icons.Default.Leaderboard, a 3-bar ascending chart, not the
-             podium-with-arms shape this used to draw. -->
+             tabs list is literally listOf("Dashboard", "Leaderboard", "Clubs"), that exact order —
+             this used to have Club before Leaderboard, reversed from the app. Leaderboard's icon is
+             Icons.Default.Leaderboard, a 3-bar ascending chart, not the podium-with-arms shape this
+             used to draw. -->
         <button id="nav-leaderboard" data-tab="leaderboard">
           <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="16" y="4" width="4" height="17" rx="1"/></svg></span>
-          <span>Leaders</span>
+          <span>Leaderboard</span>
+        </button>
+        <button id="nav-club" data-tab="club">
+          <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 21v-1.3C2 16.8 5 15 9 15s7 1.8 7 4.7V21"/><path d="M15.3 15.2c2.9.4 5.7 1.8 5.7 4.5V21"/></svg></span>
+          <span>Clubs</span>
         </button>
         <!-- Same role as HomeScreen.kt's bottom-nav More tab — opens a small menu to destinations
              that aren't part of the persistent tab bar. FIX (user request 08-24): Profile moved in
@@ -656,16 +662,19 @@
                 <circle cx="32" cy="32" r="27" fill="none" stroke="var(--card-raised)" stroke-width="6" />
                 <circle id="gami-ring-progress" cx="32" cy="32" r="27" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" />
               </svg>
-              <span id="gami-level">1</span>
+              <!-- FIX (user report 08-24: "first time the web opens, all zeros") — was a hardcoded
+                   "1"/"0"/"0.0" default, indistinguishable from a real (bad) score before the first
+                   fetch resolves. "—" reads as "not loaded yet", not "your score is zero". -->
+              <span id="gami-level">—</span>
             </div>
             <div class="gami-mid">
-              <div class="gami-xp-row"><span id="gami-xp">0</span><span class="gami-xp-label">XP</span></div>
+              <div class="gami-xp-row"><span id="gami-xp">—</span><span class="gami-xp-label">XP</span></div>
               <div class="xp-track"><div class="xp-fill" id="gami-xp-fill"></div></div>
-              <p class="muted" id="gami-xp-remaining" style="margin-top: 6px; font-size: 12px;">0 XP to level 2</p>
+              <p class="muted" id="gami-xp-remaining" style="margin-top: 6px; font-size: 12px;">Loading…</p>
             </div>
             <div class="gami-tier">
               <div class="tier-badge"></div>
-              <span id="gami-tier-name">ROOKIE</span>
+              <span id="gami-tier-name">—</span>
             </div>
           </div>
         </div>
@@ -695,11 +704,11 @@
             <div class="period-pill" data-period="yearly">Year</div>
             <div class="period-pill" data-period="alltime">All</div>
           </div>
-          <div class="activity-hero"><span id="activity-points">0.0</span><span class="activity-hero-unit">PTS</span></div>
+          <div class="activity-hero"><span id="activity-points">—</span><span class="activity-hero-unit">PTS</span></div>
           <div class="activity-tiles">
-            <div class="activity-tile"><div class="activity-tile-value" id="activity-sessions">0</div><div class="activity-tile-label">Sessions</div></div>
-            <div class="activity-tile"><div class="activity-tile-value" id="activity-duration">0 min</div><div class="activity-tile-label">Duration</div></div>
-            <div class="activity-tile"><div class="activity-tile-value" id="activity-calories">0</div><div class="activity-tile-label">Calories</div></div>
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-sessions">—</div><div class="activity-tile-label">Sessions</div></div>
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-duration">—</div><div class="activity-tile-label">Duration</div></div>
+            <div class="activity-tile"><div class="activity-tile-value" id="activity-calories">—</div><div class="activity-tile-label">Calories</div></div>
           </div>
         </div>
 
@@ -1290,7 +1299,10 @@ supabase.auth.onAuthStateChange((_event, session) => {
 // Each tab loads its own data only when activated, not eagerly on sign-in — don't fetch what
 // isn't shown yet. loadHeaderStats() is the one exception (see its own doc comment) — it fires on
 // every switch, not just one tab, since the top banner it feeds is visible regardless of tab.
-const TAB_ORDER = ["dashboard", "club", "leaderboard", "profile"];
+// Matches HomeScreen.kt's own tabs order exactly: listOf("Dashboard", "Leaderboard", "Clubs") —
+// also what the swipe gesture below walks through, so a left swipe from Dashboard should land on
+// Leaderboard, matching the nav bar's own visual order.
+const TAB_ORDER = ["dashboard", "leaderboard", "club", "profile"];
 
 // Remembers the last tab you had open (user request 08-23: "make sure the refresh stays in the
 // same page") — a plain page refresh used to always land back on Dashboard regardless of which
