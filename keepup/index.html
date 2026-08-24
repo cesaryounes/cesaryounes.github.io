@@ -3851,8 +3851,15 @@ function showManualEntryStep() {
 // never treated as ground truth." confidence is capped at "medium" (never "high") for this reason,
 // and the notes line always tells the user to double-check regardless of how many fields were found.
 const OCR_DURATION_LABELS = ["workout duration", "total duration", "workout time", "duration"];
-const OCR_CALORIE_LABELS = ["total calories", "total kilocalories", "workout calories", "active kilocalories", "calories", "kilocalories"];
-const OCR_HR_LABELS = ["avg heart rate", "avg. heart rate", "average heart rate", "avg hr"];
+// Active before Total (user request 08-24: "always take active calories and not total if both
+// applicable") — an app that separates the two (Apple Watch: "Active Kilocalories" vs "Total
+// Kilocalories") means Total includes resting/basal burn for the same period, not just the
+// workout itself; Active is the number that actually represents the session. Total-only variants
+// stay in the list as a fallback for apps that don't make the distinction at all (their "total" is
+// the only real number on offer, not a basal-inflated one).
+const OCR_CALORIE_LABELS = ["active kilocalories", "active calories", "workout calories", "calories", "total kilocalories", "total calories", "kilocalories"];
+// "ave hr" confirmed real, not speculative — a Whoop sample's "Avg" OCR'd as "Ave" (g->e misread).
+const OCR_HR_LABELS = ["avg heart rate", "avg. heart rate", "average heart rate", "avg hr", "ave hr"];
 
 // Same 6 scoring categories the manual picker (#activity-select) already offers — no need to
 // detect a specific sport the way the old Claude-based parser did (fn_scoring_category_label()/
@@ -3925,23 +3932,80 @@ function findLabelBox(words, phrases) {
   return null;
 }
 
-// Given a label's bounding box, gathers the nearby words that make up its value — "below and
-// roughly horizontally aligned with the label" is the real, generalizable signal every one of
-// these apps' card layouts shares (see this section's own doc comment), not anything app-specific.
+// Words positioned close enough together, on the same visual line, to plausibly be one number
+// Tesseract's own segmentation split into separate "words" — confirmed in testing: a Whoop sample
+// consistently split a leading "1" digit off numbers like "134"/"127" into its own token ("1",
+// "34" instead of "134"). Joined with no separator when this holds, so parseFirstNumber() below
+// sees the whole number rather than stopping at the first fragment; a bigger gap (e.g. before a
+// unit like "cals"/"bpm") still gets a space, harmless either way since the number itself is
+// already whole by then.
+function joinAdjacentWords(list) {
+  let out = "";
+  for (let i = 0; i < list.length; i++) {
+    const w = list[i];
+    if (i === 0) { out += w.text; continue; }
+    const prev = list[i - 1];
+    const prevHeight = prev.bbox.y1 - prev.bbox.y0;
+    const sameLine = Math.abs(w.bbox.y0 - prev.bbox.y0) < prevHeight * 0.6;
+    const smallGap = w.bbox.x0 - prev.bbox.x1 < prevHeight * 0.6;
+    out += (sameLine && smallGap) ? w.text : " " + w.text;
+  }
+  return out;
+}
+
+// Given a label's bounding box, gathers the nearby words that make up its value. Checks two
+// layouts, since real testing found apps using both: label directly ABOVE its value, stacked in
+// the same card (Samsung Health/Mi Fitness/Apple Fitness, checked first — the more common pattern
+// across everything tested) or label and value side by side on the same row (Whoop's "DURATION
+// 0:15:59" — no vertical stacking at all for that one).
 function valueNearLabel(words, labelBox) {
+  const labelHeight = labelBox.y1 - labelBox.y0;
+  const labelCenterY = (labelBox.y0 + labelBox.y1) / 2;
   const labelWidth = labelBox.x1 - labelBox.x0;
   const labelCenterX = (labelBox.x0 + labelBox.x1) / 2;
-  const maxGap = (labelBox.y1 - labelBox.y0) * 6; // a few line-heights below, generously
-  const candidates = words.filter((w) => {
+
+  // Digit check matters: a 2-column grid (Samsung Health's "Total duration" / "Workout calories"
+  // side by side at the same height) puts a completely unrelated LABEL in the same row too — found
+  // in testing, "Workout calories" was being grabbed as if it were "Total duration"'s value with
+  // no digit check at all. Requiring at least one digit is what tells an actual value (Whoop's
+  // "0:15:59") apart from a neighboring card's label text (which has none).
+  const sameRow = words.filter((w) => {
+    const wCenterY = (w.bbox.y0 + w.bbox.y1) / 2;
+    return w.bbox.x0 >= labelBox.x1 - 4 && Math.abs(wCenterY - labelCenterY) <= labelHeight * 0.8;
+  });
+  if (sameRow.length > 0 && sameRow.some((w) => /\d/.test(w.text))) {
+    sameRow.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    return joinAdjacentWords(sameRow.slice(0, 4));
+  }
+
+  // Wide net vertically (a real gap between a label and its value varies a lot across apps — 19px
+  // in one Apple Fitness sample, over 100px in a Whoop one — so a single fixed multiplier can't
+  // both reach a distant real value AND exclude a closer false one). Horizontal stays tighter
+  // (label width plus a modest margin, not +150px) — a 2-column grid (Apple Fitness's Active
+  // Kilocalories/Workout Time side by side) otherwise lets a NEIGHBORING column's value bleed in;
+  // confirmed in testing, an overly generous horizontal margin let "Active Kilocalories" grab
+  // "Workout Time"'s value ("1:07:46") instead of its own ("625KCAL") since both sat in the same
+  // row underneath, at nearly the same y-position.
+  const maxGap = labelHeight * 6;
+  const below = words.filter((w) => {
     const wCenterX = (w.bbox.x0 + w.bbox.x1) / 2;
     return (
       w.bbox.y0 >= labelBox.y1 - 4 && // small overlap allowance for rounding
       w.bbox.y0 - labelBox.y1 <= maxGap &&
-      Math.abs(wCenterX - labelCenterX) <= labelWidth * 1.5 + 150
+      Math.abs(wCenterX - labelCenterX) <= labelWidth * 0.9 + 60
     );
   });
-  candidates.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
-  return candidates.slice(0, 4).map((w) => w.text).join(" ");
+  below.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+  if (below.length === 0) return "";
+  // ...but once sorted, only the NEAREST row of candidates is kept — this is what actually keeps
+  // a distant real value reachable (the wide vertical net above) while still stopping at the
+  // first row found, rather than also scooping up a second, more distant row underneath it (the
+  // same Apple Fitness sample's "Total Kilocalories" label, two rows down from "Active
+  // Kilocalories", was leaking into the result before this).
+  const nearestY0 = below[0].bbox.y0;
+  const nearestHeight = below[0].bbox.y1 - below[0].bbox.y0;
+  const nearestRow = below.filter((w) => w.bbox.y0 - nearestY0 < nearestHeight * 0.6);
+  return joinAdjacentWords(nearestRow.slice(0, 4));
 }
 
 // "31:06" (mm:ss) or "1:07:59" (h:mm:ss) -> whole minutes. Colon count disambiguates the two
