@@ -4191,8 +4191,8 @@ function detectCategoryFromOcr(words) {
   return null;
 }
 
-// One OCR pass over a preprocessed canvas → the 4 fields plus enough raw detail to diagnose a
-// miss (see extractWorkoutFieldsFromOcr's diag string below).
+// One OCR pass over a preprocessed canvas → the 4 fields extractWorkoutFieldsFromOcr's two-pass
+// merge combines.
 async function runOcrPass(canvas) {
   const { data } = await Tesseract.recognize(canvas, "eng");
   const words = (data.words || []).filter((w) => w.text && w.text.trim());
@@ -4213,34 +4213,11 @@ async function runOcrPass(canvas) {
   const calorieMatch = calorieBox ? valueNearLabel(words, calorieBox, allLabelBoxes) : { text: "", distRatio: Infinity };
   const hrMatch = hrBox ? valueNearLabel(words, hrBox, allLabelBoxes) : { text: "", distRatio: Infinity };
 
-  const calories = calorieBox ? clampOcr(parseFirstNumber(calorieMatch.text), 0, 5000) : null;
-
-  // TEMP DIAGNOSTIC (user report 08-24: "it is clearly written active calories, i dont get why we
-  // cannot read it" — fair question; the "dark/low-contrast color" explanation given for this was
-  // a guess based on a synthetic test color, never actually verified against the real photo, and
-  // apparently a wrong guess. This dumps every word Tesseract found ANYWHERE within a generous
-  // radius below the calories label — regardless of clustering/boundary logic — so the real ground
-  // truth (genuinely invisible vs. detected-but-mis-positioned vs. something else entirely) is
-  // visible instead of guessed at. Remove once the real cause is found.
-  let nearCalDump = "";
-  if (calorieBox && calories === null) {
-    const near = words
-      .filter((w) => w.bbox.y0 >= calorieBox.y1 - 4 && w.bbox.y0 - calorieBox.y1 <= (calorieBox.y1 - calorieBox.y0) * 15)
-      .map((w) => `"${w.text}"@(${w.bbox.x0},${w.bbox.y0})`)
-      .slice(0, 20)
-      .join(" ");
-    nearCalDump = ` nearCal=[${near}]`;
-  }
-
   return {
     duration_minutes: durationBox ? clampOcr(parseDurationToMinutes(durationMatch.text), 1, 600) : null,
-    duration_distRatio: durationMatch.distRatio,
-    calories,
-    calories_distRatio: calorieMatch.distRatio,
+    calories: calorieBox ? clampOcr(parseFirstNumber(calorieMatch.text), 0, 5000) : null,
     avg_heart_rate: hrBox ? clampOcr(parseHeartRate(hrMatch.text), 30, 220) : null,
-    avg_heart_rate_distRatio: hrMatch.distRatio,
     category: detectCategoryFromOcr(words),
-    diagText: `words=${words.length} d=${!!durationBox}/${durationMatch.distRatio.toFixed(1)} c=${!!calorieBox}/${calorieMatch.distRatio.toFixed(1)} h=${!!hrBox}/${hrMatch.distRatio.toFixed(1)} raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 300)}"${nearCalDump}`,
   };
 }
 
@@ -4277,14 +4254,6 @@ async function extractWorkoutFieldsFromOcr(file) {
   const foundCount = [final.duration_minutes, final.calories, final.avg_heart_rate, final.category]
     .filter((v) => v !== null).length;
 
-  // TEMP DIAGNOSTIC (user report 08-24, round 4 — a new "Outdoor Run" layout came back with
-  // calories=21 and HR=30, both non-null so foundCount alone can't tell they're wrong; the earlier
-  // "only show when something's missing" gate would've hidden this exact case). Always appended
-  // for now so a wrong-but-non-null field is still visible to debug, not just a missing one.
-  // Remove once this fix is confirmed against real photos that still fail; see this function's own
-  // git history for the follow-up that strips this back out.
-  const diag = ` [diag] p1{${pass1.diagText}}` + (pass2 ? ` p2{${pass2.diagText}}` : "");
-
   return {
     success: true,
     category: final.category,
@@ -4292,7 +4261,7 @@ async function extractWorkoutFieldsFromOcr(file) {
     calories: final.calories,
     avg_heart_rate: final.avg_heart_rate,
     confidence: foundCount >= 3 ? "medium" : "low",
-    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving." + diag,
+    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving.",
   };
 }
 
