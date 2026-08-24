@@ -183,14 +183,26 @@
     display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.03em;
     text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
   }
-  .field input, .field select {
+  .field input, .field select, .field textarea {
     width: 100%; background: var(--card-raised); border: 1px solid var(--hairline);
     border-radius: 10px; color: var(--text-main); font-size: 16px; padding: 12px 14px;
-    font-family: inherit;
+    font-family: inherit; box-sizing: border-box;
   }
-  .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .field textarea { resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .row { display: flex; gap: 12px; }
   .row .field { flex: 1; }
+
+  /* ---- Contact support (user request 08-24) ---- */
+  .support-file-chip {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px;
+    background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 10px; font-size: 13px;
+  }
+  .support-file-chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .support-file-chip button {
+    width: 22px; height: 22px; min-height: 0; padding: 0; flex-shrink: 0; background: transparent;
+    color: var(--text-muted); font-size: 16px; line-height: 1;
+  }
 
   .badge {
     display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
@@ -873,6 +885,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
           Shop
         </button>
+        <!-- Contact support (user request 08-24) — opens #screen-contact-support below. -->
+        <button class="more-menu-row" id="more-menu-support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v13H7l-3 3z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
+          Contact support
+        </button>
       </div>
 
       <!-- ============ DASHBOARD ============
@@ -1520,6 +1537,39 @@
       </div>
     </div>
     <div id="shop-tab-frames" class="hidden"></div>
+  </div>
+
+  <!-- Contact support (user request 08-24) — email, subject, details, optional attachments.
+       Submitting calls send-support-email (a new Edge Function), which emails
+       cesar.younes@gmail.com via Resend with the attachments inlined and Reply-To set to
+       whatever email the user typed, so replying continues the conversation directly with them. -->
+  <div class="screen-overlay hidden" id="screen-contact-support">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-contact-support">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title">Contact support</p>
+    </div>
+    <p class="muted" style="margin-bottom:16px;">Tell us what's going on — we'll reply by email.</p>
+    <div class="field">
+      <label>Your email</label>
+      <input type="email" id="support-email-input" placeholder="you@example.com" />
+    </div>
+    <div class="field">
+      <label>Subject</label>
+      <input type="text" id="support-subject-input" placeholder="Can't log a workout" maxlength="200" />
+    </div>
+    <div class="field">
+      <label>Details</label>
+      <textarea id="support-details-input" rows="6" maxlength="5000" placeholder="What happened, what you expected instead, and any steps to reproduce it."></textarea>
+    </div>
+    <div class="field">
+      <label>Attachments (optional)</label>
+      <input type="file" id="support-files-input" multiple accept="image/*,.pdf,.doc,.docx,.txt" />
+      <div id="support-files-list" style="margin-top:8px;"></div>
+    </div>
+    <button class="btn-primary" id="support-submit-btn">Send</button>
+    <p class="muted hidden" id="support-message" style="margin-top:10px;"></p>
   </div>
 
 <!-- Real per-item SVG path/gradient data for the Gear shop — same source GearArt.kt renders from
@@ -4285,6 +4335,137 @@ el("more-menu-profile").addEventListener("click", () => {
   switchTab("profile");
 });
 el("more-menu-shop").addEventListener("click", () => { openScreen("screen-shop"); loadShop(); });
+
+// ---------- Contact support (user request 08-24) ----------
+//
+// send-support-email (new Edge Function) emails cesar.younes@gmail.com via Resend, attachments
+// inlined as base64, Reply-To set to whatever email the user typed — replying in Gmail continues
+// the conversation directly with them, no ticket system involved. MAX_SUPPORT_FILES/
+// MAX_SUPPORT_TOTAL_BYTES mirror the function's own server-side caps so a too-large attempt gets
+// caught here first instead of only after a round trip.
+const MAX_SUPPORT_FILES = 5;
+const MAX_SUPPORT_TOTAL_BYTES = 10 * 1024 * 1024; // ~10MB raw; base64 inflation is handled server-side
+let supportFiles = [];
+
+el("more-menu-support").addEventListener("click", () => {
+  openScreen("screen-contact-support");
+  supportFiles = [];
+  renderSupportFilesList();
+  el("support-email-input").value = currentSession?.user?.email || "";
+  el("support-subject-input").value = "";
+  el("support-details-input").value = "";
+  el("support-files-input").value = "";
+  hide("support-message");
+});
+
+el("support-files-input").addEventListener("change", (e) => {
+  const picked = Array.from(e.target.files || []);
+  e.target.value = ""; // lets picking the exact same file again after removing it still fire 'change'
+  for (const f of picked) {
+    if (supportFiles.length >= MAX_SUPPORT_FILES) break;
+    supportFiles.push(f);
+  }
+  renderSupportFilesList();
+});
+
+function renderSupportFilesList() {
+  const list = el("support-files-list");
+  list.innerHTML = supportFiles.map((f, i) => `
+    <div class="support-file-chip">
+      <span>${escapeHtml(f.name)} (${Math.round(f.size / 1024)} KB)</span>
+      <button type="button" data-remove-idx="${i}" aria-label="Remove">&times;</button>
+    </div>
+  `).join("");
+  Array.from(list.querySelectorAll("[data-remove-idx]")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      supportFiles.splice(Number(btn.dataset.removeIdx), 1);
+      renderSupportFilesList();
+    });
+  });
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // "data:<mime>;base64,<data>" — only the part after the comma is the actual base64 payload
+      // Resend's attachments.content expects.
+      const result = reader.result;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error(`Couldn't read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+el("support-submit-btn").addEventListener("click", async () => {
+  const btn = el("support-submit-btn");
+  const msg = el("support-message");
+  hide("support-message");
+
+  const email = el("support-email-input").value.trim();
+  const subject = el("support-subject-input").value.trim();
+  const details = el("support-details-input").value.trim();
+
+  if (!email || !email.includes("@")) {
+    msg.textContent = "Enter a valid email so we can reply.";
+    msg.style.color = "var(--danger)";
+    show("support-message");
+    return;
+  }
+  if (!subject) {
+    msg.textContent = "Subject is required.";
+    msg.style.color = "var(--danger)";
+    show("support-message");
+    return;
+  }
+  if (!details) {
+    msg.textContent = "Describe the issue first.";
+    msg.style.color = "var(--danger)";
+    show("support-message");
+    return;
+  }
+  const totalBytes = supportFiles.reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_SUPPORT_TOTAL_BYTES) {
+    msg.textContent = "Attachments are too large — keep the total under 10MB.";
+    msg.style.color = "var(--danger)";
+    show("support-message");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const attachments = await Promise.all(
+      supportFiles.map(async (f) => ({
+        filename: f.name,
+        contentType: f.type || "application/octet-stream",
+        base64: await readFileAsBase64(f),
+      })),
+    );
+    const { data, error } = await supabase.functions.invoke("send-support-email", {
+      body: { email, subject, details, platform: "Web", attachments },
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.message || "Couldn't send that right now.");
+
+    msg.textContent = data.message || "Sent — we'll reply by email.";
+    msg.style.color = "var(--success)";
+    show("support-message");
+    supportFiles = [];
+    renderSupportFilesList();
+    el("support-subject-input").value = "";
+    el("support-details-input").value = "";
+  } catch (err) {
+    msg.textContent = err.message || "Couldn't send that right now — try again.";
+    msg.style.color = "var(--danger)";
+    show("support-message");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send";
+  }
+});
 
 // ---------- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt) ----------
 const PREMIUM_FEATURES = [
