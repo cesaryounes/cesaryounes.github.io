@@ -365,6 +365,20 @@
     font-size: 12px; font-weight: 700; color: var(--success); flex-shrink: 0;
     text-transform: uppercase; letter-spacing: 0.02em;
   }
+  /* Same "Pending" + Cancel treatment as GroupsScreen.kt's own alreadyRequested row — muted label,
+     no background, plus a small text-only Cancel action, not another filled button. */
+  .requested-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .requested-tag {
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  /* Scoped under .directory-row (not just the bare class) to outrank ".directory-row button"
+     above, which would otherwise win on shared properties (min-height/padding/font-size) by
+     specificity and force this back to a full-size button. */
+  .directory-row .requested-cancel-btn {
+    background: none; border: none; padding: 4px 6px; font-size: 12px; font-weight: 700;
+    color: var(--danger); cursor: pointer; min-height: 0; width: auto;
+  }
   .directory-row.is-clickable { cursor: pointer; }
   .directory-row.is-clickable:active { background: var(--card-raised); margin: 0 -20px; padding: 12px 20px; border-radius: 8px; }
 
@@ -2266,6 +2280,14 @@ async function loadGamificationCard() {
 // Global-only version did, since Region needs a code value Club/Global don't have.
 
 let myClubs = [];
+// FIX (user request 08-25: "if request to join sent, there should [be] a label requested in the
+// Club screen at the level of the requested group") — the directory row used to flip its button
+// text to "Requested" purely as local in-memory state, so it silently reverted to "Request" on
+// any re-render (leaving Discover, coming back, a pull-to-refresh) even though the request was
+// still genuinely pending server-side. Mirrors GroupsScreen.kt's own myPendingRequestGroupIds —
+// same table, same "Users view their own join requests" RLS scoping (0003_group_requests.sql) —
+// so this is now a real persistent state, refreshed every load like myClubs already is.
+let myPendingRequestGroupIds = [];
 let myRegionCode = null; // from profiles.region_code — see the Region pill below
 let currentScope = { type: "global" };
 let currentPeriod = "weekly";
@@ -2658,6 +2680,17 @@ async function loadClubDirectory() {
     clubDirectoryData = data || [];
   }
 
+  const { data: pendingRows, error: pendingError } = await supabase
+    .from("group_join_requests")
+    .select("group_id")
+    .eq("user_id", currentSession.user.id)
+    .eq("status", "pending");
+  if (pendingError) {
+    console.error("Couldn't load pending join requests:", pendingError);
+  } else {
+    myPendingRequestGroupIds = (pendingRows || []).map((r) => r.group_id);
+  }
+
   await refreshGroupMemberCounts([...myClubs.map((c) => c.id), ...clubDirectoryData.map((g) => g.id)]);
   renderMyClubsSection();
   renderClubDirectory();
@@ -2762,6 +2795,41 @@ function renderDirectoryRow(group) {
     return li;
   }
 
+  // Same GroupsScreen.kt "Pending" + Cancel treatment (persistent, not just what the button said
+  // right after clicking — see myPendingRequestGroupIds' own doc comment).
+  if (myPendingRequestGroupIds.includes(group.id)) {
+    const wrap = document.createElement("div");
+    wrap.className = "requested-wrap";
+    const tag = document.createElement("span");
+    tag.className = "requested-tag";
+    tag.textContent = "Requested";
+    wrap.appendChild(tag);
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "requested-cancel-btn";
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      cancelBtn.disabled = true;
+      const { error } = await supabase
+        .from("group_join_requests")
+        .delete()
+        .eq("group_id", group.id)
+        .eq("user_id", currentSession.user.id)
+        .eq("status", "pending");
+      if (error) {
+        alert(error.message);
+        cancelBtn.disabled = false;
+        return;
+      }
+      myPendingRequestGroupIds = myPendingRequestGroupIds.filter((id) => id !== group.id);
+      renderClubDirectory();
+    });
+    wrap.appendChild(cancelBtn);
+    li.appendChild(wrap);
+    return li;
+  }
+
   const btn = document.createElement("button");
   btn.className = "btn-secondary";
   btn.type = "button";
@@ -2777,11 +2845,11 @@ function renderDirectoryRow(group) {
       btn.textContent = group.is_public ? "Join" : "Request";
       return;
     }
-    if (group.is_public) {
-      await loadClubDirectory();
-    } else {
-      btn.textContent = "Requested";
-    }
+    // Both branches reload the full directory now (was a local-only "Requested" text swap for the
+    // private case, which is exactly what silently reverted on the next re-render — see
+    // myPendingRequestGroupIds' own doc comment) so the persisted pending-request state is what
+    // actually renders, not a transient label this one row happened to remember.
+    await loadClubDirectory();
   });
   li.appendChild(btn);
   return li;
