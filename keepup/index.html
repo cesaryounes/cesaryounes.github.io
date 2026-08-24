@@ -4052,9 +4052,13 @@ async function extractWorkoutFieldsFromOcr(canvas) {
   const calorieBox = findLabelBox(words, OCR_CALORIE_LABELS);
   const hrBox = findLabelBox(words, OCR_HR_LABELS);
 
-  const durationMinutes = durationBox ? clampOcr(parseDurationToMinutes(valueNearLabel(words, durationBox)), 1, 600) : null;
-  const calories = calorieBox ? clampOcr(parseFirstNumber(valueNearLabel(words, calorieBox)), 0, 5000) : null;
-  const avgHeartRate = hrBox ? clampOcr(parseFirstNumber(valueNearLabel(words, hrBox)), 30, 220) : null;
+  const durationText = durationBox ? valueNearLabel(words, durationBox) : "";
+  const calorieText = calorieBox ? valueNearLabel(words, calorieBox) : "";
+  const hrText = hrBox ? valueNearLabel(words, hrBox) : "";
+
+  const durationMinutes = durationBox ? clampOcr(parseDurationToMinutes(durationText), 1, 600) : null;
+  const calories = calorieBox ? clampOcr(parseFirstNumber(calorieText), 0, 5000) : null;
+  const avgHeartRate = hrBox ? clampOcr(parseFirstNumber(hrText), 30, 220) : null;
   const category = detectCategoryFromOcr(words);
 
   const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
@@ -4063,7 +4067,7 @@ async function extractWorkoutFieldsFromOcr(canvas) {
   // the same photo) — surfaces directly in the notes text since there's no console access to the
   // reporting device. Remove once the real-device behavior is understood; see this function's own
   // git history for the follow-up that strips this back out.
-  const diag = `[diag] words=${words.length} durBox=${!!durationBox} calBox=${!!calorieBox} hrBox=${!!hrBox} sample=${words.slice(0, 6).map((w) => w.text).join("|")}`;
+  const diag = `[diag] words=${words.length} durTxt="${durationText}" calTxt="${calorieText}" hrTxt="${hrText}"`;
 
   return {
     success: true,
