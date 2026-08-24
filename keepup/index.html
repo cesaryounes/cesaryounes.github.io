@@ -151,6 +151,7 @@
   }
   .notif-panel-list { max-height: 320px; overflow-y: auto; }
   .notif-row { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-bottom: 1px solid var(--hairline); }
+  .notif-row-unread { background: rgba(204,255,0,0.05); }
   .notif-row:last-child { border-bottom: none; }
   .notif-row svg { width: 15px; height: 15px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
   .notif-row-text { flex: 1; min-width: 0; font-size: 13px; color: var(--text-main); line-height: 1.4; }
@@ -778,12 +779,14 @@
         <button class="header-icon-btn hidden" id="header-search-btn" aria-label="Search leaderboard" title="Search leaderboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
-        <!-- Notification bell (user request 08-24: "add the notification Bell in the top banner,
-             so user can check missed notifications too") — TopBanner.kt's own bell is always
-             visible regardless of tab, unlike the action icon above; same here. This page has no
-             general push/notification-center infra, so "notifications" here means recent nudges
-             (fn_get_my_recent_nudges, 0097) — the only pollable notification-shaped data available
-             client-side. Badge count and read-tracking: see refreshNotifications()/openNotifPanel(). -->
+        <!-- Notification bell (user request 08-24: "add the notification Bell... all notifications,
+             can they get them outside the web notification?" → "yes build it") — TopBanner.kt's
+             own bell is always visible regardless of tab, unlike the action icon above; same here.
+             Reads the real `notifications` table directly (every type, not just nudges — see
+             refreshNotifications()'s own doc comment) and, once a Web Push subscription is on
+             (Settings → Push notifications), the same events also arrive as real OS notifications
+             even with this tab closed (sw.js + send-notifications' sendWebPush()). Badge count and
+             read-tracking: see refreshNotifications()/openNotifPanel(). -->
         <button class="header-icon-btn" id="notif-bell-btn" aria-label="Notifications" title="Notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge hidden" id="notif-badge">0</span>
@@ -1449,6 +1452,23 @@
          swatch/switch is actually changed (updateApplyButtonState); nothing takes visual effect
          until this is pressed. -->
     <button class="btn-primary hidden" id="settings-apply-btn" style="margin-top:18px;">Apply</button>
+
+    <!-- Web Push (user request 08-24: "all notifications, can they get them outside the web
+         notification?" → "yes build it") — hidden entirely on a browser without Push API support
+         (refreshPushToggleState below). Takes effect immediately on toggle, same as every other
+         preference switch on this page — not part of the Appearance section's batched Apply. -->
+    <p class="section-label" style="margin-bottom:10px; margin-top:24px;">Notifications</p>
+    <div class="toggle-row" id="settings-push-row">
+      <div>
+        <div class="toggle-label">Push notifications</div>
+        <div class="toggle-sub">Nudges, streak reminders, and more — delivered even when this tab isn't open.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="settings-push-toggle" />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
+    <p class="muted hidden" id="settings-push-message" style="margin-top:8px; color:var(--danger);"></p>
   </div>
 
   <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
@@ -1628,6 +1648,10 @@ function renderAuthState() {
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
     refreshNotifications();
+    // Registers (or reuses, if already registered) the Service Worker so an existing Web Push
+    // subscription keeps receiving pushes without the user having to revisit Settings every
+    // session — subscribing itself still only ever happens from an explicit toggle there.
+    registerServiceWorker();
   } else {
     show("signed-out-view");
     hide("signed-in-view");
@@ -2950,51 +2974,49 @@ el("nudge-modal-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "nudge-modal-backdrop") closeNudgePicker();
 });
 
-// ---------- Notifications / receiving nudges (user request 08-24: "make sure the notification
-// send and receiving is working", then later "add the notification Bell in the top banner, so
-// user can check missed notifications too") — the web dashboard has no push infrastructure at
-// all, so this polls fn_get_my_recent_nudges (0097) on Dashboard load. Two independent "have I
-// seen this" pointers, both device-local (localStorage, same pattern as keepup_last_tab/
-// keepup_theme — not a server-side read receipt):
-//   - NUDGE_LAST_SEEN_KEY: dedupes the ephemeral toast banner so the same nudge never pops twice.
-//   - NUDGE_PANEL_SEEN_KEY: drives the bell's unread badge, cleared only when the panel is
-//     actually opened — independent of the toast so a badge you haven't looked at yet doesn't
-//     silently clear just because a toast happened to show while you were on-screen for it.
+// ---------- Notifications (user request 08-24: "make sure the notification send and receiving is
+// working", then "add the notification Bell in the top banner, so user can check missed
+// notifications too", then "all notifications, can they get them outside the web notification?" →
+// "yes build it") — reads the real `notifications` table directly (0064_notification_center.sql),
+// same source of truth send-notifications' Edge Function writes to for EVERY notification type —
+// nudges, streak-loss, club/global pass, daily tips, workout rejection, invites, all of it — not
+// just nudges the way this used to be (fn_get_my_recent_nudges). Plain client-readable/writable
+// RLS on that table ("Users view/mark read their own notifications") means no RPC is needed here,
+// same as any other RLS-permitted table this page already reads.
+//
+// Unread state is the table's own `read` column — server-side, shared across every device/browser
+// the user is signed into, not a device-local guess. The one thing still local is
+// NOTIF_TOAST_SEEN_KEY, dedup for the ephemeral toast banner — "already toasted this" only ever
+// matters to the specific tab that showed it. (Key name predates this covering every type, kept
+// as-is so an existing user's dedup state carries over instead of re-toasting their whole recent
+// history the first time this ships.)
 // ----------
-const NUDGE_LAST_SEEN_KEY = "keepup_nudge_last_seen";
-const NUDGE_PANEL_SEEN_KEY = "keepup_notif_panel_seen";
-let lastNudgeNotifications = [];
+const NOTIF_TOAST_SEEN_KEY = "keepup_nudge_last_seen";
+let lastNotifications = [];
 
 async function refreshNotifications() {
-  const { data, error } = await supabase.rpc("fn_get_my_recent_nudges", { p_limit: 20 });
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(20);
   if (error) {
     console.error("Couldn't load notifications:", error);
     return;
   }
-  lastNudgeNotifications = data || [];
+  lastNotifications = data || [];
 
-  // Toasts — unchanged behavior from before the bell existed.
-  if (lastNudgeNotifications.length > 0) {
+  if (lastNotifications.length > 0) {
     let toastSeen = null;
-    try { toastSeen = localStorage.getItem(NUDGE_LAST_SEEN_KEY); } catch {}
+    try { toastSeen = localStorage.getItem(NOTIF_TOAST_SEEN_KEY); } catch {}
     // First-ever visit: just the latest, not a backlog dump.
-    const unseenToasts = toastSeen ? lastNudgeNotifications.filter((n) => n.created_at > toastSeen) : [lastNudgeNotifications[0]];
-    try { localStorage.setItem(NUDGE_LAST_SEEN_KEY, lastNudgeNotifications[0].created_at); } catch {}
+    const unseenToasts = toastSeen ? lastNotifications.filter((n) => n.created_at > toastSeen) : [lastNotifications[0]];
+    try { localStorage.setItem(NOTIF_TOAST_SEEN_KEY, lastNotifications[0].created_at); } catch {}
     // Oldest-of-the-unseen-batch first so banners stack in the order they actually arrived.
-    unseenToasts.slice().reverse().forEach((n) => showNudgeBanner(n));
+    unseenToasts.slice().reverse().forEach((n) => showNotifToast(n));
   }
 
-  // Bell badge — separate pointer, only advanced by actually opening the panel (openNotifPanel
-  // below), so a toast alone never silently clears an unread count the user hasn't looked at.
-  let panelSeen = null;
-  try { panelSeen = localStorage.getItem(NUDGE_PANEL_SEEN_KEY); } catch {}
-  if (panelSeen === null) {
-    // First-ever visit to this feature: nothing that predates it counts as "unread".
-    try { localStorage.setItem(NUDGE_PANEL_SEEN_KEY, lastNudgeNotifications[0]?.created_at || new Date(0).toISOString()); } catch {}
-    updateNotifBadge(0);
-  } else {
-    updateNotifBadge(lastNudgeNotifications.filter((n) => n.created_at > panelSeen).length);
-  }
+  updateNotifBadge(lastNotifications.filter((n) => !n.read).length);
 }
 
 function updateNotifBadge(count) {
@@ -3009,10 +3031,10 @@ function updateNotifBadge(count) {
   }
 }
 
-function showNudgeBanner(nudge) {
+function showNotifToast(n) {
   const banner = document.createElement("div");
   banner.className = "nudge-banner";
-  banner.innerHTML = `${bellIconSvg()}<span><strong>${escapeHtml(nudge.sender_name || "Someone")}</strong> nudged you${nudge.message ? `: "${escapeHtml(nudge.message)}"` : ""}</span>`;
+  banner.innerHTML = `${bellIconSvg()}<span><strong>${escapeHtml(n.title || "KeepUp")}</strong>${n.body ? ` — ${escapeHtml(n.body)}` : ""}</span>`;
   document.body.appendChild(banner);
   requestAnimationFrame(() => banner.classList.add("show"));
   setTimeout(() => {
@@ -3037,28 +3059,32 @@ function timeAgo(isoString) {
 
 function renderNotifPanel() {
   const list = el("notif-panel-list");
-  if (lastNudgeNotifications.length === 0) {
+  if (lastNotifications.length === 0) {
     list.innerHTML = `<p class="notif-panel-empty">No notifications yet.</p>`;
     return;
   }
-  list.innerHTML = lastNudgeNotifications.map((n) => `
-    <div class="notif-row">
+  list.innerHTML = lastNotifications.map((n) => `
+    <div class="notif-row${n.read ? "" : " notif-row-unread"}">
       ${bellIconSvg()}
       <div class="notif-row-text">
-        <div><strong>${escapeHtml(n.sender_name || "Someone")}</strong> nudged you${n.message ? `: "${escapeHtml(n.message)}"` : ""}</div>
+        <div><strong>${escapeHtml(n.title || "KeepUp")}</strong></div>
+        ${n.body ? `<div>${escapeHtml(n.body)}</div>` : ""}
         <div class="notif-row-time">${timeAgo(n.created_at)} ago</div>
       </div>
     </div>
   `).join("");
 }
 
-function openNotifPanel() {
+async function openNotifPanel() {
   renderNotifPanel();
   show("notif-panel");
-  if (lastNudgeNotifications.length > 0) {
-    try { localStorage.setItem(NUDGE_PANEL_SEEN_KEY, lastNudgeNotifications[0].created_at); } catch {}
-  }
   updateNotifBadge(0);
+  const unreadIds = lastNotifications.filter((n) => !n.read).map((n) => n.id);
+  if (unreadIds.length > 0) {
+    lastNotifications = lastNotifications.map((n) => (unreadIds.includes(n.id) ? { ...n, read: true } : n));
+    const { error } = await supabase.from("notifications").update({ read: true }).in("id", unreadIds);
+    if (error) console.error("Couldn't mark notifications read:", error);
+  }
 }
 
 function closeNotifPanel() {
@@ -3077,6 +3103,123 @@ el("notif-bell-btn").addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   if (!el("notif-panel").classList.contains("hidden") && !e.target.closest("#notif-panel") && e.target.id !== "notif-bell-btn" && !e.target.closest("#notif-bell-btn")) {
     closeNotifPanel();
+  }
+});
+
+// ---------- Web Push subscribe/unsubscribe (user request 08-24: "all notifications, can they get
+// them outside the web notification?" → "yes build it") ----------
+//
+// This is the client half — the other half is sw.js (receives the push, shows the OS notification)
+// and supabase/functions/send-notifications' sendWebPush() (sends it), gated on
+// profiles.web_push_endpoint/p256dh/auth (0099_web_push_notifications.sql). Toggled from
+// #settings-push-toggle in Settings, takes effect immediately like every other preference switch
+// on this page.
+//
+// The public half of the VAPID keypair — safe to ship in client code (it's how the push service
+// verifies OUR server signed a given message, not a secret the client needs to protect). Its
+// private counterpart lives only as a Supabase Edge Function secret (VAPID_PRIVATE_KEY), never
+// here. Regenerating the keypair means updating both this constant and that secret together, or
+// every existing subscription silently stops accepting pushes.
+const VAPID_PUBLIC_KEY = "BJf4EVl2zj2BWKnKX3SkNzslDVXq-Kw1IhkqWqrr8Y4NecGTO50GQQaK35hyapIew_ev76S2eST_5npt9bpW0tY";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window;
+
+async function registerServiceWorker() {
+  if (!pushSupported) return null;
+  try {
+    // Relative path, not "/sw.js" — a Service Worker's scope is (at most) the directory it's
+    // served from, and this page lives at /keepup/, not the domain root.
+    return await navigator.serviceWorker.register("sw.js");
+  } catch (e) {
+    console.error("Service worker registration failed:", e);
+    return null;
+  }
+}
+
+async function getExistingPushSubscription() {
+  if (!pushSupported) return null;
+  const reg = await navigator.serviceWorker.ready.catch(() => null);
+  if (!reg) return null;
+  return reg.pushManager.getSubscription();
+}
+
+// Called whenever Settings opens — reflects whatever's actually true right now (a subscription
+// can go stale outside this page's control, e.g. the user revoked the permission in browser
+// settings) rather than trusting a locally-cached "on" state.
+async function refreshPushToggleState() {
+  if (!pushSupported) {
+    hide("settings-push-row");
+    return;
+  }
+  show("settings-push-row");
+  const sub = await getExistingPushSubscription();
+  el("settings-push-toggle").checked = Boolean(sub) && Notification.permission === "granted";
+}
+
+async function subscribeToPush() {
+  const reg = await registerServiceWorker();
+  if (!reg) throw new Error("This browser doesn't support push notifications.");
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Notification permission was not granted.");
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  const json = sub.toJSON();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      web_push_endpoint: json.endpoint,
+      web_push_p256dh: json.keys.p256dh,
+      web_push_auth: json.keys.auth,
+    })
+    .eq("id", currentSession.user.id);
+  if (error) throw error;
+}
+
+async function unsubscribeFromPush() {
+  const sub = await getExistingPushSubscription();
+  if (sub) {
+    try {
+      await sub.unsubscribe();
+    } catch (e) {
+      // Not fatal — clearing the server-side row below is what actually stops sends; a failed
+      // browser-side unsubscribe just means the (now-useless) subscription object lingers
+      // locally, harmless since nothing points a push at it anymore.
+      console.error("Browser-side unsubscribe failed:", e);
+    }
+  }
+  const { error } = await supabase
+    .from("profiles")
+    .update({ web_push_endpoint: null, web_push_p256dh: null, web_push_auth: null })
+    .eq("id", currentSession.user.id);
+  if (error) throw error;
+}
+
+el("settings-push-toggle").addEventListener("change", async (e) => {
+  const wantOn = e.target.checked;
+  const msg = el("settings-push-message");
+  hide("settings-push-message");
+  e.target.disabled = true;
+  try {
+    if (wantOn) {
+      await subscribeToPush();
+    } else {
+      await unsubscribeFromPush();
+    }
+  } catch (err) {
+    e.target.checked = !wantOn;
+    msg.textContent = err.message || "Couldn't update notification settings.";
+    show("settings-push-message");
+  } finally {
+    e.target.disabled = false;
   }
 });
 
@@ -4036,7 +4179,7 @@ el("more-menu-membership").addEventListener("click", () => {
   // too so the status is always fresh regardless of tab-visit history.
   loadProfile();
 });
-el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); openAppearanceSettings(); });
+el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); openAppearanceSettings(); refreshPushToggleState(); });
 // Profile is a real tab (#tab-profile, part of TAB_ORDER), not an overlay like Membership/Shop/
 // Settings — so this closes the popover and switches to it directly, rather than going through
 // openScreen()'s overlay machinery.
