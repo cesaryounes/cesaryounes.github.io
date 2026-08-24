@@ -3977,6 +3977,36 @@ function findLabelBox(words, phrases) {
   return null;
 }
 
+// Like findLabelBox, but returns EVERY matching occurrence across ALL phrases instead of
+// stopping at the first — used to build a boundary set (see valueNearLabel's `boundaries` param)
+// so a value search for one label can never wander past a DIFFERENT label's own row. Apple
+// Fitness stacks "Active Kilocalories" directly above "Total Kilocalories" in the same column —
+// when Active's own value OCR's to nothing, the search needs to stop before reaching Total's row,
+// not casually accept Total's value (or a still-further row's) instead.
+function findAllLabelBoxes(words, phrases) {
+  const lower = words.map((w) => (w.text || "").toLowerCase().replace(/[^a-z.]/g, ""));
+  const boxes = [];
+  for (const phrase of phrases) {
+    const parts = phrase.split(" ").map((p) => p.replace(/[^a-z.]/g, ""));
+    for (let i = 0; i <= lower.length - parts.length; i++) {
+      let ok = true;
+      for (let j = 0; j < parts.length; j++) {
+        if (lower[i + j] !== parts[j]) { ok = false; break; }
+      }
+      if (ok) {
+        const slice = words.slice(i, i + parts.length);
+        boxes.push({
+          x0: Math.min(...slice.map((w) => w.bbox.x0)),
+          y0: Math.min(...slice.map((w) => w.bbox.y0)),
+          x1: Math.max(...slice.map((w) => w.bbox.x1)),
+          y1: Math.max(...slice.map((w) => w.bbox.y1)),
+        });
+      }
+    }
+  }
+  return boxes;
+}
+
 // Words positioned close enough together, on the same visual line, to plausibly be one number
 // Tesseract's own segmentation split into separate "words" — confirmed in testing: a Whoop sample
 // consistently split a leading "1" digit off numbers like "134"/"127" into its own token ("1",
@@ -4003,7 +4033,13 @@ function joinAdjacentWords(list) {
 // the same card (Samsung Health/Mi Fitness/Apple Fitness, checked first — the more common pattern
 // across everything tested) or label and value side by side on the same row (Whoop's "DURATION
 // 0:15:59" — no vertical stacking at all for that one).
-function valueNearLabel(words, labelBox) {
+//
+// `boundaries` — every OTHER known label's box (see findAllLabelBoxes) — caps how far the
+// below-search is allowed to reach: real layouts repeat label/value pairs down a column (Apple
+// Fitness's "Active Kilocalories" stacked directly above "Total Kilocalories"), and without a
+// boundary, a value that OCR'd to nothing gets quietly replaced by the NEXT label's value instead
+// of correctly coming up empty.
+function valueNearLabel(words, labelBox, boundaries = []) {
   const labelHeight = labelBox.y1 - labelBox.y0;
   const labelCenterY = (labelBox.y0 + labelBox.y1) / 2;
   const labelCenterX = (labelBox.x0 + labelBox.x1) / 2;
@@ -4037,10 +4073,20 @@ function valueNearLabel(words, labelBox) {
   // CLOSEST-FIRST (weighted distance below), clusters each into the contiguous same-line run it's
   // part of, and returns the first such cluster that contains a digit — skipping straight past any
   // no-digit cluster (which can only ever be a neighboring label, never a real value) to try the
-  // next-closest one instead of just accepting whatever happens to be nearest.
+  // next-closest one instead of just accepting whatever happens to be nearest. `boundaryY` (the
+  // nearest OTHER known label sitting below this one) puts a hard ceiling on that search — digit
+  // content alone isn't enough of a signal once a value has gone invisible (see this function's
+  // own doc comment), since the NEXT label's real value also contains a digit and would otherwise
+  // get accepted as if it were this label's.
+  const boundaryY = boundaries
+    .map((b) => b.y0)
+    .filter((y) => y > labelBox.y1 + 2)
+    .reduce((min, y) => Math.min(min, y), Infinity);
+
   const below = words.filter((w) => (
     w.bbox.y0 >= labelBox.y1 - 4 && // small overlap allowance for rounding
-    w.bbox.y0 - labelBox.y1 <= labelHeight * 10
+    w.bbox.y0 - labelBox.y1 <= labelHeight * 10 &&
+    w.bbox.y0 < boundaryY - 2
   ));
   below.forEach((w) => {
     const wCenterX = (w.bbox.x0 + w.bbox.x1) / 2;
@@ -4149,9 +4195,17 @@ async function runOcrPass(canvas) {
   const calorieBox = findLabelBox(words, OCR_CALORIE_LABELS);
   const hrBox = findLabelBox(words, OCR_HR_LABELS);
 
-  const durationMatch = durationBox ? valueNearLabel(words, durationBox) : { text: "", distRatio: Infinity };
-  const calorieMatch = calorieBox ? valueNearLabel(words, calorieBox) : { text: "", distRatio: Infinity };
-  const hrMatch = hrBox ? valueNearLabel(words, hrBox) : { text: "", distRatio: Infinity };
+  // Every known label occurrence — not just the 3 actually being solved for — bounds ALL THREE
+  // searches below (see valueNearLabel's `boundaries` param and findAllLabelBoxes' doc comment).
+  const allLabelBoxes = [
+    ...findAllLabelBoxes(words, OCR_DURATION_LABELS),
+    ...findAllLabelBoxes(words, OCR_CALORIE_LABELS),
+    ...findAllLabelBoxes(words, OCR_HR_LABELS),
+  ];
+
+  const durationMatch = durationBox ? valueNearLabel(words, durationBox, allLabelBoxes) : { text: "", distRatio: Infinity };
+  const calorieMatch = calorieBox ? valueNearLabel(words, calorieBox, allLabelBoxes) : { text: "", distRatio: Infinity };
+  const hrMatch = hrBox ? valueNearLabel(words, hrBox, allLabelBoxes) : { text: "", distRatio: Infinity };
 
   return {
     duration_minutes: durationBox ? clampOcr(parseDurationToMinutes(durationMatch.text), 1, 600) : null,
@@ -4198,12 +4252,13 @@ async function extractWorkoutFieldsFromOcr(file) {
   const foundCount = [final.duration_minutes, final.calories, final.avg_heart_rate, final.category]
     .filter((v) => v !== null).length;
 
-  // TEMP DIAGNOSTIC — only appended when something's still missing after both passes, so a normal
-  // successful parse stays clean. Remove once the two-pass fix is confirmed against real photos
-  // that still fail; see this function's own git history for the follow-up that strips this out.
-  const diag = foundCount < 4
-    ? ` [diag] p1{${pass1.diagText}}` + (pass2 ? ` p2{${pass2.diagText}}` : "")
-    : "";
+  // TEMP DIAGNOSTIC (user report 08-24, round 4 — a new "Outdoor Run" layout came back with
+  // calories=21 and HR=30, both non-null so foundCount alone can't tell they're wrong; the earlier
+  // "only show when something's missing" gate would've hidden this exact case). Always appended
+  // for now so a wrong-but-non-null field is still visible to debug, not just a missing one.
+  // Remove once this fix is confirmed against real photos that still fail; see this function's own
+  // git history for the follow-up that strips this back out.
+  const diag = ` [diag] p1{${pass1.diagText}}` + (pass2 ? ` p2{${pass2.diagText}}` : "");
 
   return {
     success: true,
