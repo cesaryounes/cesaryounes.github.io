@@ -3911,6 +3911,46 @@ function preprocessForOcr(file) {
   });
 }
 
+// FIX (user report 08-24: Apple HIIT "Moderate" screenshot — the bold colored value text (yellow
+// duration, pink/orange calories/HR) vanished from OCR entirely while plain grey label text read
+// fine). A/B-tested against synthetic dark-card renders at a range of value-text luminances:
+// plain grayscale alone loses contrast on darker/more-saturated colored text against a near-black
+// background; a strong linear contrast push (crush low greys to black, blow high greys to white)
+// recovers it. But the same push is too aggressive to use as the ONLY preprocessing — it corrupted
+// an otherwise-working Mi Fitness sample in the same testing — so it's a second, high-contrast
+// variant of the same canvas, used only as a fallback for whatever the first pass missed (see
+// extractWorkoutFieldsFromOcr's two-pass merge below), never as a replacement for it.
+function preprocessForOcrHighContrast(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      img.onerror = reject;
+      img.onload = () => {
+        const width = Math.min(Math.round(img.width * 2), 2600);
+        const height = Math.round(img.height * (width / img.width));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.filter = "grayscale(1)";
+        ctx.drawImage(img, 0, 0, width, height);
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const d = imageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const v = Math.max(0, Math.min(255, d[i] * 4.5 - 160));
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Finds the first of `phrases` (priority order — callers list their preferred label wording
 // first) that actually appears in `words` as a consecutive sequence, and returns its union
 // bounding box. Punctuation-tolerant (".", ",") since OCR is inconsistent about capturing it.
@@ -4081,7 +4121,9 @@ function detectCategoryFromOcr(words) {
   return null;
 }
 
-async function extractWorkoutFieldsFromOcr(canvas) {
+// One OCR pass over a preprocessed canvas → the 4 fields plus enough raw detail to diagnose a
+// miss (see extractWorkoutFieldsFromOcr's diag string below).
+async function runOcrPass(canvas) {
   const { data } = await Tesseract.recognize(canvas, "eng");
   const words = (data.words || []).filter((w) => w.text && w.text.trim());
 
@@ -4093,32 +4135,56 @@ async function extractWorkoutFieldsFromOcr(canvas) {
   const calorieText = calorieBox ? valueNearLabel(words, calorieBox) : "";
   const hrText = hrBox ? valueNearLabel(words, hrBox) : "";
 
-  const durationMinutes = durationBox ? clampOcr(parseDurationToMinutes(durationText), 1, 600) : null;
-  const calories = calorieBox ? clampOcr(parseFirstNumber(calorieText), 0, 5000) : null;
-  const avgHeartRate = hrBox ? clampOcr(parseHeartRate(hrText), 30, 220) : null;
-  const category = detectCategoryFromOcr(words);
+  return {
+    duration_minutes: durationBox ? clampOcr(parseDurationToMinutes(durationText), 1, 600) : null,
+    calories: calorieBox ? clampOcr(parseFirstNumber(calorieText), 0, 5000) : null,
+    avg_heart_rate: hrBox ? clampOcr(parseHeartRate(hrText), 30, 220) : null,
+    category: detectCategoryFromOcr(words),
+    diagText: `words=${words.length} d=${!!durationBox} c=${!!calorieBox} h=${!!hrBox} raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 300)}"`,
+  };
+}
 
-  const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
+// FIX (user report 08-24: Apple HIIT "Moderate" screenshot — duration/calories came back empty
+// and HR grabbed the wrong card's number, all traced to the same root cause: the bold colored
+// value text OCR'd to nothing at all, see preprocessForOcrHighContrast's comment). Two passes —
+// the normal grayscale one first, and only when it's missing something, a second pass on a
+// high-contrast variant of the same photo. The second pass only ever FILLS IN fields the first
+// one missed (`??`, never overwrites a real value) — it's individually too aggressive to trust as
+// the primary read (see that function's comment), but safe as a fallback since a field it gets
+// wrong here was already null, not downgraded from a working value.
+async function extractWorkoutFieldsFromOcr(file) {
+  const pass1 = await runOcrPass(await preprocessForOcr(file));
+  const foundCount1 = [pass1.duration_minutes, pass1.calories, pass1.avg_heart_rate, pass1.category]
+    .filter((v) => v !== null).length;
 
-  // TEMP DIAGNOSTIC (user report 08-24, round 2 — a new Apple HIIT screenshot with an "Effort"
-  // card came back with duration/calories empty and HR showing "6 Moderate", the Effort score two
-  // rows below the real "135BPM" value. Round 1's durTxt/calTxt/hrTxt alone couldn't tell whether a
-  // label wasn't found at all vs. found-but-no-value-matched, so this round adds a found-flag per
-  // label plus a compact dump of the raw linear OCR text — no image/file access on my end to
-  // reproduce this locally, so the on-device text itself is the only way to diagnose it further.
-  // Only appended when something's actually missing, so a normal successful parse stays clean.
-  // Remove once the real-device text is captured; see this function's own git history for the
-  // follow-up that strips this back out.
+  let final = pass1;
+  let pass2 = null;
+  if (foundCount1 < 4) {
+    pass2 = await runOcrPass(await preprocessForOcrHighContrast(file));
+    final = {
+      duration_minutes: pass1.duration_minutes ?? pass2.duration_minutes,
+      calories: pass1.calories ?? pass2.calories,
+      avg_heart_rate: pass1.avg_heart_rate ?? pass2.avg_heart_rate,
+      category: pass1.category ?? pass2.category,
+    };
+  }
+
+  const foundCount = [final.duration_minutes, final.calories, final.avg_heart_rate, final.category]
+    .filter((v) => v !== null).length;
+
+  // TEMP DIAGNOSTIC — only appended when something's still missing after both passes, so a normal
+  // successful parse stays clean. Remove once the two-pass fix is confirmed against real photos
+  // that still fail; see this function's own git history for the follow-up that strips this out.
   const diag = foundCount < 4
-    ? ` [diag] words=${words.length} d=${!!durationBox} c=${!!calorieBox} h=${!!hrBox} durTxt="${durationText}" calTxt="${calorieText}" hrTxt="${hrText}" raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 400)}"`
+    ? ` [diag] p1{${pass1.diagText}}` + (pass2 ? ` p2{${pass2.diagText}}` : "")
     : "";
 
   return {
     success: true,
-    category,
-    duration_minutes: durationMinutes,
-    calories,
-    avg_heart_rate: avgHeartRate,
+    category: final.category,
+    duration_minutes: final.duration_minutes,
+    calories: final.calories,
+    avg_heart_rate: final.avg_heart_rate,
     confidence: foundCount >= 3 ? "medium" : "low",
     notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving." + diag,
   };
@@ -4172,9 +4238,8 @@ el("photo-input").addEventListener("change", async (e) => {
 
     // On-device OCR (user request 08-24: "can we do something for free?") — no network call, no
     // account, no cost. See extractWorkoutFieldsFromOcr()'s own doc comment for the real accuracy
-    // testing behind this approach.
-    const ocrCanvas = await preprocessForOcr(file);
-    const result = await extractWorkoutFieldsFromOcr(ocrCanvas);
+    // testing behind this approach (now a two-pass read — see that function for why).
+    const result = await extractWorkoutFieldsFromOcr(file);
 
     currentParse = result;
     populateConfirmStep(result);
