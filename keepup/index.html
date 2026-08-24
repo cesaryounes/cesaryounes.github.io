@@ -111,6 +111,18 @@
   .top-banner-logo .wordmark {
     font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: var(--text-main);
   }
+  .top-banner-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+  /* Small round header action icon (user request 08-24: "no need for the big button...just a plus
+     in the top banner to the right") — a per-tab action slot next to the stat cluster, same idea
+     as TopBanner.kt's own onCreateActionChanged-reported icon in the app. Only the Club tab uses
+     one so far (see setHeaderAction() below), hidden the rest of the time. */
+  .icon-btn {
+    width: 32px; height: 32px; min-height: 32px; padding: 0; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-size: 19px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0;
+  }
+  .icon-btn:active { background: var(--accent); color: #0B0E14; }
 
   .card {
     background: var(--card); border: 1px solid var(--hairline); border-radius: 16px;
@@ -235,11 +247,6 @@
   .lb-row.is-me .lb-rank { color: var(--accent); }
   .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-  /* Smaller than .nudge-bell-btn (club member list) — the leaderboard row is already tight with
-     rank/avatar/name/delta/points, same reasoning LeaderboardScreen.kt's own row bell is compact
-     compared to its full nudge-picker affordance elsewhere. */
-  .lb-row .nudge-bell-btn { width: 26px; height: 26px; min-height: 26px; }
-  .lb-row .nudge-bell-btn svg { width: 13px; height: 13px; }
 
   /* Bottom nav bar (user request 08-23) — fixed to the viewport bottom, icon+label per tab, same
      accent-soft pill behind the selected icon HomeScreen.kt's own NavigationBar uses (Material3's
@@ -364,13 +371,6 @@
     font-size: 10px; font-weight: 800; color: var(--amber); text-transform: uppercase;
     letter-spacing: 0.03em; margin-left: 6px;
   }
-  .nudge-bell-btn {
-    width: 36px; height: 36px; min-height: 36px; padding: 0; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--accent-soft); border-radius: 50%;
-  }
-  .nudge-bell-btn svg { width: 18px; height: 18px; color: var(--accent); }
-
   /* ---- Nudge picker modal (user request 08-24) — first real centered-modal pattern on this page
      (everything else is either a full .screen-overlay takeover or the small anchored .more-menu
      popover); a full-screen takeover would be overkill for "pick a message and send", so this is
@@ -384,12 +384,20 @@
     width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto;
     padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   }
-  .nudge-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
+     of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
+     nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
+  .nudge-preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .nudge-preset-chip {
-    width: auto; min-height: 40px; padding: 8px 10px; font-size: 12px; font-weight: 600;
-    text-align: left; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 10px;
-    color: var(--text-main);
+    width: auto; min-height: 0; padding: 8px 6px 6px; font-size: 11px; font-weight: 700;
+    text-align: center; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 12px;
+    color: var(--text-main); display: flex; flex-direction: column; align-items: center; gap: 4px;
   }
+  .nudge-mascot { width: 56px; height: 56px; flex-shrink: 0; }
+  .nudge-mascot svg { display: block; }
+  /* renderMascotOrLabel()'s text-only fallback (Lottie failed to load, or hasn't finished loading
+     yet) — same chip shape as before this feature, just still labeled by shortLabel. */
+  .nudge-preset-chip.text-only { min-height: 40px; padding: 8px 10px; text-align: left; }
 
   /* Incoming-nudge toast (checkForNewNudges/showNudgeBanner) — no push infrastructure on this
      page at all, so this is what "receiving" actually looks like here: appears while the tab is
@@ -644,6 +652,24 @@
     color: #0B0E14; border: 1.5px solid var(--bg);
   }
   .podium-slot.first .podium-rank-badge { width: 20px; height: 20px; font-size: 10px; }
+
+  /* ---- Nudge bell attached to an avatar (user request 08-24: "for the bell, can you add it to
+     the avatar? a small bell attached to the picture, like we did in the app") — a small circular
+     badge overlapping the avatar's corner, replacing the separate standalone .nudge-bell-btn that
+     used to sit after the name. Default corner is bottom-right (matches podium-rank-badge's own
+     placement convention); the podium variant below moves to bottom-left since the rank badge
+     already owns bottom-right there. ---- */
+  .avatar-nudge-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
+  .avatar-nudge-badge {
+    position: absolute; bottom: -2px; right: -2px; border-radius: 50%;
+    background: var(--card-raised); border: 1.5px solid var(--bg);
+    display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+    width: 15px; height: 15px; min-height: 0;
+  }
+  .avatar-nudge-badge svg { width: 9px; height: 9px; color: var(--accent); flex-shrink: 0; }
+  .member-row .avatar-nudge-badge, .podium-avatar-wrap .avatar-nudge-badge { width: 18px; height: 18px; }
+  .member-row .avatar-nudge-badge svg, .podium-avatar-wrap .avatar-nudge-badge svg { width: 11px; height: 11px; }
+  .podium-avatar-wrap .avatar-nudge-badge { right: auto; left: -2px; }
   .podium-slot .podium-name { font-size: 13px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); }
   .podium-slot.is-me .podium-name { color: var(--accent); }
   .podium-points-row { display: flex; align-items: center; gap: 2px; margin-top: 1px; }
@@ -678,20 +704,25 @@
         </svg>
         <span class="wordmark">KEEPUP</span>
       </div>
-      <div class="stat-cluster hidden" id="stat-cluster">
-        <div class="stat-cell" style="color:var(--text-muted);">
-          <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
-          <span id="stat-streak">0</span>
+      <div class="top-banner-right">
+        <!-- Per-tab header action — the Club tab's "+" (create a club), user request 08-24.
+             setHeaderAction()/clearHeaderAction() below show/hide and wire this on tab switch. -->
+        <button class="icon-btn hidden" id="header-action-btn" aria-label="Create a club" title="Create a club">+</button>
+        <div class="stat-cluster hidden" id="stat-cluster">
+          <div class="stat-cell" style="color:var(--text-muted);">
+            <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
+            <span id="stat-streak">0</span>
+          </div>
+          <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
+            <svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg>
+            <span id="stat-freeze">0</span>
+          </div>
+          <div class="stat-cell" style="color:var(--amber);">
+            <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
+            <span id="stat-gems" style="color:var(--text-main);">0</span>
+          </div>
+          <div class="stat-mult" id="stat-multiplier">1.00x</div>
         </div>
-        <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
-          <svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg>
-          <span id="stat-freeze">0</span>
-        </div>
-        <div class="stat-cell" style="color:var(--amber);">
-          <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
-          <span id="stat-gems" style="color:var(--text-main);">0</span>
-        </div>
-        <div class="stat-mult" id="stat-multiplier">1.00x</div>
       </div>
     </header>
 
@@ -955,8 +986,10 @@
            takes the argument normally; this page just always passes true and never exposes the
            control. Gear-bonus stays a real optional toggle, same as the app. -->
       <div id="tab-club" class="tab-view hidden">
-        <button class="btn-primary" id="open-create-club-btn" style="margin-bottom:16px;">+ Create a club</button>
-
+        <!-- FIX (user request 08-24: "no need for the big button...just a plus in the top banner
+             to the right") — was a full-width "+ Create a club" button here; that action now lives
+             in the header's "+" icon (see #header-action-btn, wired by setHeaderAction() below),
+             matching the app's own convention of TopBanner carrying the current tab's one action. -->
         <div class="card hidden" id="create-club-flow">
           <p class="section-label" style="margin-bottom:14px;">New club</p>
           <div class="field">
@@ -1250,8 +1283,9 @@
        nudge GroupsScreen.kt/LeaderboardScreen.kt's own NudgeDialog offers: a quick nudge (no
        message), tap any of the 9 real presets (NUDGE_PRESETS, Models.kt — same ids/text, so a
        nudge sent from the web reads identically on the recipient's Android app) to send it
-       immediately, or type a custom message. No Lottie animations here (this page has no asset
-       hosting for them) — text-only, same underlying fn_send_nudge either way. -->
+       immediately, or type a custom message. Each preset plays its real mascot animation (see the
+       lottie-web <script> tag and openNudgePicker's own doc comment) rather than showing plain
+       text — same underlying fn_send_nudge either way. -->
   <div class="modal-backdrop hidden" id="nudge-modal-backdrop">
     <div class="modal-card">
       <p class="section-label" id="nudge-modal-title" style="margin-bottom:14px;">Nudge</p>
@@ -1387,6 +1421,14 @@
      (gear/scripts/parsed_gear.json, the Claude Design handoff), just emitted as SVG instead of
      Compose Canvas calls. Loaded as a plain global (window.GEAR_ART) rather than inlined into the
      module script below, purely to keep this already-large file's own source easier to scroll. -->
+<!-- Renders the nudge-preset mascot animations (user request 08-24: "can't we see the Mascots,
+     instead of the text?") — same Lottie files GroupsScreen.kt/LeaderboardScreen.kt's NudgeDialog
+     bundles as raw resources (nudge_<id>.json), copied into this repo's own mascots/ folder (see
+     openNudgePicker below) since the app's res/raw/ isn't reachable over HTTP. Loaded from jsDelivr
+     rather than inlined — nine ~200KB vector JSONs is fine to fetch lazily but not to ship in every
+     page load. If this fails to load (network blocked, CDN down), renderMascotOrLabel() below falls
+     back to the plain text label, same as before this feature existed. -->
+<script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
 <script src="gear-art-data.js"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -1571,6 +1613,23 @@ const LAST_TAB_KEY = "keepup_last_tab";
 // stopped having one. This is the actual source of truth switchTab() itself updates.
 let currentTabId = "dashboard";
 
+// Per-tab header action (user request 08-24: "just a plus in the top banner to the right") — one
+// shared icon button in the persistent header, retargeted on every tab switch rather than each
+// tab keeping its own copy. Assigning .onclick directly (not addEventListener) so switching tabs
+// back and forth never piles up duplicate handlers on the same button.
+function setHeaderAction(label, onClick) {
+  const btn = el("header-action-btn");
+  btn.onclick = onClick;
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+  show("header-action-btn");
+}
+function clearHeaderAction() {
+  const btn = el("header-action-btn");
+  btn.onclick = null;
+  hide("header-action-btn");
+}
+
 function switchTab(tab) {
   currentTabId = tab;
   TAB_ORDER.forEach((t) => {
@@ -1588,6 +1647,11 @@ function switchTab(tab) {
     // Storage full/disabled (private browsing, etc.) — just won't restore next load.
   }
   loadHeaderStats();
+  if (tab === "club") {
+    setHeaderAction("Create a club", openCreateClubFlow);
+  } else {
+    clearHeaderAction();
+  }
   if (tab === "dashboard") loadDashboard();
   if (tab === "club") loadClubDirectory();
   if (tab === "leaderboard") loadMyClubs();
@@ -2067,6 +2131,15 @@ async function refreshClubmateUserIds() {
   clubmateUserIds = new Set((data || []).map((r) => r.user_id).filter((id) => id !== currentSession.user.id));
 }
 
+// Shared by every leaderboard row AND the podium slots (user request 08-24: "i should be able to
+// nudge the top 3 (on the podium)" — the podium used to skip this check entirely since it had no
+// bell at all). Club scope: everyone shown is already a clubmate by construction (get_leaderboard
+// was scoped to that club). Global/Region: only if fn_send_nudge would actually accept it.
+function canNudgeLeaderboardRow(userId) {
+  if (userId === currentSession.user.id) return false;
+  return currentScope.type === "club" || clubmateUserIds.has(userId);
+}
+
 async function loadMyClubs() {
   myClubs = await fetchMyClubs();
   await refreshClubmateUserIds();
@@ -2201,6 +2274,17 @@ function avatarHtml(name, avatarUrl, sizePx, borderColor) {
   return `<div class="avatar-initials" style="width:${sizePx}px;height:${sizePx}px;font-size:${Math.round(sizePx * 0.4)}px;${border}">${escapeHtml(initialsFor(name))}</div>`;
 }
 
+// Nudge bell attached directly to an avatar (user request 08-24: "add it to the avatar... like we
+// did in the app") — replaces the standalone .nudge-bell-btn that used to sit after the name on
+// leaderboard/member rows. Wraps avatarHtml() in a relative container only when a bell is actually
+// warranted; every caller still just gets back one HTML string to drop in place of avatarHtml().
+function avatarWithNudgeHtml(name, avatarUrl, sizePx, uid, canNudge, borderColor) {
+  const avatar = avatarHtml(name, avatarUrl, sizePx, borderColor);
+  if (!canNudge) return avatar;
+  const label = escapeHtml(name || "Member");
+  return `<div class="avatar-nudge-wrap">${avatar}<button type="button" class="avatar-nudge-badge" data-uid="${uid}" data-name="${label}" aria-label="Nudge ${label}">${bellIconSvg()}</button></div>`;
+}
+
 async function loadClubLeaderboard() {
   const params = { p_period: currentPeriod, p_group_id: null, p_region_code: null };
   if (currentScope.type === "club") params.p_group_id = currentScope.id;
@@ -2266,13 +2350,16 @@ function renderLeaderboardRows(rows) {
       slot.innerHTML = `
         <svg class="podium-crown" viewBox="0 0 24 24"><path d="M3 18h18l-1.5-9-4.5 4-3-6-3 6-4.5-4L3 18z" fill="${medal}"/></svg>
         <div class="podium-avatar-wrap">
-          ${avatarHtml(r.display_name, r.avatar_url, avatarSize, medal)}
+          ${avatarWithNudgeHtml(r.display_name, r.avatar_url, avatarSize, r.user_id, canNudgeLeaderboardRow(r.user_id), medal)}
           <div class="podium-rank-badge" style="background:${medal};">${i + 1}</div>
         </div>
         <div class="podium-name">${escapeHtml(r.display_name || "Member")}${isMe ? " (You)" : ""}</div>
         <div class="podium-points-row">${rankDeltaHtml(r._delta)}<span>${Number(r.period_points ?? 0).toFixed(2)} pts</span></div>
       `;
       podiumWrap.appendChild(slot);
+    });
+    Array.from(podiumWrap.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
+      btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
     });
     show("lb-podium");
   }
@@ -2294,22 +2381,16 @@ function renderLeaderboardRows(rows) {
   listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
-    const isMe = r.user_id === currentSession.user.id;
-    // Club scope: everyone shown is already a clubmate by construction (the rows came from
-    // get_leaderboard scoped to that club). Global/Region: only if fn_send_nudge would actually
-    // accept it — see refreshClubmateUserIds's own doc comment.
-    const canNudgeRow = !isMe && (currentScope.type === "club" || clubmateUserIds.has(r.user_id));
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
-      ${avatarHtml(r.display_name, r.avatar_url, 28)}
+      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canNudgeLeaderboardRow(r.user_id))}
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
-      ${canNudgeRow ? `<button type="button" class="nudge-bell-btn" data-uid="${r.user_id}" data-name="${escapeHtml(r.display_name || "Member")}" aria-label="Nudge ${escapeHtml(r.display_name || "Member")}">${bellIconSvg()}</button>` : ""}
     `;
     rowsWrap.appendChild(row);
   });
-  Array.from(rowsWrap.querySelectorAll(".nudge-bell-btn")).forEach((btn) => {
+  Array.from(rowsWrap.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
   });
 }
@@ -2587,14 +2668,16 @@ function renderClubMembers(members) {
     const li = document.createElement("li");
     li.className = "member-row";
     const isMe = m.user_id === currentSession.user.id;
+    // fn_get_club_members only ever succeeds for an actual member of this club (its own membership
+    // check) — so unlike the leaderboard's canNudgeLeaderboardRow, no clubmate check is needed here,
+    // just "not yourself", same as the app's isViewerMember-gated member dialog.
     li.innerHTML = `
-      ${avatarHtml(m.display_name, m.avatar_url, 34)}
+      ${avatarWithNudgeHtml(m.display_name, m.avatar_url, 34, m.user_id, !isMe)}
       <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}</div>
-      ${isMe ? "" : `<button type="button" class="nudge-bell-btn" data-uid="${m.user_id}" data-name="${escapeHtml(m.display_name || "Member")}" aria-label="Nudge ${escapeHtml(m.display_name || "Member")}">${bellIconSvg()}</button>`}
     `;
     list.appendChild(li);
   });
-  Array.from(list.querySelectorAll(".nudge-bell-btn")).forEach((btn) => {
+  Array.from(list.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
   });
 }
@@ -2657,9 +2740,10 @@ el("club-invite-btn").addEventListener("click", async () => {
 
 // ---------- Nudge (user request 08-24: "the bell should also appear in the leaderboard... add the
 // bell" to the club member list) — same fn_send_nudge RPC and NUDGE_PRESETS (Models.kt) the app
-// itself uses, so a nudge sent from here reads identically on the recipient's phone. No Lottie
-// animations (this page has no asset hosting for them) — text-only, same underlying call either
-// way. ----------
+// itself uses, so a nudge sent from here reads identically on the recipient's phone. Each preset's
+// real Lottie mascot (nudge_<id>.json, copied from app/src/main/res/raw/ into this repo's own
+// mascots/ folder) plays in its chip via the lottie-web CDN script tagged in <head> — same idea as
+// GroupsScreen.kt/LeaderboardScreen.kt's own NudgeDialog, "instead of the text" per the request. ----------
 const NUDGE_PRESETS = [
   { id: "slipping", text: "You're slipping down the leaderboard.", shortLabel: "Slipping" },
   { id: "kudos", text: "Kudos — keep it up.", shortLabel: "Kudos" },
@@ -2677,14 +2761,30 @@ function bellIconSvg() {
 }
 
 let nudgeTargetUserId = null;
+// Lottie players for whichever preset grid is currently showing — destroyed on every close so a
+// backgrounded/closed modal never keeps nine animations quietly running (and re-created fresh on
+// every open rather than reused, since a stale player from a previous target has nothing to do
+// with the new one anyway).
+let activeMascotAnims = [];
+
+function destroyMascotAnims() {
+  activeMascotAnims.forEach((anim) => anim.destroy());
+  activeMascotAnims = [];
+}
 
 function openNudgePicker(userId, displayName) {
   nudgeTargetUserId = userId;
   el("nudge-modal-title").textContent = `Nudge ${displayName}`;
   el("nudge-custom-input").value = "";
   hide("nudge-modal-message");
-  el("nudge-preset-grid").innerHTML = NUDGE_PRESETS.map((p) =>
-    `<button type="button" class="nudge-preset-chip" data-preset-id="${p.id}">${escapeHtml(p.shortLabel)}</button>`
+  destroyMascotAnims();
+  // window.lottie comes from the CDN <script> tag in <head> — if it didn't load (network blocked,
+  // CDN unreachable), fall back to the original text-chip look rather than showing nine empty
+  // boxes with no way to tell one preset from another.
+  const mascotsAvailable = typeof window.lottie !== "undefined";
+  el("nudge-preset-grid").innerHTML = NUDGE_PRESETS.map((p) => mascotsAvailable
+    ? `<button type="button" class="nudge-preset-chip" data-preset-id="${p.id}"><div class="nudge-mascot" id="mascot-${p.id}"></div><span>${escapeHtml(p.shortLabel)}</span></button>`
+    : `<button type="button" class="nudge-preset-chip text-only" data-preset-id="${p.id}">${escapeHtml(p.shortLabel)}</button>`
   ).join("");
   Array.from(el("nudge-preset-grid").querySelectorAll(".nudge-preset-chip")).forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2692,12 +2792,30 @@ function openNudgePicker(userId, displayName) {
       submitNudge(preset.text, preset.id);
     });
   });
+  if (mascotsAvailable) {
+    NUDGE_PRESETS.forEach((p) => {
+      try {
+        activeMascotAnims.push(window.lottie.loadAnimation({
+          container: el(`mascot-${p.id}`),
+          renderer: "svg",
+          loop: true,
+          autoplay: true,
+          path: `mascots/nudge_${p.id}.json`,
+        }));
+      } catch (e) {
+        // One bad/missing file shouldn't take the rest of the picker down with it — that chip
+        // just plays no animation, same as the mascotsAvailable=false fallback for a single preset.
+        console.error(`Couldn't load mascot for ${p.id}:`, e);
+      }
+    });
+  }
   show("nudge-modal-backdrop");
 }
 
 function closeNudgePicker() {
   hide("nudge-modal-backdrop");
   nudgeTargetUserId = null;
+  destroyMascotAnims();
 }
 
 async function submitNudge(message, presetId) {
@@ -2771,18 +2889,23 @@ function showNudgeBanner(nudge) {
 
 function closeCreateClubFlow() {
   hide("create-club-flow");
-  show("open-create-club-btn");
+  // Only the Club tab ever wants this icon back — if the tab's already been switched away from
+  // by the time this fires, switchTab()'s own clearHeaderAction() call has the header covered.
+  if (currentTabId === "club") show("header-action-btn");
 }
 
-el("open-create-club-btn").addEventListener("click", () => {
-  hide("open-create-club-btn");
+// FIX (user request 08-24): was a click listener bound to a big "+ Create a club" button living
+// inside #tab-club; that button's gone (see this tab's own comment) — this is now a plain named
+// function so switchTab() can hand it to the shared header icon via setHeaderAction() instead.
+function openCreateClubFlow() {
+  hide("header-action-btn");
   show("create-club-flow");
   el("new-club-name").value = "";
   el("new-club-public").checked = true;
   el("new-club-gear-bonus").checked = false;
   hide("create-club-message");
   openOverlay(closeCreateClubFlow);
-});
+}
 // Routes through closeOverlay() (see its own doc comment) so the back button closes this the same
 // way Cancel does.
 el("cancel-create-club-btn").addEventListener("click", () => closeOverlay(closeCreateClubFlow));
