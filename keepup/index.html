@@ -1584,6 +1584,13 @@
      page load. If this fails to load (network blocked, CDN down), renderMascotOrLabel() below falls
      back to the plain text label, same as before this feature existed. -->
 <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+<!-- On-device workout-photo OCR (user request 08-24: "can we do something for free?" -> "let's do
+     option 2") — replaces the paid Claude-vision Edge Function (parse-workout-photo) with local,
+     $0-forever text recognition. Runs entirely in the browser (WASM), no account, no API key, no
+     server round trip for the recognition itself. See extractWorkoutFieldsFromOcr() below for the
+     real accuracy findings from testing this against actual Samsung Health/Mi Fitness/Apple
+     Fitness screenshots before this shipped. -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="gear-art-data.js"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -1592,7 +1599,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // public; access control lives in this project's RLS policies, not in keeping this key secret.
 const SUPABASE_URL = "https://cfflfqobladpkwssdjka.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmZmxmcW9ibGFkcGt3c3NkamthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjQ2MjYsImV4cCI6MjEwMTEwMDYyNn0.NkhhSl9Ixe2k-nNPX2Q4KEUueWOLA10Ku2D0yzkD6rI";
-const PARSE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/parse-workout-photo`;
+// PARSE_FUNCTION_URL removed (user request 08-24: "can we do something for free?") — photo parsing
+// is on-device now (extractWorkoutFieldsFromOcr below), no Edge Function call for it anymore.
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -3811,6 +3819,193 @@ function showManualEntryStep() {
   show("confirm-step");
 }
 
+// ---------- On-device workout-photo OCR (user request 08-24: "can we do something for free?" ->
+// "let's do option 2") ----------
+//
+// Replaces the paid Claude-vision Edge Function (parse-workout-photo) with local text recognition
+// (Tesseract.js, WASM, CDN-loaded above) — $0 forever, no account, no API key, nothing to run out
+// of credit. Two real findings from testing this against actual Samsung Health/Mi Fitness/Apple
+// Fitness screenshots, before any of this shipped:
+//
+//   1. Grayscale conversion is what actually matters, not upscaling. Without it, a Samsung Health
+//      card's colored labels ("Total duration", "Workout calories" — a saturated blue/purple on a
+//      near-black background) read as NOTHING at all; the numbers themselves (bold white text)
+//      still read fine. With plain grayscale (no contrast-stretching or sharpening needed — both
+//      were tested and added nothing beyond grayscale alone), the labels appear correctly. This is
+//      why preprocessForOcr() below converts to grayscale rather than skipping straight to OCR.
+//
+//   2. Position matters more than the flat text string. OCR's own linear text output frequently
+//      merges a label directly into its neighboring value with no separator ("35:10 230 ca" for
+//      two entirely different stats) or drops the label's line break — a plain regex search over
+//      that flat string was tested and produces wrong-field assignments too often to trust. Using
+//      each word's own bounding box instead — every one of these apps stacks a label directly
+//      above its value within the same card, confirmed across all three — is what makes matching
+//      reliable: findLabelBox() locates the label, valueNearLabel() only looks at words positioned
+//      below and horizontally aligned with it.
+//
+// What this does NOT fix: real digit misreads. A separate Apple Watch sample had "125BPM" OCR'd as
+// "1258PM" even after grayscale (a "B"->"8" confusion) — this is a genuine limit of character-level
+// recognition that semantic vision doesn't have to the same degree. That's exactly why every field
+// extracted here still lands in the existing editable confirm step rather than ever auto-saving —
+// same principle the Claude-based version's own doc comment stated: "this function's own output is
+// never treated as ground truth." confidence is capped at "medium" (never "high") for this reason,
+// and the notes line always tells the user to double-check regardless of how many fields were found.
+const OCR_DURATION_LABELS = ["workout duration", "total duration", "workout time", "duration"];
+const OCR_CALORIE_LABELS = ["total calories", "total kilocalories", "workout calories", "active kilocalories", "calories", "kilocalories"];
+const OCR_HR_LABELS = ["avg heart rate", "avg. heart rate", "average heart rate", "avg hr"];
+
+// Same 6 scoring categories the manual picker (#activity-select) already offers — no need to
+// detect a specific sport the way the old Claude-based parser did (fn_scoring_category_label()/
+// 0096_category_based_scoring_formula.sql only ever distinguishes these 6 buckets for scoring
+// anyway, so a specific-sport guess would just get bucketed down regardless).
+const OCR_CATEGORY_KEYWORDS = {
+  weight: ["strength training", "weight training", "weightlifting", "weight lifting"],
+  circuit: ["circuit training", "circuit", "hiit", "high-intensity", "high intensity", "crossfit", "boot camp", "interval training"],
+  racket: ["tennis", "racquetball", "badminton", "squash", "pickleball"],
+  swim: ["swimming", "swim", "pool"],
+  recovery: ["yoga", "pilates", "stretch", "breathing", "recovery"],
+  cardio: [
+    "running", "run", "walking", "walk", "cycling", "biking", "bike", "hiking", "hike",
+    "elliptical", "stair", "boxing", "dancing", "treadmill", "outdoor run", "indoor run",
+    "kayak", "kayaking", "rowing", "row", "paddle",
+  ],
+};
+
+// Builds the actual OCR input — a grayscale canvas, upscaled ~2x (capped so a very high-res source
+// photo doesn't make recognition needlessly slow). Kept separate from downscaleImage() above,
+// which still handles the displayed preview image — different goals (small/fast to show vs.
+// accurate to read), so no reason to force them through the same pipeline.
+function preprocessForOcr(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      img.onerror = reject;
+      img.onload = () => {
+        const width = Math.min(Math.round(img.width * 2), 2600);
+        const height = Math.round(img.height * (width / img.width));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.filter = "grayscale(1)";
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Finds the first of `phrases` (priority order — callers list their preferred label wording
+// first) that actually appears in `words` as a consecutive sequence, and returns its union
+// bounding box. Punctuation-tolerant (".", ",") since OCR is inconsistent about capturing it.
+function findLabelBox(words, phrases) {
+  const lower = words.map((w) => (w.text || "").toLowerCase().replace(/[^a-z.]/g, ""));
+  for (const phrase of phrases) {
+    const parts = phrase.split(" ").map((p) => p.replace(/[^a-z.]/g, ""));
+    for (let i = 0; i <= lower.length - parts.length; i++) {
+      let ok = true;
+      for (let j = 0; j < parts.length; j++) {
+        if (lower[i + j] !== parts[j]) { ok = false; break; }
+      }
+      if (ok) {
+        const slice = words.slice(i, i + parts.length);
+        return {
+          x0: Math.min(...slice.map((w) => w.bbox.x0)),
+          y0: Math.min(...slice.map((w) => w.bbox.y0)),
+          x1: Math.max(...slice.map((w) => w.bbox.x1)),
+          y1: Math.max(...slice.map((w) => w.bbox.y1)),
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// Given a label's bounding box, gathers the nearby words that make up its value — "below and
+// roughly horizontally aligned with the label" is the real, generalizable signal every one of
+// these apps' card layouts shares (see this section's own doc comment), not anything app-specific.
+function valueNearLabel(words, labelBox) {
+  const labelWidth = labelBox.x1 - labelBox.x0;
+  const labelCenterX = (labelBox.x0 + labelBox.x1) / 2;
+  const maxGap = (labelBox.y1 - labelBox.y0) * 6; // a few line-heights below, generously
+  const candidates = words.filter((w) => {
+    const wCenterX = (w.bbox.x0 + w.bbox.x1) / 2;
+    return (
+      w.bbox.y0 >= labelBox.y1 - 4 && // small overlap allowance for rounding
+      w.bbox.y0 - labelBox.y1 <= maxGap &&
+      Math.abs(wCenterX - labelCenterX) <= labelWidth * 1.5 + 150
+    );
+  });
+  candidates.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+  return candidates.slice(0, 4).map((w) => w.text).join(" ");
+}
+
+// "31:06" (mm:ss) or "1:07:59" (h:mm:ss) -> whole minutes. Colon count disambiguates the two
+// formats — every real sample tested used one or the other consistently, never anything else.
+function parseDurationToMinutes(text) {
+  const m = text.match(/(\d{1,2})\s*[:.]\s*(\d{1,2})(?:\s*[:.]\s*(\d{1,2}))?/);
+  if (!m) return null;
+  if (m[3] !== undefined) {
+    return Math.round(Number(m[1]) * 60 + Number(m[2]) + Number(m[3]) / 60);
+  }
+  return Math.round(Number(m[1]) + Number(m[2]) / 60);
+}
+
+function parseFirstNumber(text) {
+  const m = text.match(/\d+/);
+  return m ? Number(m[0]) : null;
+}
+
+// Same sane-bounds clamping the old server-side parser used — a plausible single workout, not a
+// hard science limit; the confirm/edit step is still the real backstop either way.
+function clampOcr(value, min, max) {
+  if (value === null || !Number.isFinite(value)) return null;
+  return Math.min(max, Math.max(min, value));
+}
+
+function detectCategoryFromOcr(words) {
+  // Titles read top-of-image in every sample tested — restricting the search to roughly the top
+  // third stops an unrelated word further down the screen from winning by accident.
+  const maxY = Math.max(...words.map((w) => w.bbox.y1)) * 0.35;
+  const topText = " " + words.filter((w) => w.bbox.y0 <= maxY).map((w) => (w.text || "").toLowerCase()).join(" ") + " ";
+  for (const [category, keywords] of Object.entries(OCR_CATEGORY_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (topText.includes(" " + kw)) return category;
+    }
+  }
+  return null;
+}
+
+async function extractWorkoutFieldsFromOcr(canvas) {
+  const { data } = await Tesseract.recognize(canvas, "eng");
+  const words = (data.words || []).filter((w) => w.text && w.text.trim());
+
+  const durationBox = findLabelBox(words, OCR_DURATION_LABELS);
+  const calorieBox = findLabelBox(words, OCR_CALORIE_LABELS);
+  const hrBox = findLabelBox(words, OCR_HR_LABELS);
+
+  const durationMinutes = durationBox ? clampOcr(parseDurationToMinutes(valueNearLabel(words, durationBox)), 1, 600) : null;
+  const calories = calorieBox ? clampOcr(parseFirstNumber(valueNearLabel(words, calorieBox)), 0, 5000) : null;
+  const avgHeartRate = hrBox ? clampOcr(parseFirstNumber(valueNearLabel(words, hrBox)), 30, 220) : null;
+  const category = detectCategoryFromOcr(words);
+
+  const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
+
+  return {
+    success: true,
+    category,
+    duration_minutes: durationMinutes,
+    calories,
+    avg_heart_rate: avgHeartRate,
+    confidence: foundCount >= 3 ? "medium" : "low",
+    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving.",
+  };
+}
+
 // ---------- Photo capture + downscale ----------
 
 // Downscale to a reasonable max dimension before sending — keeps the payload small (faster
@@ -3856,33 +4051,25 @@ el("photo-input").addEventListener("change", async (e) => {
   try {
     const dataUrl = await downscaleImage(file);
     currentPhotoDataUrl = dataUrl;
-    const base64 = dataUrl.split(",")[1];
 
-    const res = await fetch(PARSE_FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${currentSession.access_token}`,
-      },
-      body: JSON.stringify({ image_base64: base64, media_type: "image/jpeg" }),
-    });
-    const result = await res.json();
-
-    if (!res.ok || !result.success) {
-      throw new Error(result.message || "Couldn't read this photo.");
-    }
+    // On-device OCR (user request 08-24: "can we do something for free?") — no network call, no
+    // account, no cost. See extractWorkoutFieldsFromOcr()'s own doc comment for the real accuracy
+    // testing behind this approach.
+    const ocrCanvas = await preprocessForOcr(file);
+    const result = await extractWorkoutFieldsFromOcr(ocrCanvas);
 
     currentParse = result;
     populateConfirmStep(result);
     hide("parsing-step");
     show("confirm-step");
   } catch (err) {
+    console.error("On-device photo parsing failed:", err);
     hide("parsing-step");
     show("confirm-step");
     show("confirm-photo-section");
     show("retake-btn");
     el("photo-preview").src = currentPhotoDataUrl ?? "";
-    el("parse-error").textContent = err.message || "Something went wrong reading that photo — you can still enter the stats yourself.";
+    el("parse-error").textContent = "Couldn't read this photo automatically — enter the stats yourself below.";
     show("parse-error");
     el("confidence-row").innerHTML = "";
   }
@@ -3902,11 +4089,12 @@ function populateConfirmStep(result) {
     `<span class="badge ${badgeClass}">${result.confidence} confidence</span>` +
     (result.notes ? `<p class="muted" style="margin-top:8px;">${escapeHtml(result.notes)}</p>` : "");
 
-  // FIX (user request 08-24, category-only picker) — was a direct match against the select's own
-  // options; the select no longer speaks the photo-parser's specific-sport vocabulary, so this
-  // goes through PARSED_LABEL_TO_CATEGORY first. Falls back to "cardio" (the parser's own
-  // "other_workout" already maps there too) rather than a dead value the select can't select.
-  el("activity-select").value = PARSED_LABEL_TO_CATEGORY[result.activity_label] || "cardio";
+  // result.category comes straight from the on-device OCR parser (extractWorkoutFieldsFromOcr) —
+  // it detects one of the select's own 6 categories directly now, no separate specific-sport
+  // vocabulary to translate. result.activity_label/PARSED_LABEL_TO_CATEGORY are the old
+  // Claude-based parser's shape, kept only so nothing breaks if this is ever called with that
+  // instead. Falls back to "cardio" either way rather than a dead value the select can't select.
+  el("activity-select").value = result.category || PARSED_LABEL_TO_CATEGORY[result.activity_label] || "cardio";
   renderCategoryPicker();
   el("duration-input").value = result.duration_minutes ?? "";
   el("calories-input").value = result.calories ?? "";
