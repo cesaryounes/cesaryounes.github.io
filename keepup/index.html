@@ -311,6 +311,48 @@
   .directory-row.is-clickable { cursor: pointer; }
   .directory-row.is-clickable:active { background: var(--card-raised); margin: 0 -20px; padding: 12px 20px; border-radius: 8px; }
 
+  /* ---- Club thumbnails (user request 08-24, real-app screenshot comparison) — same GroupThumbnail
+     shape/colors GroupsScreen.kt uses: 44px rounded-square, accent-soft fill, first-letter
+     fallback in the accent color, plus a small public/private badge bottom-right. No club-photo
+     upload on the web dashboard, so unlike Android this is always the letter fallback, never a
+     real photo. ---- */
+  .club-thumb {
+    position: relative; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: var(--accent-soft); display: flex; align-items: center; justify-content: center;
+  }
+  .club-thumb-letter { font-size: 18px; font-weight: 900; color: var(--accent); }
+  .club-thumb-badge {
+    position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--bg); border: 1.5px solid var(--card); display: flex; align-items: center; justify-content: center;
+  }
+  .club-thumb-badge svg { width: 10px; height: 10px; color: var(--text-muted); }
+  .club-thumb-global { background: var(--accent-soft); color: var(--accent); }
+  .club-thumb-global svg { width: 20px; height: 20px; }
+
+  /* Shared row shape for the Global shortcut and My Clubs rows — thumbnail + name/sub + trailing
+     content, same layout GroupsScreen.kt's own club Card/Row uses. */
+  .club-row-card, .my-club-row {
+    display: flex; align-items: center; gap: 12px; padding: 0;
+  }
+  .club-row-info { flex: 1; min-width: 0; }
+  .club-row-name { font-size: 15px; font-weight: 700; color: var(--text-main); }
+  .club-row-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .club-row-chevron { width: 20px; height: 20px; color: var(--text-muted); flex-shrink: 0; }
+  #global-shortcut-row { cursor: pointer; }
+  #global-shortcut-row:active { background: var(--card-raised); }
+
+  .my-club-row { padding: 10px 0; border-bottom: 1px solid var(--hairline); cursor: pointer; }
+  .my-club-row:last-child { border-bottom: none; }
+  .my-club-row:active { background: var(--card-raised); margin: 0 -20px; padding: 10px 20px; border-radius: 8px; }
+  .my-club-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .my-club-meta .owner-badge { margin-left: 0; }
+  .club-row-menu-dot { width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0; }
+
+  .discover-count-pill {
+    font-size: 10px; font-weight: 800; color: var(--text-muted); background: var(--card-raised);
+    padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+
   /* ---- Club member list (Club detail screen, user request 08-24) ---- */
   .member-list { list-style: none; padding: 0; margin: 0; }
   .member-row {
@@ -955,6 +997,20 @@
              the Discover-equivalent, so a club that doesn't allow web uploads had literally no way
              to reach it from here at all — not just a visual mismatch, a real functional gap. Tap a
              row to open its member list (screen-club-detail below). -->
+        <!-- "Global" — not a real club (GroupsScreen.kt's own comment: "no photo/rename/leave/
+             members dialog, just a shortcut straight to the Leaderboard's Global tab"), a plain
+             card styled like a club row so the two tabs feel consistent. -->
+        <div class="card club-row-card" id="global-shortcut-row" style="margin-bottom:12px;">
+          <div class="club-thumb club-thumb-global">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9c-2.5-2.5-4-6-4-9s1.5-6.5 4-9z"/></svg>
+          </div>
+          <div class="club-row-info">
+            <div class="club-row-name">Global</div>
+            <div class="club-row-sub">Everyone on KeepUp</div>
+          </div>
+          <svg class="club-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+
         <div class="card" id="my-clubs-card">
           <p class="section-label" style="margin-bottom:14px;">My clubs</p>
           <p class="muted" id="my-clubs-empty">You haven't joined a club yet — find one below, or create your own.</p>
@@ -962,7 +1018,10 @@
         </div>
 
         <div class="card">
-          <p class="section-label" style="margin-bottom:4px;">Discover</p>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <p class="section-label" style="margin-bottom:0;">Discover</p>
+            <span class="discover-count-pill" id="discover-count-pill">0 clubs</span>
+          </div>
           <p class="muted" style="margin-bottom:14px; font-size:11px;">Only clubs allowed to upload score will show up here.</p>
           <div class="field club-directory-search">
             <input type="text" id="club-directory-search-input" placeholder="Search clubs…" />
@@ -2277,9 +2336,30 @@ let clubDirectoryData = [];
 let clubSearchQuery = "";
 let clubVisibilityFilter = "all"; // "all" | "public" | "private"
 
+// "N members" on every Clubs row, My Clubs and Discover alike — fn_group_member_counts()
+// (0008_group_member_counts.sql) already exists and is already granted to `authenticated`
+// (RewardsShopScreen.kt... actually GroupsScreen.kt/AppViewModel.kt use it) — a club you haven't
+// joined yet is exactly one a plain group_members select won't show member ROWS for, but the
+// headcount alone isn't sensitive (the club list itself is already public), which is why this
+// needs its own SECURITY DEFINER RPC rather than a client query. No new migration needed, this
+// RPC was already real and callable before today.
+let groupMemberCounts = {};
+async function refreshGroupMemberCounts(ids) {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    groupMemberCounts = {};
+    return;
+  }
+  const { data, error } = await supabase.rpc("fn_group_member_counts", { p_group_ids: uniqueIds });
+  if (error) {
+    console.error("Couldn't load member counts:", error);
+    return;
+  }
+  (data || []).forEach((row) => { groupMemberCounts[row.group_id] = row.member_count; });
+}
+
 async function loadClubDirectory() {
   myClubs = await fetchMyClubs(); // refresh membership so Join/Joined state below is current
-  renderMyClubsSection();
 
   const { data, error } = await supabase
     .from("groups")
@@ -2290,16 +2370,19 @@ async function loadClubDirectory() {
   if (error) {
     console.error("Couldn't load club directory:", error);
     clubDirectoryData = [];
-    renderClubDirectory();
-    return;
+  } else {
+    clubDirectoryData = data || [];
   }
-  clubDirectoryData = data || [];
+
+  await refreshGroupMemberCounts([...myClubs.map((c) => c.id), ...clubDirectoryData.map((g) => g.id)]);
+  renderMyClubsSection();
   renderClubDirectory();
 }
 
 function renderClubDirectory() {
   const list = el("club-directory-list");
   list.innerHTML = "";
+  el("discover-count-pill").textContent = `${clubDirectoryData.length} club${clubDirectoryData.length === 1 ? "" : "s"}`;
 
   const filtered = clubDirectoryData
     .filter((g) => clubVisibilityFilter === "all" || (clubVisibilityFilter === "public") === !!g.is_public)
@@ -2324,6 +2407,17 @@ function renderClubDirectory() {
   filtered.forEach((group) => list.appendChild(renderDirectoryRow(group)));
 }
 
+// "Global" — not a real club (GroupsScreen.kt's own comment: "no photo/rename/leave/members
+// dialog, just a shortcut straight to the Leaderboard's Global tab"). Sets currentScope directly
+// rather than calling setScope() (which re-renders scope pills that don't exist until
+// loadMyClubs() — triggered by switchTab below — has actually built them) — loadMyClubs() only
+// overrides an already-set scope if it's no longer valid, and Global always is, so this is
+// race-free.
+el("global-shortcut-row").addEventListener("click", () => {
+  currentScope = { type: "global" };
+  switchTab("leaderboard");
+});
+
 el("club-directory-search-input").addEventListener("input", (e) => {
   clubSearchQuery = e.target.value.trim().toLowerCase();
   renderClubDirectory();
@@ -2337,14 +2431,40 @@ Array.from(el("club-directory-visibility-pills").children).forEach((pill) => {
   });
 });
 
+// Same GroupThumbnail (GroupsScreen.kt) shape/colors: 44px rounded-square, accent-soft fill,
+// first-letter fallback, small public/private badge bottom-right. No club-photo upload on the web
+// dashboard, so always the letter fallback here, never a real photo.
+function groupThumbnailHtml(name) {
+  const letter = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+  return `<div class="club-thumb"><span class="club-thumb-letter">${escapeHtml(letter)}</span></div>`;
+}
+function visibilityBadgeSvg(isPublic) {
+  return isPublic
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9c-2.5-2.5-4-6-4-9s1.5-6.5 4-9z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+}
+function memberCountLabel(groupId) {
+  const n = groupMemberCounts[groupId];
+  if (n === undefined) return "";
+  return `${n} member${n === 1 ? "" : "s"}`;
+}
+
 function renderDirectoryRow(group) {
   const li = document.createElement("li");
   li.className = "directory-row";
 
+  const thumbWrap = document.createElement("div");
+  thumbWrap.innerHTML = groupThumbnailHtml(group.name);
+  const thumb = thumbWrap.firstElementChild;
+  thumb.insertAdjacentHTML("beforeend", `<span class="club-thumb-badge">${visibilityBadgeSvg(group.is_public)}</span>`);
+  li.appendChild(thumb);
+
   const info = document.createElement("div");
+  info.style.flex = "1";
+  info.style.minWidth = "0";
   info.innerHTML = `
     <div class="directory-row-name">${escapeHtml(group.name)}</div>
-    <div class="directory-row-sub">${group.is_public ? "Public" : "Private — needs owner approval"}</div>
+    <div class="directory-row-sub">${memberCountLabel(group.id) || (group.is_public ? "Public" : "Private — needs owner approval")}</div>
   `;
   li.appendChild(info);
 
@@ -2402,15 +2522,18 @@ function renderMyClubsSection() {
 
 function renderMyClubRow(group) {
   const li = document.createElement("li");
-  li.className = "directory-row is-clickable";
+  li.className = "my-club-row";
   const isOwner = group.owner_id === currentSession.user.id;
+  const memberLabel = memberCountLabel(group.id);
   li.innerHTML = `
-    <div>
-      <div class="directory-row-name">${escapeHtml(group.name)}</div>
-      <div class="directory-row-sub">${group.is_public ? "Public" : "Private"}</div>
+    ${groupThumbnailHtml(group.name)}
+    <div class="club-row-info">
+      <div class="club-row-name">${escapeHtml(group.name)}${isOwner ? '<span class="owner-badge">Owner</span>' : ""}</div>
+      ${memberLabel ? `<div class="my-club-meta"><span class="directory-row-sub">${memberLabel}</span></div>` : ""}
     </div>
-    ${isOwner ? '<span class="owner-badge">Owner</span>' : ""}
+    <svg class="club-row-menu-dot" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
   `;
+  li.querySelector(".club-thumb").insertAdjacentHTML("beforeend", `<span class="club-thumb-badge">${visibilityBadgeSvg(group.is_public)}</span>`);
   li.addEventListener("click", () => openClubDetail(group));
   return li;
 }
