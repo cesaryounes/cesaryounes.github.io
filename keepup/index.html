@@ -4100,16 +4100,17 @@ async function extractWorkoutFieldsFromOcr(canvas) {
 
   const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
 
-  // TEMP DIAGNOSTIC (user report 08-24: this exact Apple HIIT screenshot reads correctly in local
-  // Node testing — duration 28, calories 321, hr 146 — but on the real device came back with
-  // duration empty and calories showing 146 (the HR value's own number, from a different card
-  // entirely), meaning the on-device OCR/bounding-box output genuinely differs from the locally
-  // captured copy of the same photo, likely due to a different re-compression somewhere in how the
-  // photo reached the phone. Only appended when something's actually missing, so a normal
-  // successful parse stays clean. Remove once the real-device text is captured; see this
-  // function's own git history for the follow-up that strips this back out.
+  // TEMP DIAGNOSTIC (user report 08-24, round 2 — a new Apple HIIT screenshot with an "Effort"
+  // card came back with duration/calories empty and HR showing "6 Moderate", the Effort score two
+  // rows below the real "135BPM" value. Round 1's durTxt/calTxt/hrTxt alone couldn't tell whether a
+  // label wasn't found at all vs. found-but-no-value-matched, so this round adds a found-flag per
+  // label plus a compact dump of the raw linear OCR text — no image/file access on my end to
+  // reproduce this locally, so the on-device text itself is the only way to diagnose it further.
+  // Only appended when something's actually missing, so a normal successful parse stays clean.
+  // Remove once the real-device text is captured; see this function's own git history for the
+  // follow-up that strips this back out.
   const diag = foundCount < 4
-    ? ` [diag] words=${words.length} durTxt="${durationText}" calTxt="${calorieText}" hrTxt="${hrText}"`
+    ? ` [diag] words=${words.length} d=${!!durationBox} c=${!!calorieBox} h=${!!hrBox} durTxt="${durationText}" calTxt="${calorieText}" hrTxt="${hrText}" raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 400)}"`
     : "";
 
   return {
