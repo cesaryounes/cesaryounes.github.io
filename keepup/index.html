@@ -235,6 +235,11 @@
   .lb-row.is-me .lb-rank { color: var(--accent); }
   .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  /* Smaller than .nudge-bell-btn (club member list) — the leaderboard row is already tight with
+     rank/avatar/name/delta/points, same reasoning LeaderboardScreen.kt's own row bell is compact
+     compared to its full nudge-picker affordance elsewhere. */
+  .lb-row .nudge-bell-btn { width: 26px; height: 26px; min-height: 26px; }
+  .lb-row .nudge-bell-btn svg { width: 13px; height: 13px; }
 
   /* Bottom nav bar (user request 08-23) — fixed to the viewport bottom, icon+label per tab, same
      accent-soft pill behind the selected icon HomeScreen.kt's own NavigationBar uses (Material3's
@@ -303,6 +308,61 @@
     font-size: 12px; font-weight: 700; color: var(--success); flex-shrink: 0;
     text-transform: uppercase; letter-spacing: 0.02em;
   }
+  .directory-row.is-clickable { cursor: pointer; }
+  .directory-row.is-clickable:active { background: var(--card-raised); margin: 0 -20px; padding: 12px 20px; border-radius: 8px; }
+
+  /* ---- Club member list (Club detail screen, user request 08-24) ---- */
+  .member-list { list-style: none; padding: 0; margin: 0; }
+  .member-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .member-row:last-child { border-bottom: none; }
+  .member-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .owner-badge {
+    font-size: 10px; font-weight: 800; color: var(--amber); text-transform: uppercase;
+    letter-spacing: 0.03em; margin-left: 6px;
+  }
+  .nudge-bell-btn {
+    width: 36px; height: 36px; min-height: 36px; padding: 0; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); border-radius: 50%;
+  }
+  .nudge-bell-btn svg { width: 18px; height: 18px; color: var(--accent); }
+
+  /* ---- Nudge picker modal (user request 08-24) — first real centered-modal pattern on this page
+     (everything else is either a full .screen-overlay takeover or the small anchored .more-menu
+     popover); a full-screen takeover would be overkill for "pick a message and send", so this is
+     new: a translucent backdrop + a centered card, closed by backdrop tap or Cancel. ---- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal-backdrop .modal-card {
+    background: var(--card); border-radius: 20px 20px 0 0; padding: 20px;
+    width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  .nudge-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .nudge-preset-chip {
+    width: auto; min-height: 40px; padding: 8px 10px; font-size: 12px; font-weight: 600;
+    text-align: left; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 10px;
+    color: var(--text-main);
+  }
+
+  /* Incoming-nudge toast (checkForNewNudges/showNudgeBanner) — no push infrastructure on this
+     page at all, so this is what "receiving" actually looks like here: appears while the tab is
+     open, not a real background notification. Slides down from under the fixed header, auto-
+     dismisses after 5s. */
+  .nudge-banner {
+    position: fixed; top: 12px; left: 12px; right: 12px; max-width: 396px; margin: 0 auto; z-index: 60;
+    background: var(--card); border: 1px solid var(--accent); border-radius: 14px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transform: translateY(-120%); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  .nudge-banner.show { transform: translateY(0); opacity: 1; }
+  .nudge-banner svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
+  .nudge-banner span { font-size: 13px; color: var(--text-main); }
 
   /* ---- Stat cluster, in the top banner (mirrors HomeScreen.kt's TopBanner: streak/freeze/
      gems/multiplier, icon+number only, no labels — always visible across every tab, not just
@@ -889,9 +949,21 @@
           <p class="muted hidden" id="create-club-message" style="margin-top:10px; color:var(--danger);"></p>
         </div>
 
+        <!-- FIX (user request 08-24: "update the GUI of the Clubs as close to the GUI of the Clubs
+             from the Application") — GroupsScreen.kt's real layout is My Clubs (every club you
+             belong to) above Discover (browse/join), in that order; this page previously only had
+             the Discover-equivalent, so a club that doesn't allow web uploads had literally no way
+             to reach it from here at all — not just a visual mismatch, a real functional gap. Tap a
+             row to open its member list (screen-club-detail below). -->
+        <div class="card" id="my-clubs-card">
+          <p class="section-label" style="margin-bottom:14px;">My clubs</p>
+          <p class="muted" id="my-clubs-empty">You haven't joined a club yet — find one below, or create your own.</p>
+          <ul class="history-list hidden" id="my-clubs-list"></ul>
+        </div>
+
         <div class="card">
-          <p class="section-label" style="margin-bottom:4px;">Clubs open to web uploads</p>
-          <p class="muted" style="margin-bottom:14px;">Only clubs whose owner turned on "Allow score uploads" show up here — the same setting from the app's create-club screen.</p>
+          <p class="section-label" style="margin-bottom:4px;">Discover</p>
+          <p class="muted" style="margin-bottom:14px; font-size:11px;">Only clubs allowed to upload score will show up here.</p>
           <div class="field club-directory-search">
             <input type="text" id="club-directory-search-input" placeholder="Search clubs…" />
           </div>
@@ -1061,6 +1133,84 @@
     </div>
     <p class="muted" id="history-empty">No workouts yet — log one from the Dashboard and it'll show up here.</p>
     <ul class="history-list hidden" id="history-list"></ul>
+  </div>
+
+  <!-- ============ CLUB DETAIL (user request 08-24: "clicking on the club should open the list of
+       club members with the ability to nudge... rename, private vs public, invite user") ============
+       Reached by tapping a "Joined" row in the Club tab's directory. Owner-only controls section
+       (rename/visibility/invite) mirrors GroupsScreen.kt's setGroupName/setGroupIsPublic/
+       inviteByUsername exactly — same plain RLS-gated .update() calls, same fn_invite_by_username
+       RPC, just shown/hidden by owner_id === currentSession.user.id rather than Android's own
+       equivalent check. Member list mirrors GroupsScreen.kt's own member list + nudge bell. -->
+  <div class="screen-overlay hidden" id="screen-club-detail">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-club-detail">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title" id="club-detail-title" style="flex:1;">Club</p>
+    </div>
+
+    <div class="card hidden" id="club-owner-controls">
+      <p class="section-label" style="margin-bottom:14px;">Manage club</p>
+      <div class="field">
+        <label>Club name</label>
+        <div class="btn-row">
+          <input type="text" id="club-rename-input" style="flex:1;" />
+          <button class="btn-secondary" id="club-rename-btn" style="width:auto; padding:12px 16px;">Save</button>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Public club</div>
+          <div class="toggle-sub">Anyone can join a public club; a private one needs your approval.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="club-visibility-toggle" />
+          <span class="track"></span><span class="thumb"></span>
+        </label>
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label>Invite by username</label>
+        <div class="btn-row">
+          <input type="text" id="club-invite-input" placeholder="their display name" style="flex:1;" />
+          <button class="btn-secondary" id="club-invite-btn" style="width:auto; padding:12px 16px;">Invite</button>
+        </div>
+      </div>
+      <p class="muted hidden" id="club-manage-message" style="margin-top:10px;"></p>
+    </div>
+
+    <div class="card">
+      <p class="section-label" style="margin-bottom:14px;">Members</p>
+      <p class="muted" id="club-members-empty">Loading…</p>
+      <ul class="member-list hidden" id="club-members-list"></ul>
+    </div>
+  </div>
+
+  <!-- Nudge picker (user request 08-24) — shared between the club member list above and the
+       Leaderboard rows below, opened via openNudgePicker(userId, displayName). Same three ways to
+       nudge GroupsScreen.kt/LeaderboardScreen.kt's own NudgeDialog offers: a quick nudge (no
+       message), tap any of the 9 real presets (NUDGE_PRESETS, Models.kt — same ids/text, so a
+       nudge sent from the web reads identically on the recipient's Android app) to send it
+       immediately, or type a custom message. No Lottie animations here (this page has no asset
+       hosting for them) — text-only, same underlying fn_send_nudge either way. -->
+  <div class="modal-backdrop hidden" id="nudge-modal-backdrop">
+    <div class="modal-card">
+      <p class="section-label" id="nudge-modal-title" style="margin-bottom:14px;">Nudge</p>
+      <button class="btn-secondary" id="nudge-quick-btn" style="margin-bottom:14px;">🔔 Quick nudge</button>
+      <div class="nudge-preset-grid" id="nudge-preset-grid"></div>
+      <div class="field" style="margin-top:14px;">
+        <label>Or write your own</label>
+        <div class="btn-row">
+          <!-- 50, not a round nicer number — matches fn_send_nudge's own server-side truncation
+               (0045_nudge_cooldown_1min.sql: left(v_message, 50)) exactly, so nothing gets
+               silently cut short after the fact. -->
+          <input type="text" id="nudge-custom-input" maxlength="50" placeholder="Say something…" style="flex:1;" />
+          <button class="btn-primary" id="nudge-custom-send-btn" style="width:auto; padding:12px 16px;">Send</button>
+        </div>
+      </div>
+      <button class="btn-text" id="nudge-cancel-btn" style="margin-top:10px;">Cancel</button>
+      <p class="muted hidden" id="nudge-modal-message" style="margin-top:8px;"></p>
+    </div>
   </div>
 
   <!-- ============ MEMBERSHIP (user request 08-23) ============
@@ -1303,6 +1453,7 @@ function renderAuthState() {
     collapseSubmitFlow({ refresh: false });
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
+    checkForNewNudges();
   } else {
     show("signed-out-view");
     hide("signed-in-view");
@@ -1823,7 +1974,7 @@ let lbSearchQuery = "";
 async function fetchMyClubs() {
   const { data, error } = await supabase
     .from("group_members")
-    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads)")
+    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads, owner_id)")
     .eq("user_id", currentSession.user.id);
   if (error) {
     console.error("Couldn't load your clubs:", error);
@@ -1832,8 +1983,34 @@ async function fetchMyClubs() {
   return (data || []).map((row) => row.groups);
 }
 
+// Who you can nudge from the Global/Region leaderboard (user request 08-24: "the bell should also
+// appear in the leaderboard") — fn_send_nudge requires sender and recipient to share a club, so
+// the bell is only real on a row where that's actually true, same canNudge logic
+// LeaderboardScreen.kt's own row bell already uses: every row on your own club's leaderboard (true
+// by construction — myClubs is where those rows came from), but per-row on Global/Region, checked
+// against this set, since a stranger's row would just get a server-side rejection otherwise.
+let clubmateUserIds = new Set();
+
+async function refreshClubmateUserIds() {
+  const myIds = myClubs.map((c) => c.id);
+  if (myIds.length === 0) {
+    clubmateUserIds = new Set();
+    return;
+  }
+  const { data, error } = await supabase
+    .from("group_members")
+    .select("user_id")
+    .in("group_id", myIds);
+  if (error) {
+    console.error("Couldn't load clubmates:", error);
+    return;
+  }
+  clubmateUserIds = new Set((data || []).map((r) => r.user_id).filter((id) => id !== currentSession.user.id));
+}
+
 async function loadMyClubs() {
   myClubs = await fetchMyClubs();
+  await refreshClubmateUserIds();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -2058,14 +2235,23 @@ function renderLeaderboardRows(rows) {
   listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
+    const isMe = r.user_id === currentSession.user.id;
+    // Club scope: everyone shown is already a clubmate by construction (the rows came from
+    // get_leaderboard scoped to that club). Global/Region: only if fn_send_nudge would actually
+    // accept it — see refreshClubmateUserIds's own doc comment.
+    const canNudgeRow = !isMe && (currentScope.type === "club" || clubmateUserIds.has(r.user_id));
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
       ${avatarHtml(r.display_name, r.avatar_url, 28)}
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
+      ${canNudgeRow ? `<button type="button" class="nudge-bell-btn" data-uid="${r.user_id}" data-name="${escapeHtml(r.display_name || "Member")}" aria-label="Nudge ${escapeHtml(r.display_name || "Member")}">${bellIconSvg()}</button>` : ""}
     `;
     rowsWrap.appendChild(row);
+  });
+  Array.from(rowsWrap.querySelectorAll(".nudge-bell-btn")).forEach((btn) => {
+    btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
   });
 }
 
@@ -2093,10 +2279,11 @@ let clubVisibilityFilter = "all"; // "all" | "public" | "private"
 
 async function loadClubDirectory() {
   myClubs = await fetchMyClubs(); // refresh membership so Join/Joined state below is current
+  renderMyClubsSection();
 
   const { data, error } = await supabase
     .from("groups")
-    .select("id, name, is_public")
+    .select("id, name, is_public, owner_id")
     .eq("allow_score_uploads", true)
     .order("name");
 
@@ -2166,6 +2353,8 @@ function renderDirectoryRow(group) {
     tag.className = "joined-tag";
     tag.textContent = "Joined";
     li.appendChild(tag);
+    li.classList.add("is-clickable");
+    li.addEventListener("click", () => openClubDetail(group));
     return li;
   }
 
@@ -2192,6 +2381,263 @@ function renderDirectoryRow(group) {
   });
   li.appendChild(btn);
   return li;
+}
+
+// ---------- My Clubs (user request 08-24: GUI parity with GroupsScreen.kt's own My Clubs
+// section, and the only way to reach a club that doesn't allow web uploads at all — Discover
+// only ever lists upload-enabled clubs, so without this list a club without that setting had no
+// path to its own member list from this page.) ----------
+function renderMyClubsSection() {
+  const list = el("my-clubs-list");
+  list.innerHTML = "";
+  if (myClubs.length === 0) {
+    hide("my-clubs-list");
+    show("my-clubs-empty");
+    return;
+  }
+  hide("my-clubs-empty");
+  show("my-clubs-list");
+  myClubs.forEach((group) => list.appendChild(renderMyClubRow(group)));
+}
+
+function renderMyClubRow(group) {
+  const li = document.createElement("li");
+  li.className = "directory-row is-clickable";
+  const isOwner = group.owner_id === currentSession.user.id;
+  li.innerHTML = `
+    <div>
+      <div class="directory-row-name">${escapeHtml(group.name)}</div>
+      <div class="directory-row-sub">${group.is_public ? "Public" : "Private"}</div>
+    </div>
+    ${isOwner ? '<span class="owner-badge">Owner</span>' : ""}
+  `;
+  li.addEventListener("click", () => openClubDetail(group));
+  return li;
+}
+
+// ---------- Club detail (user request 08-24: "clicking on the club should open the list of club
+// members with the ability to nudge... rename, private vs public, invite user") ----------
+let currentClubDetail = null;
+
+async function openClubDetail(group) {
+  currentClubDetail = group;
+  el("club-detail-title").textContent = group.name;
+  openScreen("screen-club-detail");
+
+  const isOwner = group.owner_id === currentSession.user.id;
+  el("club-owner-controls").classList.toggle("hidden", !isOwner);
+  if (isOwner) {
+    el("club-rename-input").value = group.name;
+    el("club-visibility-toggle").checked = !!group.is_public;
+    el("club-invite-input").value = "";
+    hide("club-manage-message");
+  }
+
+  el("club-members-empty").textContent = "Loading…";
+  show("club-members-empty");
+  hide("club-members-list");
+
+  // fn_get_club_members (0097_web_nudge_read_and_club_detail.sql) — plain group_members/profiles
+  // selects would need two round trips and re-deriving "is this the owner" in JS; this is the same
+  // membership check "Members can view fellow group members" already gates, just joined server-side.
+  const { data, error } = await supabase.rpc("fn_get_club_members", { p_group_id: group.id });
+  if (error) {
+    console.error("Couldn't load club members:", error);
+    el("club-members-empty").textContent = "Couldn't load members right now.";
+    return;
+  }
+  renderClubMembers(data || []);
+}
+
+function renderClubMembers(members) {
+  const list = el("club-members-list");
+  list.innerHTML = "";
+  if (members.length === 0) {
+    el("club-members-empty").textContent = "No members yet.";
+    show("club-members-empty");
+    hide("club-members-list");
+    return;
+  }
+  hide("club-members-empty");
+  show("club-members-list");
+  members.forEach((m) => {
+    const li = document.createElement("li");
+    li.className = "member-row";
+    const isMe = m.user_id === currentSession.user.id;
+    li.innerHTML = `
+      ${avatarHtml(m.display_name, m.avatar_url, 34)}
+      <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}</div>
+      ${isMe ? "" : `<button type="button" class="nudge-bell-btn" data-uid="${m.user_id}" data-name="${escapeHtml(m.display_name || "Member")}" aria-label="Nudge ${escapeHtml(m.display_name || "Member")}">${bellIconSvg()}</button>`}
+    `;
+    list.appendChild(li);
+  });
+  Array.from(list.querySelectorAll(".nudge-bell-btn")).forEach((btn) => {
+    btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
+  });
+}
+
+el("club-rename-btn").addEventListener("click", async () => {
+  if (!currentClubDetail) return;
+  const newName = el("club-rename-input").value.trim();
+  if (!newName) {
+    el("club-manage-message").textContent = "Club name is required";
+    el("club-manage-message").style.color = "var(--danger)";
+    show("club-manage-message");
+    return;
+  }
+  const { error } = await supabase.from("groups").update({ name: newName }).eq("id", currentClubDetail.id);
+  if (error) {
+    el("club-manage-message").textContent = error.message;
+    el("club-manage-message").style.color = "var(--danger)";
+    show("club-manage-message");
+    return;
+  }
+  currentClubDetail.name = newName;
+  el("club-detail-title").textContent = newName;
+  el("club-manage-message").textContent = "Saved";
+  el("club-manage-message").style.color = "var(--success)";
+  show("club-manage-message");
+  await loadClubDirectory();
+});
+
+el("club-visibility-toggle").addEventListener("change", async (e) => {
+  if (!currentClubDetail) return;
+  const isPublic = e.target.checked;
+  const { error } = await supabase.from("groups").update({ is_public: isPublic }).eq("id", currentClubDetail.id);
+  if (error) {
+    e.target.checked = !isPublic; // revert the switch — the update didn't actually take
+    alert(error.message);
+    return;
+  }
+  currentClubDetail.is_public = isPublic;
+  await loadClubDirectory();
+});
+
+el("club-invite-btn").addEventListener("click", async () => {
+  if (!currentClubDetail) return;
+  const username = el("club-invite-input").value.trim();
+  if (!username) return;
+  const btn = el("club-invite-btn");
+  btn.disabled = true;
+  const { data, error } = await supabase.rpc("fn_invite_by_username", {
+    p_group_id: currentClubDetail.id,
+    p_username: username,
+  });
+  btn.disabled = false;
+  const result = Array.isArray(data) ? data[0] : data;
+  const success = !error && result?.success;
+  el("club-manage-message").textContent = error ? error.message : (result?.message || (success ? "Invited" : "Something went wrong"));
+  el("club-manage-message").style.color = success ? "var(--success)" : "var(--danger)";
+  show("club-manage-message");
+  if (success) el("club-invite-input").value = "";
+});
+
+// ---------- Nudge (user request 08-24: "the bell should also appear in the leaderboard... add the
+// bell" to the club member list) — same fn_send_nudge RPC and NUDGE_PRESETS (Models.kt) the app
+// itself uses, so a nudge sent from here reads identically on the recipient's phone. No Lottie
+// animations (this page has no asset hosting for them) — text-only, same underlying call either
+// way. ----------
+const NUDGE_PRESETS = [
+  { id: "slipping", text: "You're slipping down the leaderboard.", shortLabel: "Slipping" },
+  { id: "kudos", text: "Kudos — keep it up.", shortLabel: "Kudos" },
+  { id: "streak_miss", text: "Your streak misses you.", shortLabel: "Streak miss" },
+  { id: "champion", text: "Get up, champion.", shortLabel: "Champion" },
+  { id: "about_to_pass", text: "Someone's about to pass you.", shortLabel: "About to pass" },
+  { id: "long_time", text: "Long time no workout.", shortLabel: "Long time" },
+  { id: "board_waits", text: "The board doesn't wait.", shortLabel: "Board waits" },
+  { id: "go_great", text: "Go be great today.", shortLabel: "Go great" },
+  { id: "what_did_you_do", text: "What did you just do?!", shortLabel: "Whoa" },
+];
+
+function bellIconSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
+}
+
+let nudgeTargetUserId = null;
+
+function openNudgePicker(userId, displayName) {
+  nudgeTargetUserId = userId;
+  el("nudge-modal-title").textContent = `Nudge ${displayName}`;
+  el("nudge-custom-input").value = "";
+  hide("nudge-modal-message");
+  el("nudge-preset-grid").innerHTML = NUDGE_PRESETS.map((p) =>
+    `<button type="button" class="nudge-preset-chip" data-preset-id="${p.id}">${escapeHtml(p.shortLabel)}</button>`
+  ).join("");
+  Array.from(el("nudge-preset-grid").querySelectorAll(".nudge-preset-chip")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const preset = NUDGE_PRESETS.find((p) => p.id === btn.dataset.presetId);
+      submitNudge(preset.text, preset.id);
+    });
+  });
+  show("nudge-modal-backdrop");
+}
+
+function closeNudgePicker() {
+  hide("nudge-modal-backdrop");
+  nudgeTargetUserId = null;
+}
+
+async function submitNudge(message, presetId) {
+  if (!nudgeTargetUserId) return;
+  const { error } = await supabase.rpc("fn_send_nudge", {
+    p_recipient_id: nudgeTargetUserId,
+    p_message: message || null,
+    p_preset_id: presetId || null,
+  });
+  if (error) {
+    el("nudge-modal-message").textContent = error.message;
+    el("nudge-modal-message").style.color = "var(--danger)";
+    show("nudge-modal-message");
+    return;
+  }
+  closeNudgePicker();
+}
+
+el("nudge-quick-btn").addEventListener("click", () => submitNudge(null, null));
+el("nudge-custom-send-btn").addEventListener("click", () => {
+  const msg = el("nudge-custom-input").value.trim();
+  if (!msg) return;
+  submitNudge(msg, null);
+});
+el("nudge-cancel-btn").addEventListener("click", closeNudgePicker);
+el("nudge-modal-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "nudge-modal-backdrop") closeNudgePicker();
+});
+
+// ---------- Receiving nudges (user request 08-24: "make sure the notification send and receiving
+// is working") — the web dashboard has no push infrastructure at all, so this polls
+// fn_get_my_recent_nudges (0097) on Dashboard load and shows anything newer than the last one this
+// browser has already seen (tracked in localStorage, same pattern as keepup_last_tab/keepup_theme
+// — a device-local "already seen" marker, not a server-side read receipt). ----------
+const NUDGE_LAST_SEEN_KEY = "keepup_nudge_last_seen";
+
+async function checkForNewNudges() {
+  const { data, error } = await supabase.rpc("fn_get_my_recent_nudges", { p_limit: 5 });
+  if (error || !data || data.length === 0) return;
+
+  let lastSeen = null;
+  try { lastSeen = localStorage.getItem(NUDGE_LAST_SEEN_KEY); } catch {}
+
+  const unseen = lastSeen ? data.filter((n) => n.created_at > lastSeen) : [data[0]]; // first-ever visit: just the latest, not a backlog dump
+  if (unseen.length === 0) return;
+
+  try { localStorage.setItem(NUDGE_LAST_SEEN_KEY, data[0].created_at); } catch {}
+
+  // Newest first in `data` — show oldest-of-the-unseen-batch first so banners stack in the order
+  // they actually arrived.
+  unseen.slice().reverse().forEach((n) => showNudgeBanner(n));
+}
+
+function showNudgeBanner(nudge) {
+  const banner = document.createElement("div");
+  banner.className = "nudge-banner";
+  banner.innerHTML = `${bellIconSvg()}<span><strong>${escapeHtml(nudge.sender_name || "Someone")}</strong> nudged you${nudge.message ? `: "${escapeHtml(nudge.message)}"` : ""}</span>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("show"));
+  setTimeout(() => {
+    banner.classList.remove("show");
+    setTimeout(() => banner.remove(), 300);
+  }, 5000);
 }
 
 // ---------- Create a club (user request 08-21, item 2) ----------
