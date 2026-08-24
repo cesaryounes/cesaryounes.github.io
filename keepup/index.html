@@ -3961,7 +3961,6 @@ function joinAdjacentWords(list) {
 function valueNearLabel(words, labelBox) {
   const labelHeight = labelBox.y1 - labelBox.y0;
   const labelCenterY = (labelBox.y0 + labelBox.y1) / 2;
-  const labelWidth = labelBox.x1 - labelBox.x0;
   const labelCenterX = (labelBox.x0 + labelBox.x1) / 2;
 
   // Digit check matters: a 2-column grid (Samsung Health's "Total duration" / "Workout calories"
@@ -3978,34 +3977,55 @@ function valueNearLabel(words, labelBox) {
     return joinAdjacentWords(sameRow.slice(0, 4));
   }
 
-  // Wide net vertically (a real gap between a label and its value varies a lot across apps — 19px
-  // in one Apple Fitness sample, over 100px in a Whoop one — so a single fixed multiplier can't
-  // both reach a distant real value AND exclude a closer false one). Horizontal stays tighter
-  // (label width plus a modest margin, not +150px) — a 2-column grid (Apple Fitness's Active
-  // Kilocalories/Workout Time side by side) otherwise lets a NEIGHBORING column's value bleed in;
-  // confirmed in testing, an overly generous horizontal margin let "Active Kilocalories" grab
-  // "Workout Time"'s value ("1:07:46") instead of its own ("625KCAL") since both sat in the same
-  // row underneath, at nearly the same y-position.
-  const maxGap = labelHeight * 6;
-  const below = words.filter((w) => {
+  // Stacked layout (label above value) — cast a wide net both ways (confirmed in testing: a real
+  // label-to-value gap varies enormously across apps, and so does a label's own column width, so
+  // no single fixed distance threshold can reliably both reach a real value AND exclude a wrong
+  // one — every attempt at fixed thresholds tried before this ended up either too tight, missing a
+  // real value sitting further off than expected, or too loose, catching a neighboring column's
+  // value or a second label two rows further down). Digit content, not distance, is what actually
+  // tells a value apart from a label — Apple Fitness's own layout repeats label/value/label/value
+  // down each column (confirmed in testing: a "Total Kilocalories" label two rows below "Active
+  // Kilocalories" was being grabbed outright as if IT were the value), so this walks candidates
+  // CLOSEST-FIRST (weighted distance below), clusters each into the contiguous same-line run it's
+  // part of, and returns the first such cluster that contains a digit — skipping straight past any
+  // no-digit cluster (which can only ever be a neighboring label, never a real value) to try the
+  // next-closest one instead of just accepting whatever happens to be nearest.
+  const below = words.filter((w) => (
+    w.bbox.y0 >= labelBox.y1 - 4 && // small overlap allowance for rounding
+    w.bbox.y0 - labelBox.y1 <= labelHeight * 10
+  ));
+  below.forEach((w) => {
     const wCenterX = (w.bbox.x0 + w.bbox.x1) / 2;
-    return (
-      w.bbox.y0 >= labelBox.y1 - 4 && // small overlap allowance for rounding
-      w.bbox.y0 - labelBox.y1 <= maxGap &&
-      Math.abs(wCenterX - labelCenterX) <= labelWidth * 0.9 + 60
-    );
+    // Vertical gap weighted heavier than horizontal — a same-row word in the WRONG column should
+    // still lose to a same-column word one row down, not the other way around.
+    w._dist = (w.bbox.y0 - labelBox.y1) * 3 + Math.abs(wCenterX - labelCenterX);
   });
-  below.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
-  if (below.length === 0) return "";
-  // ...but once sorted, only the NEAREST row of candidates is kept — this is what actually keeps
-  // a distant real value reachable (the wide vertical net above) while still stopping at the
-  // first row found, rather than also scooping up a second, more distant row underneath it (the
-  // same Apple Fitness sample's "Total Kilocalories" label, two rows down from "Active
-  // Kilocalories", was leaking into the result before this).
-  const nearestY0 = below[0].bbox.y0;
-  const nearestHeight = below[0].bbox.y1 - below[0].bbox.y0;
-  const nearestRow = below.filter((w) => w.bbox.y0 - nearestY0 < nearestHeight * 0.6);
-  return joinAdjacentWords(nearestRow.slice(0, 4));
+  below.sort((a, b) => a._dist - b._dist);
+
+  const used = new Set();
+  for (const seed of below) {
+    if (used.has(seed)) continue;
+    const seedCenterY = (seed.bbox.y0 + seed.bbox.y1) / 2;
+    const seedHeight = seed.bbox.y1 - seed.bbox.y0 || 20; // guard a degenerate 0-height box
+    const lineWords = below
+      .filter((w) => !used.has(w) && Math.abs((w.bbox.y0 + w.bbox.y1) / 2 - seedCenterY) < seedHeight * 0.6)
+      .sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const seedIdx = lineWords.indexOf(seed);
+    const cluster = [seed];
+    for (let k = seedIdx + 1; k < lineWords.length; k++) {
+      if (lineWords[k].bbox.x0 - lineWords[k - 1].bbox.x1 > seedHeight * 1.5) break;
+      cluster.push(lineWords[k]);
+    }
+    for (let k = seedIdx - 1; k >= 0; k--) {
+      if (lineWords[k + 1].bbox.x0 - lineWords[k].bbox.x1 > seedHeight * 1.5) break;
+      cluster.unshift(lineWords[k]);
+    }
+    cluster.forEach((w) => used.add(w));
+    if (cluster.some((w) => /\d/.test(w.text))) {
+      return joinAdjacentWords(cluster);
+    }
+  }
+  return "";
 }
 
 // "31:06" (mm:ss) or "1:07:59" (h:mm:ss) -> whole minutes. Colon count disambiguates the two
@@ -4022,6 +4042,18 @@ function parseDurationToMinutes(text) {
 function parseFirstNumber(text) {
   const m = text.match(/\d+/);
   return m ? Number(m[0]) : null;
+}
+
+// "B" in "BPM" misread as "8" — confirmed twice independently in testing on real Apple Watch
+// screenshots ("125BPM" -> "1258PM", "146BPM" -> "1468PM"), both times leaving the real 2-3 digit
+// bpm value intact except for the corrupted "8PM" tacked onto the end. Checked before the generic
+// parseFirstNumber() fallback, which alone would otherwise swallow that trailing "8" into the
+// number itself (1258, 1468 — both then clamped to a suspiciously round 220 rather than the real
+// value, the exact failure mode this specifically targets).
+function parseHeartRate(text) {
+  const bpmMisread = text.match(/(\d{2,3})8PM/i);
+  if (bpmMisread) return Number(bpmMisread[1]);
+  return parseFirstNumber(text);
 }
 
 // Same sane-bounds clamping the old server-side parser used — a plausible single workout, not a
@@ -4058,16 +4090,10 @@ async function extractWorkoutFieldsFromOcr(canvas) {
 
   const durationMinutes = durationBox ? clampOcr(parseDurationToMinutes(durationText), 1, 600) : null;
   const calories = calorieBox ? clampOcr(parseFirstNumber(calorieText), 0, 5000) : null;
-  const avgHeartRate = hrBox ? clampOcr(parseFirstNumber(hrText), 30, 220) : null;
+  const avgHeartRate = hrBox ? clampOcr(parseHeartRate(hrText), 30, 220) : null;
   const category = detectCategoryFromOcr(words);
 
   const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
-
-  // TEMP DIAGNOSTIC (user report 08-24: real-device results not matching Node-side testing for
-  // the same photo) — surfaces directly in the notes text since there's no console access to the
-  // reporting device. Remove once the real-device behavior is understood; see this function's own
-  // git history for the follow-up that strips this back out.
-  const diag = `[diag] words=${words.length} durTxt="${durationText}" calTxt="${calorieText}" hrTxt="${hrText}"`;
 
   return {
     success: true,
@@ -4076,7 +4102,7 @@ async function extractWorkoutFieldsFromOcr(canvas) {
     calories,
     avg_heart_rate: avgHeartRate,
     confidence: foundCount >= 3 ? "medium" : "low",
-    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving. " + diag,
+    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving.",
   };
 }
 
