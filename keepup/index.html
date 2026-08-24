@@ -771,6 +771,13 @@
         <button class="header-icon-btn hidden" id="header-action-btn" aria-label="Create a club" title="Create a club">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
+        <!-- Leaderboard's search toggle (user request 08-24) — same fixed "tab action" slot
+             header-action-btn uses (mutually exclusive by tab, so the two never show at once);
+             reveals #lb-search-wrap in the Leaderboard tab rather than living in the header
+             itself, same as LeaderboardScreen.kt's own Search icon does for its own search field. -->
+        <button class="header-icon-btn hidden" id="header-search-btn" aria-label="Search leaderboard" title="Search leaderboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
         <!-- Notification bell (user request 08-24: "add the notification Bell in the top banner,
              so user can check missed notifications too") — TopBanner.kt's own bell is always
              visible regardless of tab, unlike the action icon above; same here. This page has no
@@ -1149,7 +1156,11 @@
             <div class="period-pill" data-period="yearly">Year</div>
             <div class="period-pill" data-period="alltime">All</div>
           </div>
-          <div class="field lb-search">
+          <!-- FIX (user request 08-24: "move the search to the top banner, to the left of the
+               bell") — was always-visible inline; now toggled by #header-search-btn in the header
+               (setHeaderAction-style per-tab slot), same as LeaderboardScreen.kt's own Search icon
+               revealing this exact field rather than it just always sitting there. -->
+          <div class="field lb-search hidden" id="lb-search-wrap">
             <input type="text" id="lb-search-input" placeholder="Search this leaderboard…" />
           </div>
           <div class="podium hidden" id="lb-podium"></div>
@@ -1714,6 +1725,15 @@ function switchTab(tab) {
   } else {
     clearHeaderAction();
   }
+  // Leaderboard's search toggle lives in this same fixed header slot (mutually exclusive with the
+  // Club tab's "+" above, so both can share the "left of the bell" position) — shown only while
+  // on that tab, and any open search is cleared on the way out so a stale filter never lingers.
+  if (tab === "leaderboard") {
+    show("header-search-btn");
+  } else {
+    hide("header-search-btn");
+    closeLbSearch();
+  }
   if (tab === "dashboard") loadDashboard();
   if (tab === "club") loadClubDirectory();
   if (tab === "leaderboard") loadMyClubs();
@@ -2275,6 +2295,29 @@ Array.from(el("period-pills").children).forEach((pill, i) => {
 el("lb-search-input").addEventListener("input", (e) => {
   lbSearchQuery = e.target.value.trim().toLowerCase();
   renderLeaderboardRows(lastLeaderboardRows);
+});
+
+// #header-search-btn toggles this (user request 08-24) — was always-visible; now hidden until
+// opened, and always cleared when closed (button toggle or leaving the tab) so a stale filter
+// never silently keeps rows hidden the next time this reopens.
+function openLbSearch() {
+  show("lb-search-wrap");
+  el("lb-search-input").focus();
+}
+function closeLbSearch() {
+  hide("lb-search-wrap");
+  el("lb-search-input").value = "";
+  if (lbSearchQuery) {
+    lbSearchQuery = "";
+    renderLeaderboardRows(lastLeaderboardRows);
+  }
+}
+el("header-search-btn").addEventListener("click", () => {
+  if (el("lb-search-wrap").classList.contains("hidden")) {
+    openLbSearch();
+  } else {
+    closeLbSearch();
+  }
 });
 
 // ---------- Rank-delta (user request 08-21, item 7) ----------
