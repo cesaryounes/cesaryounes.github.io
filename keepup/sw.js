@@ -16,7 +16,11 @@ self.addEventListener("push", (event) => {
     console.error("Push payload wasn't valid JSON:", e);
   }
 
-  const data = payload.data || {};
+  // title/body ride along INSIDE the notification's own `data` too (not just as the visible
+  // title/body args below) — notificationclick only gets event.notification.data back, and the
+  // tip-routing case (see index.html's handleNotificationRouting) needs the actual message text
+  // to show, not just a bare `type`.
+  const data = { ...(payload.data || {}), title: payload.title, body: payload.body };
   event.waitUntil(
     self.registration.showNotification(payload.title || "KeepUp", {
       body: payload.body || "",
@@ -33,18 +37,34 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Clicking the OS notification focuses an already-open KeepUp tab if one exists, or opens a new
-// one — same "take me to the app" behavior MainActivity.kt's handleIntent() gives a tapped
-// Android push, just without per-type deep-linking (every notification type routes to the same
-// dashboard URL here; see this file's own top comment on why the web side keeps this simpler).
+// Clicking the OS notification routes by type (user request 08-24: "clicking the notification
+// should either open the Daily message in a banner or go to the leaderboard in case it is a
+// leaderboard update") — same idea as MainActivity.kt's handleIntent() routing a tapped Android
+// push, just reached differently here since there's no deep-link Intent system on the web:
+//   - an already-open tab gets a postMessage the page's own listener acts on directly
+//     (handleNotificationRouting in index.html).
+//   - a freshly-opened tab has no page script running yet to receive that message, so the same
+//     routing info goes as URL query params instead — index.html checks for them once on load.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ("focus" in client) return client.focus();
+        if ("focus" in client) {
+          client.focus();
+          client.postMessage({ source: "keepup-notification-click", data });
+          return;
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow("./");
+      if (self.clients.openWindow) {
+        const params = new URLSearchParams();
+        if (data.type) params.set("notifType", data.type);
+        if (data.title) params.set("notifTitle", data.title);
+        if (data.body) params.set("notifBody", data.body);
+        const qs = params.toString();
+        return self.clients.openWindow(qs ? `./?${qs}` : "./");
+      }
     }),
   );
 });

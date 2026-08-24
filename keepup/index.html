@@ -150,7 +150,10 @@
     color: var(--text-muted); margin: 0;
   }
   .notif-panel-list { max-height: 320px; overflow-y: auto; }
-  .notif-row { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-bottom: 1px solid var(--hairline); }
+  /* Clickable (user request 08-24: "clicking the notification should either open the Daily
+     message in a banner or go to the leaderboard...") — see handleNotificationRouting(). */
+  .notif-row { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-bottom: 1px solid var(--hairline); cursor: pointer; }
+  .notif-row:active { background: var(--card-raised); }
   .notif-row-unread { background: rgba(204,255,0,0.05); }
   .notif-row:last-child { border-bottom: none; }
   .notif-row svg { width: 15px; height: 15px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
@@ -449,6 +452,15 @@
   .nudge-banner.show { transform: translateY(0); opacity: 1; }
   .nudge-banner svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
   .nudge-banner span { font-size: 13px; color: var(--text-main); }
+
+  /* Manually-dismissed variant (showTipBanner, user request 08-24: "open the Daily message in a
+     banner") — same look, no auto-dismiss timer, plus a close button since opening this one was a
+     deliberate click rather than an ambient ping. */
+  .tip-banner { padding-right: 40px; }
+  .tip-banner-close {
+    position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; min-height: 0; padding: 0;
+    background: transparent; color: var(--text-muted); font-size: 18px; line-height: 1;
+  }
 
   /* ---- Stat cluster, in the top banner (mirrors HomeScreen.kt's TopBanner: streak/freeze/
      gems/multiplier, icon+number only, no labels — always visible across every tab, not just
@@ -1652,6 +1664,10 @@ function renderAuthState() {
     // subscription keeps receiving pushes without the user having to revisit Settings every
     // session — subscribing itself still only ever happens from an explicit toggle there.
     registerServiceWorker();
+    // Runs after switchTab(lastActiveTab()) above so a leaderboard-routed notification click
+    // (a fresh tab opened from an OS-level push, see sw.js) overrides that default tab choice
+    // rather than the other way around.
+    checkUrlNotificationParams();
   } else {
     show("signed-out-view");
     hide("signed-in-view");
@@ -3064,7 +3080,7 @@ function renderNotifPanel() {
     return;
   }
   list.innerHTML = lastNotifications.map((n) => `
-    <div class="notif-row${n.read ? "" : " notif-row-unread"}">
+    <div class="notif-row${n.read ? "" : " notif-row-unread"}" data-notif-id="${n.id}">
       ${bellIconSvg()}
       <div class="notif-row-text">
         <div><strong>${escapeHtml(n.title || "KeepUp")}</strong></div>
@@ -3073,6 +3089,87 @@ function renderNotifPanel() {
       </div>
     </div>
   `).join("");
+  // FIX (user request 08-24: "clicking the notification should either open the Daily message in a
+  // banner or go to the leaderboard in case it is a leaderboard update") — rows were purely
+  // informational before; each is now clickable and routes through the same
+  // handleNotificationRouting() a real OS push notification's click uses (see sw.js), so both
+  // surfaces behave identically for the same notification type.
+  Array.from(list.querySelectorAll(".notif-row")).forEach((row) => {
+    row.addEventListener("click", () => {
+      const n = lastNotifications.find((x) => x.id === row.dataset.notifId);
+      if (!n) return;
+      closeNotifPanel();
+      handleNotificationRouting(n.type, n.title, n.body);
+    });
+  });
+}
+
+// Shared by both notification surfaces — an in-page bell panel row click (renderNotifPanel above)
+// and a real OS-level Web Push notification click (sw.js's notificationclick, relayed here via
+// postMessage or a URL param — see checkUrlNotificationParams below). Only two types have an
+// actual destination right now, per the explicit ask; everything else (nudge, invite_response,
+// group_email_invite, workout_rejected, inactivity) has no defined target yet and is a no-op here
+// — the panel/toast the user already saw is itself the whole of "seeing" that notification.
+const LEADERBOARD_PASS_TYPES = new Set(["global_leaderboard_pass", "club_leaderboard_pass", "club_passed"]);
+const TIP_TYPES = new Set(["daily_tip", "evening_nudge"]);
+function handleNotificationRouting(type, title, body) {
+  if (LEADERBOARD_PASS_TYPES.has(type)) {
+    switchTab("leaderboard");
+  } else if (TIP_TYPES.has(type)) {
+    showTipBanner(title, body);
+  }
+}
+
+// A deliberately-opened, manually-dismissed banner (no auto-dismiss timer, unlike
+// showNotifToast's ambient 5s toast) — reuses the same .nudge-banner visual language since the
+// user asked for this "in a banner" specifically, just with a close button since opening it was a
+// deliberate action (clicking a notification), not a passive ambient ping.
+function showTipBanner(title, body) {
+  const banner = document.createElement("div");
+  banner.className = "nudge-banner tip-banner";
+  banner.innerHTML = `
+    ${bellIconSvg()}
+    <span><strong>${escapeHtml(title || "KeepUp")}</strong>${body ? ` — ${escapeHtml(body)}` : ""}</span>
+    <button type="button" class="tip-banner-close" aria-label="Close">&times;</button>
+  `;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("show"));
+  const dismiss = () => {
+    banner.classList.remove("show");
+    setTimeout(() => banner.remove(), 300);
+  };
+  banner.querySelector(".tip-banner-close").addEventListener("click", dismiss);
+}
+
+// Relays a click on a real OS-level push notification back into this same routing — an
+// already-open tab gets this via sw.js's postMessage (see notificationclick there).
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data && event.data.source === "keepup-notification-click") {
+      const d = event.data.data || {};
+      handleNotificationRouting(d.type, d.title, d.body);
+    }
+  });
+}
+
+// The other half of the same relay — a notification click that had to open a FRESH tab (no
+// existing client for sw.js's postMessage to reach) carries the same routing info as URL query
+// params instead (see sw.js's notificationclick). Checked once, after sign-in state has resolved
+// (called from renderAuthState below) so switchTab("leaderboard") has an actual signed-in UI to
+// act on; the params are then stripped from the URL so a later manual refresh doesn't re-trigger it.
+let notifRoutingHandledFromUrl = false;
+function checkUrlNotificationParams() {
+  if (notifRoutingHandledFromUrl) return;
+  const params = new URLSearchParams(location.search);
+  const type = params.get("notifType");
+  if (!type) return;
+  notifRoutingHandledFromUrl = true;
+  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"));
+  params.delete("notifType");
+  params.delete("notifTitle");
+  params.delete("notifBody");
+  const newSearch = params.toString();
+  history.replaceState(null, "", location.pathname + (newSearch ? `?${newSearch}` : "") + location.hash);
 }
 
 async function openNotifPanel() {
