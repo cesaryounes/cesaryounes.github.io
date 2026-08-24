@@ -4095,34 +4095,40 @@ function valueNearLabel(words, labelBox, boundaries = []) {
     w._dist = (w.bbox.y0 - labelBox.y1) * 3 + Math.abs(wCenterX - labelCenterX);
   });
   below.sort((a, b) => a._dist - b._dist);
+  if (below.length === 0) return { text: "", distRatio: Infinity };
 
-  const used = new Set();
-  for (const seed of below) {
-    if (used.has(seed)) continue;
-    const seedCenterY = (seed.bbox.y0 + seed.bbox.y1) / 2;
-    const seedHeight = seed.bbox.y1 - seed.bbox.y0 || 20; // guard a degenerate 0-height box
-    const lineWords = below
-      .filter((w) => !used.has(w) && Math.abs((w.bbox.y0 + w.bbox.y1) / 2 - seedCenterY) < seedHeight * 0.6)
-      .sort((a, b) => a.bbox.x0 - b.bbox.x0);
-    const seedIdx = lineWords.indexOf(seed);
-    const cluster = [seed];
-    for (let k = seedIdx + 1; k < lineWords.length; k++) {
-      if (lineWords[k].bbox.x0 - lineWords[k - 1].bbox.x1 > seedHeight * 1.5) break;
-      cluster.push(lineWords[k]);
-    }
-    for (let k = seedIdx - 1; k >= 0; k--) {
-      if (lineWords[k + 1].bbox.x0 - lineWords[k].bbox.x1 > seedHeight * 1.5) break;
-      cluster.unshift(lineWords[k]);
-    }
-    cluster.forEach((w) => used.add(w));
-    if (cluster.some((w) => /\d/.test(w.text))) {
-      // distRatio: the winning seed's weighted distance, normalized by label height so it means
-      // roughly the same thing regardless of image resolution/upscale factor — "how many label-
-      // heights below" the match sits. A same-card value one row down lands well under 10; a wrong
-      // match that skipped an invisible real value to land on a DIFFERENT card further down (see
-      // extractWorkoutFieldsFromOcr's two-pass merge) lands well past it.
-      return { text: joinAdjacentWords(cluster), distRatio: seed._dist / labelHeight };
-    }
+  // FIX (user report 08-24: a fitness-app layout with fields NOT in any of our 3 known label
+  // lists — "Elevation Gain" / "Avg. Cadence" sitting between the calories row and the heart-rate
+  // row — came back with calories=21, grabbed straight off "Elevation Gain"'s own value several
+  // rows down). This used to keep walking PAST a no-digit cluster to the next-closest one, on the
+  // theory that a no-digit cluster could only be a stray neighboring label — true when the search
+  // starts right next to its own value, but false once that value has gone invisible (see
+  // preprocessForOcrHighContrast's comment): the closest cluster is then some OTHER label's own
+  // row, and skipping past it walks straight into that unrelated field's value instead. Now only
+  // the single CLOSEST cluster is ever considered — if it has no digit, that's treated as "this
+  // label's value isn't visible here" and the search stops, rather than wandering further down
+  // hunting for someone else's number.
+  const seed = below[0];
+  const seedCenterY = (seed.bbox.y0 + seed.bbox.y1) / 2;
+  const seedHeight = seed.bbox.y1 - seed.bbox.y0 || 20; // guard a degenerate 0-height box
+  const lineWords = below
+    .filter((w) => Math.abs((w.bbox.y0 + w.bbox.y1) / 2 - seedCenterY) < seedHeight * 0.6)
+    .sort((a, b) => a.bbox.x0 - b.bbox.x0);
+  const seedIdx = lineWords.indexOf(seed);
+  const cluster = [seed];
+  for (let k = seedIdx + 1; k < lineWords.length; k++) {
+    if (lineWords[k].bbox.x0 - lineWords[k - 1].bbox.x1 > seedHeight * 1.5) break;
+    cluster.push(lineWords[k]);
+  }
+  for (let k = seedIdx - 1; k >= 0; k--) {
+    if (lineWords[k + 1].bbox.x0 - lineWords[k].bbox.x1 > seedHeight * 1.5) break;
+    cluster.unshift(lineWords[k]);
+  }
+  if (cluster.some((w) => /\d/.test(w.text))) {
+    // distRatio: the winning seed's weighted distance, normalized by label height so it means
+    // roughly the same thing regardless of image resolution/upscale factor — "how many label-
+    // heights below" the match sits.
+    return { text: joinAdjacentWords(cluster), distRatio: seed._dist / labelHeight };
   }
   return { text: "", distRatio: Infinity };
 }
