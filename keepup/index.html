@@ -4059,6 +4059,12 @@ async function extractWorkoutFieldsFromOcr(canvas) {
 
   const foundCount = [durationMinutes, calories, avgHeartRate, category].filter((v) => v !== null).length;
 
+  // TEMP DIAGNOSTIC (user report 08-24: real-device results not matching Node-side testing for
+  // the same photo) — surfaces directly in the notes text since there's no console access to the
+  // reporting device. Remove once the real-device behavior is understood; see this function's own
+  // git history for the follow-up that strips this back out.
+  const diag = `[diag] words=${words.length} durBox=${!!durationBox} calBox=${!!calorieBox} hrBox=${!!hrBox} sample=${words.slice(0, 6).map((w) => w.text).join("|")}`;
+
   return {
     success: true,
     category,
@@ -4066,7 +4072,7 @@ async function extractWorkoutFieldsFromOcr(canvas) {
     calories,
     avg_heart_rate: avgHeartRate,
     confidence: foundCount >= 3 ? "medium" : "low",
-    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving.",
+    notes: "Read using on-device text recognition, not AI vision — double-check the numbers below before saving. " + diag,
   };
 }
 
