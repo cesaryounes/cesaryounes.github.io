@@ -4019,7 +4019,10 @@ function valueNearLabel(words, labelBox) {
   });
   if (sameRow.length > 0 && sameRow.some((w) => /\d/.test(w.text))) {
     sameRow.sort((a, b) => a.bbox.x0 - b.bbox.x0);
-    return joinAdjacentWords(sameRow.slice(0, 4));
+    // Same-row is the highest-confidence match there is (Whoop's label-beside-value layout) — a
+    // near-zero distRatio so callers (see extractWorkoutFieldsFromOcr's two-pass merge) never
+    // prefer a fallback pass's guess over this.
+    return { text: joinAdjacentWords(sameRow.slice(0, 4)), distRatio: 0 };
   }
 
   // Stacked layout (label above value) — cast a wide net both ways (confirmed in testing: a real
@@ -4067,10 +4070,15 @@ function valueNearLabel(words, labelBox) {
     }
     cluster.forEach((w) => used.add(w));
     if (cluster.some((w) => /\d/.test(w.text))) {
-      return joinAdjacentWords(cluster);
+      // distRatio: the winning seed's weighted distance, normalized by label height so it means
+      // roughly the same thing regardless of image resolution/upscale factor — "how many label-
+      // heights below" the match sits. A same-card value one row down lands well under 10; a wrong
+      // match that skipped an invisible real value to land on a DIFFERENT card further down (see
+      // extractWorkoutFieldsFromOcr's two-pass merge) lands well past it.
+      return { text: joinAdjacentWords(cluster), distRatio: seed._dist / labelHeight };
     }
   }
-  return "";
+  return { text: "", distRatio: Infinity };
 }
 
 // "31:06" (mm:ss) or "1:07:59" (h:mm:ss) -> whole minutes. Colon count disambiguates the two
@@ -4101,11 +4109,21 @@ function parseHeartRate(text) {
   return parseFirstNumber(text);
 }
 
-// Same sane-bounds clamping the old server-side parser used — a plausible single workout, not a
-// hard science limit; the confirm/edit step is still the real backstop either way.
+// FIX (user report 08-24: HR came back as 30 instead of 135 — traced to this function, not the
+// matching logic). The old behavior clamped a too-LOW value up to `min`, e.g. clampOcr(6, 30, 220)
+// → 30. That's fine for a genuinely-plausible-but-slightly-off reading, but "6" wasn't that — it
+// was valueNearLabel latching onto a completely different card's number (an Effort score) after
+// the real "135BPM" OCR'd to nothing. Clamping laundered that into a plausible-LOOKING 30 instead
+// of surfacing it as a miss, which silently blocked extractWorkoutFieldsFromOcr's two-pass fallback
+// from ever being consulted for this field — a wrong-but-non-null value looks identical to a right
+// one to a merge step that only fills in `null`s. Too-HIGH stays clamped (min(max, value)): a huge
+// misread is still usually a garbled version of a real, plausible number (extra merged digit), so
+// capping it is more useful than discarding it. Too-LOW has no equivalent excuse — reject it as
+// unfound instead, so a real fallback pass gets the chance this bug denied it.
 function clampOcr(value, min, max) {
   if (value === null || !Number.isFinite(value)) return null;
-  return Math.min(max, Math.max(min, value));
+  if (value < min) return null;
+  return Math.min(max, value);
 }
 
 function detectCategoryFromOcr(words) {
@@ -4131,27 +4149,35 @@ async function runOcrPass(canvas) {
   const calorieBox = findLabelBox(words, OCR_CALORIE_LABELS);
   const hrBox = findLabelBox(words, OCR_HR_LABELS);
 
-  const durationText = durationBox ? valueNearLabel(words, durationBox) : "";
-  const calorieText = calorieBox ? valueNearLabel(words, calorieBox) : "";
-  const hrText = hrBox ? valueNearLabel(words, hrBox) : "";
+  const durationMatch = durationBox ? valueNearLabel(words, durationBox) : { text: "", distRatio: Infinity };
+  const calorieMatch = calorieBox ? valueNearLabel(words, calorieBox) : { text: "", distRatio: Infinity };
+  const hrMatch = hrBox ? valueNearLabel(words, hrBox) : { text: "", distRatio: Infinity };
 
   return {
-    duration_minutes: durationBox ? clampOcr(parseDurationToMinutes(durationText), 1, 600) : null,
-    calories: calorieBox ? clampOcr(parseFirstNumber(calorieText), 0, 5000) : null,
-    avg_heart_rate: hrBox ? clampOcr(parseHeartRate(hrText), 30, 220) : null,
+    duration_minutes: durationBox ? clampOcr(parseDurationToMinutes(durationMatch.text), 1, 600) : null,
+    duration_distRatio: durationMatch.distRatio,
+    calories: calorieBox ? clampOcr(parseFirstNumber(calorieMatch.text), 0, 5000) : null,
+    calories_distRatio: calorieMatch.distRatio,
+    avg_heart_rate: hrBox ? clampOcr(parseHeartRate(hrMatch.text), 30, 220) : null,
+    avg_heart_rate_distRatio: hrMatch.distRatio,
     category: detectCategoryFromOcr(words),
-    diagText: `words=${words.length} d=${!!durationBox} c=${!!calorieBox} h=${!!hrBox} raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 300)}"`,
+    diagText: `words=${words.length} d=${!!durationBox}/${durationMatch.distRatio.toFixed(1)} c=${!!calorieBox}/${calorieMatch.distRatio.toFixed(1)} h=${!!hrBox}/${hrMatch.distRatio.toFixed(1)} raw="${(data.text || "").replace(/\s+/g, " ").trim().slice(0, 300)}"`,
   };
 }
 
 // FIX (user report 08-24: Apple HIIT "Moderate" screenshot — duration/calories came back empty
-// and HR grabbed the wrong card's number, all traced to the same root cause: the bold colored
-// value text OCR'd to nothing at all, see preprocessForOcrHighContrast's comment). Two passes —
-// the normal grayscale one first, and only when it's missing something, a second pass on a
-// high-contrast variant of the same photo. The second pass only ever FILLS IN fields the first
-// one missed (`??`, never overwrites a real value) — it's individually too aggressive to trust as
-// the primary read (see that function's comment), but safe as a fallback since a field it gets
-// wrong here was already null, not downgraded from a working value.
+// and HR grabbed a DIFFERENT card's number ("6" from an Effort score several rows further down) —
+// all traced to the same root cause: the bold colored value text OCR'd to nothing at all, see
+// preprocessForOcrHighContrast's comment. The merge below only ever FILLS IN fields the first
+// (safer) pass returned null for (`??`, never overwrites a value pass 1 already found) — tried a
+// distance-based "is this match suspiciously far from its label" override instead (using each
+// match's distRatio, see valueNearLabel), but real testing showed different apps have genuinely
+// different normal label-to-value gaps (Whoop's real matches sit 14-15 label-heights below;
+// Apple's sit 2-4), so no distance threshold can tell "far but correct" apart from "far and wrong"
+// across apps. The HR case turned out not to need that at all: the real bug was clampOcr silently
+// laundering the implausible "6" into a plausible-looking clamped 30 instead of rejecting it,
+// which is what blocked this fallback from ever being consulted (see clampOcr's own comment) —
+// fixing that there means the plain null-fill merge here was already correct all along.
 async function extractWorkoutFieldsFromOcr(file) {
   const pass1 = await runOcrPass(await preprocessForOcr(file));
   const foundCount1 = [pass1.duration_minutes, pass1.calories, pass1.avg_heart_rate, pass1.category]
