@@ -38,6 +38,11 @@
   ever actually seen by a human as a fallback: app not installed yet, or verification hasn't
   completed. Crawlers generating a link preview never run the JS below at all — they only read
   the static meta tags above.
+
+  Platform split (user request 08-24): Android gets the existing APK-download/app-deep-link
+  handling below; everything else (iOS, desktop) redirects straight to the KeepUp web dashboard
+  instead — there's no APK for them to install and no keepup:// scheme registered anywhere for
+  them to hand off to either way. See the JS block's own comment for the detection logic.
 -->
 <style>
   :root { color-scheme: dark; }
@@ -117,19 +122,12 @@
       var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.example.keepup";
       var APK_URL = "/downloads/keepup-debug.apk";
       // ---- end swap block ----
+      var WEB_URL = "https://cesaryounes.github.io/keepup/";
 
       var getAppBtn = document.getElementById('getAppBtn');
       var joinCopy = document.getElementById('joinCopy');
       var installHint = document.getElementById('installHint');
-      if (PLAY_STORE_MODE) {
-        getAppBtn.href = PLAY_STORE_URL;
-        getAppBtn.textContent = 'Get KeepUp on Google Play';
-        joinCopy.textContent = 'Get KeepUp from the Play Store to accept the invite.';
-        installHint.style.display = 'none';
-      } else {
-        getAppBtn.href = APK_URL;
-        getAppBtn.textContent = 'Get KeepUp';
-      }
+      var openBtn = document.getElementById('openBtn');
 
       // Matches extractGroupCode()/extractInviterId() in the app's Models.kt, which read the
       // same "id"/"inviter" query params — any id shape that works there works here too.
@@ -141,15 +139,49 @@
         return;
       }
       var inviterId = params.get('inviter');
-      var deepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
 
-      document.getElementById('openBtn').addEventListener('click', function () {
+      // Platform split (user request 08-24: "if opened on iphone, redirect to web... if on
+      // android to the apk download") — there's no iOS app at all (never has been; KeepUp is
+      // Android + this web dashboard), so an iPhone/iPad getting the Android-only "Get KeepUp"
+      // APK button/keepup:// deep link was always a dead end for them. Only Android gets its own
+      // branch below — everything else (iOS included, and a desktop browser opening the link)
+      // falls through to the same web-dashboard redirect, since none of them have an APK to hand
+      // off to either. Not detecting iOS specifically: iPadOS 13+ reports its User-Agent as a
+      // plain Mac (no "iPad"/"iPhone" substring at all), so a real isIOS check needs its own
+      // maxTouchPoints heuristic just to catch that case — not worth the extra surface for a
+      // branch that would end up doing exactly the same thing as the "not Android" fallback.
+      var isAndroid = /Android/i.test(navigator.userAgent);
+
+      if (isAndroid) {
+        if (PLAY_STORE_MODE) {
+          getAppBtn.href = PLAY_STORE_URL;
+          getAppBtn.textContent = 'Get KeepUp on Google Play';
+          joinCopy.textContent = 'Get KeepUp from the Play Store to accept the invite.';
+          installHint.style.display = 'none';
+        } else {
+          getAppBtn.href = APK_URL;
+          getAppBtn.textContent = 'Get KeepUp';
+        }
+
+        var deepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        openBtn.addEventListener('click', function () {
+          window.location.href = deepLink;
+        });
+        // Best-effort automatic handoff too, in case the app is installed but this device hasn't
+        // finished (or ever completed) App Link verification — harmless no-op if it's not.
         window.location.href = deepLink;
-      });
-
-      // Best-effort automatic handoff too, in case the app is installed but this device hasn't
-      // finished (or ever completed) App Link verification — harmless no-op if it's not.
-      window.location.href = deepLink;
+      } else {
+        // iOS (and anything else that isn't Android) — no native app to hand off to, so this
+        // just goes straight to the web dashboard. Not carrying the invite id through: the web
+        // dashboard has no "auto-join from a link" flow yet (only Discover/browse), so there's
+        // nothing useful to do with it there today.
+        joinCopy.textContent = "KeepUp isn't available as an app here yet — continue on the web instead.";
+        getAppBtn.href = WEB_URL;
+        getAppBtn.textContent = 'Continue to KeepUp Web';
+        installHint.style.display = 'none';
+        openBtn.style.display = 'none';
+        window.location.href = WEB_URL;
+      }
     })();
   </script>
 </body>
