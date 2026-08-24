@@ -102,8 +102,13 @@
 
   /* ---- Top banner (mirrors HomeScreen.kt's TopBanner) — logo left, stat cluster right, always
      visible across every tab, not just Dashboard, same as the app. ---- */
+  /* ---- TopBanner.kt layout (user request 08-24: "make it as close as to the Android app") —
+     logo fixed-left, stat cluster centered in the flexible middle (Box(weight(1f),
+     contentAlignment=Center) there), tab action + bell as a fixed-width trailing group. position:
+     relative so #notif-panel below can anchor to this row instead of the viewport. ---- */
   .top-banner {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: relative;
+    display: flex; align-items: center; gap: 12px;
     padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline);
   }
   .top-banner-logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -111,18 +116,47 @@
   .top-banner-logo .wordmark {
     font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: var(--text-main);
   }
-  .top-banner-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .top-banner-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+  .top-banner-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 
-  /* Small round header action icon (user request 08-24: "no need for the big button...just a plus
-     in the top banner to the right") — a per-tab action slot next to the stat cluster, same idea
-     as TopBanner.kt's own onCreateActionChanged-reported icon in the app. Only the Club tab uses
-     one so far (see setHeaderAction() below), hidden the rest of the time. */
-  .icon-btn {
-    width: 32px; height: 32px; min-height: 32px; padding: 0; border-radius: 999px;
-    background: var(--accent-soft); color: var(--accent); font-size: 19px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0;
+  /* Plain tinted glyph, no background circle — matches Icons.Default.Add/Notifications' own
+     bare-icon treatment in TopBanner.kt (a filled accent-soft circle here used to read as a
+     separate floating chip rather than "attached" to this row, per the user's own wording). */
+  .header-icon-btn {
+    width: auto; height: auto; min-height: 0; padding: 0; background: transparent; border: none;
+    display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0;
   }
-  .icon-btn:active { background: var(--accent); color: #0B0E14; }
+  .header-icon-btn svg { width: 20px; height: 20px; color: var(--text-main); display: block; }
+  #notif-bell-btn svg { width: 19px; height: 19px; }
+  /* FIX (user request 08-17 on the app side, mirrored here): the bell itself recolors when there's
+     something unread, not just its badge — a glance at the bell alone tells you. */
+  #notif-bell-btn.has-unread svg { color: var(--accent); }
+  /* Bare small corner number, no filled pill — same "tiny mark, not a badge competing with the
+     icon" choice TopBanner.kt's own unreadNotificationCount readout makes. */
+  .notif-badge {
+    position: absolute; top: -3px; right: -6px; font-size: 8px; font-weight: 800;
+    color: var(--danger); line-height: 1;
+  }
+
+  .notif-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+    width: 300px; max-width: calc(100vw - 32px);
+    background: var(--card); border: 1px solid var(--hairline); border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35); overflow: hidden;
+  }
+  .notif-panel-header {
+    padding: 12px 14px; border-bottom: 1px solid var(--hairline);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--text-muted); margin: 0;
+  }
+  .notif-panel-list { max-height: 320px; overflow-y: auto; }
+  .notif-row { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-bottom: 1px solid var(--hairline); }
+  .notif-row:last-child { border-bottom: none; }
+  .notif-row svg { width: 15px; height: 15px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+  .notif-row-text { flex: 1; min-width: 0; font-size: 13px; color: var(--text-main); line-height: 1.4; }
+  .notif-row-text strong { font-weight: 700; }
+  .notif-row-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .notif-panel-empty { padding: 22px 14px; text-align: center; font-size: 13px; color: var(--text-muted); }
 
   .card {
     background: var(--card); border: 1px solid var(--hairline); border-radius: 16px;
@@ -399,10 +433,11 @@
      yet) — same chip shape as before this feature, just still labeled by shortLabel. */
   .nudge-preset-chip.text-only { min-height: 40px; padding: 8px 10px; text-align: left; }
 
-  /* Incoming-nudge toast (checkForNewNudges/showNudgeBanner) — no push infrastructure on this
+  /* Incoming-nudge toast (refreshNotifications/showNudgeBanner) — no push infrastructure on this
      page at all, so this is what "receiving" actually looks like here: appears while the tab is
      open, not a real background notification. Slides down from under the fixed header, auto-
-     dismisses after 5s. */
+     dismisses after 5s. The notification bell's unread badge (below) is the persistent record of
+     what's been missed — this toast is just the in-the-moment ping. */
   .nudge-banner {
     position: fixed; top: 12px; left: 12px; right: 12px; max-width: 396px; margin: 0 auto; z-index: 60;
     background: var(--card); border: 1px solid var(--accent); border-radius: 14px;
@@ -704,10 +739,13 @@
         </svg>
         <span class="wordmark">KEEPUP</span>
       </div>
-      <div class="top-banner-right">
-        <!-- Per-tab header action — the Club tab's "+" (create a club), user request 08-24.
-             setHeaderAction()/clearHeaderAction() below show/hide and wire this on tab switch. -->
-        <button class="icon-btn hidden" id="header-action-btn" aria-label="Create a club" title="Create a club">+</button>
+      <!-- FIX (user request 08-24: "make it as close as to the Android app") — was logo-left /
+           everything-else-crammed-right; TopBanner.kt actually centers the stat cluster in the
+           flexible space BETWEEN the wordmark and the right-side icons (Box(weight(1f),
+           contentAlignment=Center)), with the tab action and bell as a fixed group after it, not
+           bundled in with the stats. Restructured to match: this center wrap is the flex-grow
+           middle section, right-icons is its own fixed-width trailing group. -->
+      <div class="top-banner-center">
         <div class="stat-cluster hidden" id="stat-cluster">
           <div class="stat-cell" style="color:var(--text-muted);">
             <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
@@ -722,6 +760,30 @@
             <span id="stat-gems" style="color:var(--text-main);">0</span>
           </div>
           <div class="stat-mult" id="stat-multiplier">1.00x</div>
+        </div>
+      </div>
+      <div class="top-banner-right">
+        <!-- Per-tab header action — the Club tab's "+" (create a club), user request 08-24. A
+             plain tinted glyph, no background circle, matching Icons.Default.Add's own bare-icon
+             treatment in TopBanner.kt (the earlier accent-soft circle badge read as a separate
+             floating chip rather than "attached" to this row — user's own wording). setHeaderAction()/
+             clearHeaderAction() below show/hide and retarget it on every tab switch. -->
+        <button class="header-icon-btn hidden" id="header-action-btn" aria-label="Create a club" title="Create a club">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <!-- Notification bell (user request 08-24: "add the notification Bell in the top banner,
+             so user can check missed notifications too") — TopBanner.kt's own bell is always
+             visible regardless of tab, unlike the action icon above; same here. This page has no
+             general push/notification-center infra, so "notifications" here means recent nudges
+             (fn_get_my_recent_nudges, 0097) — the only pollable notification-shaped data available
+             client-side. Badge count and read-tracking: see refreshNotifications()/openNotifPanel(). -->
+        <button class="header-icon-btn" id="notif-bell-btn" aria-label="Notifications" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge hidden" id="notif-badge">0</span>
+        </button>
+        <div class="notif-panel hidden" id="notif-panel">
+          <p class="notif-panel-header">Notifications</p>
+          <div class="notif-panel-list" id="notif-panel-list"></div>
         </div>
       </div>
     </header>
@@ -1554,7 +1616,7 @@ function renderAuthState() {
     collapseSubmitFlow({ refresh: false });
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
-    checkForNewNudges();
+    refreshNotifications();
   } else {
     show("signed-out-view");
     hide("signed-in-view");
@@ -2845,28 +2907,63 @@ el("nudge-modal-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "nudge-modal-backdrop") closeNudgePicker();
 });
 
-// ---------- Receiving nudges (user request 08-24: "make sure the notification send and receiving
-// is working") — the web dashboard has no push infrastructure at all, so this polls
-// fn_get_my_recent_nudges (0097) on Dashboard load and shows anything newer than the last one this
-// browser has already seen (tracked in localStorage, same pattern as keepup_last_tab/keepup_theme
-// — a device-local "already seen" marker, not a server-side read receipt). ----------
+// ---------- Notifications / receiving nudges (user request 08-24: "make sure the notification
+// send and receiving is working", then later "add the notification Bell in the top banner, so
+// user can check missed notifications too") — the web dashboard has no push infrastructure at
+// all, so this polls fn_get_my_recent_nudges (0097) on Dashboard load. Two independent "have I
+// seen this" pointers, both device-local (localStorage, same pattern as keepup_last_tab/
+// keepup_theme — not a server-side read receipt):
+//   - NUDGE_LAST_SEEN_KEY: dedupes the ephemeral toast banner so the same nudge never pops twice.
+//   - NUDGE_PANEL_SEEN_KEY: drives the bell's unread badge, cleared only when the panel is
+//     actually opened — independent of the toast so a badge you haven't looked at yet doesn't
+//     silently clear just because a toast happened to show while you were on-screen for it.
+// ----------
 const NUDGE_LAST_SEEN_KEY = "keepup_nudge_last_seen";
+const NUDGE_PANEL_SEEN_KEY = "keepup_notif_panel_seen";
+let lastNudgeNotifications = [];
 
-async function checkForNewNudges() {
-  const { data, error } = await supabase.rpc("fn_get_my_recent_nudges", { p_limit: 5 });
-  if (error || !data || data.length === 0) return;
+async function refreshNotifications() {
+  const { data, error } = await supabase.rpc("fn_get_my_recent_nudges", { p_limit: 20 });
+  if (error) {
+    console.error("Couldn't load notifications:", error);
+    return;
+  }
+  lastNudgeNotifications = data || [];
 
-  let lastSeen = null;
-  try { lastSeen = localStorage.getItem(NUDGE_LAST_SEEN_KEY); } catch {}
+  // Toasts — unchanged behavior from before the bell existed.
+  if (lastNudgeNotifications.length > 0) {
+    let toastSeen = null;
+    try { toastSeen = localStorage.getItem(NUDGE_LAST_SEEN_KEY); } catch {}
+    // First-ever visit: just the latest, not a backlog dump.
+    const unseenToasts = toastSeen ? lastNudgeNotifications.filter((n) => n.created_at > toastSeen) : [lastNudgeNotifications[0]];
+    try { localStorage.setItem(NUDGE_LAST_SEEN_KEY, lastNudgeNotifications[0].created_at); } catch {}
+    // Oldest-of-the-unseen-batch first so banners stack in the order they actually arrived.
+    unseenToasts.slice().reverse().forEach((n) => showNudgeBanner(n));
+  }
 
-  const unseen = lastSeen ? data.filter((n) => n.created_at > lastSeen) : [data[0]]; // first-ever visit: just the latest, not a backlog dump
-  if (unseen.length === 0) return;
+  // Bell badge — separate pointer, only advanced by actually opening the panel (openNotifPanel
+  // below), so a toast alone never silently clears an unread count the user hasn't looked at.
+  let panelSeen = null;
+  try { panelSeen = localStorage.getItem(NUDGE_PANEL_SEEN_KEY); } catch {}
+  if (panelSeen === null) {
+    // First-ever visit to this feature: nothing that predates it counts as "unread".
+    try { localStorage.setItem(NUDGE_PANEL_SEEN_KEY, lastNudgeNotifications[0]?.created_at || new Date(0).toISOString()); } catch {}
+    updateNotifBadge(0);
+  } else {
+    updateNotifBadge(lastNudgeNotifications.filter((n) => n.created_at > panelSeen).length);
+  }
+}
 
-  try { localStorage.setItem(NUDGE_LAST_SEEN_KEY, data[0].created_at); } catch {}
-
-  // Newest first in `data` — show oldest-of-the-unseen-batch first so banners stack in the order
-  // they actually arrived.
-  unseen.slice().reverse().forEach((n) => showNudgeBanner(n));
+function updateNotifBadge(count) {
+  const badge = el("notif-badge");
+  const bell = el("notif-bell-btn");
+  bell.classList.toggle("has-unread", count > 0);
+  if (count > 0) {
+    badge.textContent = count > 9 ? "9+" : String(count);
+    show("notif-badge");
+  } else {
+    hide("notif-badge");
+  }
 }
 
 function showNudgeBanner(nudge) {
@@ -2880,6 +2977,65 @@ function showNudgeBanner(nudge) {
     setTimeout(() => banner.remove(), 300);
   }, 5000);
 }
+
+// Small relative-time label ("3m", "2h", "5d") for the notification panel's rows — nothing else
+// on this page has needed one before now (workout history shows the actual submitted date).
+function timeAgo(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(isoString).toLocaleDateString();
+}
+
+function renderNotifPanel() {
+  const list = el("notif-panel-list");
+  if (lastNudgeNotifications.length === 0) {
+    list.innerHTML = `<p class="notif-panel-empty">No notifications yet.</p>`;
+    return;
+  }
+  list.innerHTML = lastNudgeNotifications.map((n) => `
+    <div class="notif-row">
+      ${bellIconSvg()}
+      <div class="notif-row-text">
+        <div><strong>${escapeHtml(n.sender_name || "Someone")}</strong> nudged you${n.message ? `: "${escapeHtml(n.message)}"` : ""}</div>
+        <div class="notif-row-time">${timeAgo(n.created_at)} ago</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openNotifPanel() {
+  renderNotifPanel();
+  show("notif-panel");
+  if (lastNudgeNotifications.length > 0) {
+    try { localStorage.setItem(NUDGE_PANEL_SEEN_KEY, lastNudgeNotifications[0].created_at); } catch {}
+  }
+  updateNotifBadge(0);
+}
+
+function closeNotifPanel() {
+  hide("notif-panel");
+}
+
+el("notif-bell-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (el("notif-panel").classList.contains("hidden")) {
+    openNotifPanel();
+  } else {
+    closeNotifPanel();
+  }
+});
+// Click-outside-to-close, same pattern #more-menu already uses.
+document.addEventListener("click", (e) => {
+  if (!el("notif-panel").classList.contains("hidden") && !e.target.closest("#notif-panel") && e.target.id !== "notif-bell-btn" && !e.target.closest("#notif-bell-btn")) {
+    closeNotifPanel();
+  }
+});
 
 // ---------- Create a club (user request 08-21, item 2) ----------
 //
