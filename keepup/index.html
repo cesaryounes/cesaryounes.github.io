@@ -1723,12 +1723,33 @@ async function refreshSession() {
   renderAuthState();
 }
 
-function renderAuthState() {
+// FIX (user report 08-25: "i broke my 5 day streak but it is still showing 5 and i have the
+// multiplier" — confirmed the same bug exists here, not just the Android app, see
+// AppViewModel.kt's loadInitialData() for the original fix). current_streak is only ever
+// recomputed by the workout-insert trigger (0001_gamification.sql), which fires on a NEW
+// workout — missing a day doesn't insert anything, so nothing ever notices, and the stale value
+// (with its multiplier) just sits there until the next workout finally recomputes it from
+// scratch. fn_recompute_my_streak() (0017_premium_accounts.sql) derives it fresh from actual
+// workout history instead. Gated on this flag (not just called every renderAuthState() — that
+// fires on every auth event including token refresh, not only sign-in) so it's genuinely once
+// per page load, not once an hour; reset on sign-out so a different account signing in on the
+// same tab still gets its own recompute.
+let streakRecomputedThisSession = false;
+
+async function renderAuthState() {
   if (currentSession) {
     hide("signed-out-view");
     show("signed-in-view");
     show("stat-cluster");
     collapseSubmitFlow({ refresh: false });
+    if (!streakRecomputedThisSession) {
+      streakRecomputedThisSession = true;
+      try {
+        await supabase.rpc("fn_recompute_my_streak");
+      } catch (e) {
+        console.error("Streak recompute error:", e);
+      }
+    }
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
     refreshNotifications();
@@ -1767,6 +1788,7 @@ function prefetchOtherTabs(activeTab) {
 
 el("sign-out-btn").addEventListener("click", async () => {
   await supabase.auth.signOut();
+  streakRecomputedThisSession = false;
   await refreshSession();
 });
 
