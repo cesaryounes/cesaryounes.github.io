@@ -478,6 +478,12 @@
   .nudge-banner.show { transform: translateY(0); opacity: 1; }
   .nudge-banner svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
   .nudge-banner span { font-size: 13px; color: var(--text-main); }
+  /* FIX (user report 08-25: "received nudges on the web, is not playing or showing any animation")
+     — a received nudge now swaps the plain bell for the same mascot lottie the sender picked
+     (banner-mascot, see showBannerMascotOrBell()), same visual language as the Android app's
+     NudgeBannerOverlay instead of a static icon indistinguishable from every other notification. */
+  .nudge-banner-mascot { width: 40px; height: 40px; flex-shrink: 0; }
+  .nudge-banner-mascot svg { display: block; }
 
   /* Manually-dismissed variant (showTipBanner, user request 08-24: "open the Daily message in a
      banner") — same look, no auto-dismiss timer, plus a close button since opening this one was a
@@ -1736,6 +1742,36 @@ async function refreshSession() {
 // same tab still gets its own recompute.
 let streakRecomputedThisSession = false;
 
+// FIX (user report 08-25: "the Daily notification only arrived at Sami after I nudged him... he
+// didn't receive anything at 7 AM") — root cause, confirmed against the real data: Sami's
+// profiles.timezone is NULL. fn_process_daily_tip_notifications() (0079_daily_tips.sql) falls
+// back to UTC for a null timezone, so his "7 AM" push fires at 7 AM UTC — 3 hours late for Beirut.
+// The Android app has always kept this in sync (AppViewModel.syncTimezoneIfNeeded(), fired off
+// TimeZone.getDefault().id on every profile load) — this page never had an equivalent, so anyone
+// who signs up or primarily lives on the web (like Sami, apparently) simply never gets a
+// timezone written at all. Same once-per-session gate as the streak recompute above, same reason
+// (renderAuthState fires on token refresh too, not just real sign-in).
+let timezoneSyncedThisSession = false;
+async function syncTimezoneIfNeeded() {
+  try {
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!deviceTimezone) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("timezone")
+      .eq("id", currentSession.user.id)
+      .single();
+    if (profile?.timezone === deviceTimezone) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ timezone: deviceTimezone })
+      .eq("id", currentSession.user.id);
+    if (error) console.error("Timezone sync error:", error);
+  } catch (e) {
+    console.error("Timezone sync error:", e);
+  }
+}
+
 async function renderAuthState() {
   if (currentSession) {
     hide("signed-out-view");
@@ -1749,6 +1785,10 @@ async function renderAuthState() {
       } catch (e) {
         console.error("Streak recompute error:", e);
       }
+    }
+    if (!timezoneSyncedThisSession) {
+      timezoneSyncedThisSession = true;
+      syncTimezoneIfNeeded();
     }
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
@@ -1789,6 +1829,7 @@ function prefetchOtherTabs(activeTab) {
 el("sign-out-btn").addEventListener("click", async () => {
   await supabase.auth.signOut();
   streakRecomputedThisSession = false;
+  timezoneSyncedThisSession = false;
   await refreshSession();
 });
 
@@ -3158,6 +3199,59 @@ el("nudge-modal-backdrop").addEventListener("click", (e) => {
 const NOTIF_TOAST_SEEN_KEY = "keepup_nudge_last_seen";
 let lastNotifications = [];
 
+// FIX (user report 08-25, video attached: banner drifts up and overlaps the phone's own status
+// bar while scrolling) — `.nudge-banner` is `position: fixed; top: 12px`, which tracks the LAYOUT
+// viewport. Mobile Chrome collapses its address bar on scroll and grows the visible content area
+// upward into that freed space; a plain fixed `top` doesn't move with it, so the banner ends up
+// pinned to a point that's no longer where "12px from the visible top" actually is — it visually
+// slides up under the OS status bar. The Visual Viewport API reports where the content is ACTUALLY
+// visible right now, so pin to that instead and keep it live-updated as the toolbar collapses/
+// expands. No-op (falls back to the static CSS top:12px) on a browser without the API.
+function pinBannerToViewport(banner) {
+  if (!window.visualViewport) return () => {};
+  const reposition = () => { banner.style.top = `${window.visualViewport.offsetTop + 12}px`; };
+  reposition();
+  window.visualViewport.addEventListener("resize", reposition);
+  window.visualViewport.addEventListener("scroll", reposition);
+  return () => {
+    window.visualViewport.removeEventListener("resize", reposition);
+    window.visualViewport.removeEventListener("scroll", reposition);
+  };
+}
+
+// FIX (user report 08-25: "received nudges on the web, is not playing or showing any animation")
+// — shared by showNotifToast/showTipBanner. A received nudge carries its sender's chosen
+// preset_id through in notifications.data (send-notifications/index.ts's notifyData → this
+// table's `data` column), the same preset_id NUDGE_PRESETS/openNudgePicker above key their mascot
+// lottie files by — so play the SAME animation the sender picked instead of a static bell,
+// matching what the Android app's NudgeBannerOverlay already does on the receiving end. Falls
+// back to the plain bell for every other notification type, a presetless/custom-message nudge, or
+// if the lottie CDN didn't load — same graceful-degradation the picker itself uses.
+let bannerMascotSeq = 0;
+function bannerIconHtml(n) {
+  const presetId = n.type === "nudge" ? n.data?.preset_id : null;
+  if (presetId && typeof window.lottie !== "undefined") {
+    const mascotId = `banner-mascot-${++bannerMascotSeq}`;
+    return { html: `<div class="nudge-banner-mascot" id="${mascotId}"></div>`, mascotId, presetId };
+  }
+  return { html: bellIconSvg(), mascotId: null, presetId: null };
+}
+function loadBannerMascot(mascotId, presetId) {
+  if (!mascotId) return null;
+  try {
+    return window.lottie.loadAnimation({
+      container: el(mascotId),
+      renderer: "svg",
+      loop: true,
+      autoplay: true,
+      path: `mascots/nudge_${presetId}.json`,
+    });
+  } catch (e) {
+    console.error(`Couldn't load banner mascot for ${presetId}:`, e);
+    return null;
+  }
+}
+
 async function refreshNotifications() {
   const { data, error } = await supabase
     .from("notifications")
@@ -3198,12 +3292,19 @@ function updateNotifBadge(count) {
 function showNotifToast(n) {
   const banner = document.createElement("div");
   banner.className = "nudge-banner";
-  banner.innerHTML = `${bellIconSvg()}<span><strong>${escapeHtml(n.title || "KeepUp")}</strong>${n.body ? ` — ${escapeHtml(n.body)}` : ""}</span>`;
+  const icon = bannerIconHtml(n);
+  banner.innerHTML = `${icon.html}<span><strong>${escapeHtml(n.title || "KeepUp")}</strong>${n.body ? ` — ${escapeHtml(n.body)}` : ""}</span>`;
   document.body.appendChild(banner);
+  const mascotAnim = loadBannerMascot(icon.mascotId, icon.presetId);
+  const unpin = pinBannerToViewport(banner);
   requestAnimationFrame(() => banner.classList.add("show"));
   setTimeout(() => {
     banner.classList.remove("show");
-    setTimeout(() => banner.remove(), 300);
+    setTimeout(() => {
+      unpin();
+      if (mascotAnim) mascotAnim.destroy();
+      banner.remove();
+    }, 300);
   }, 5000);
 }
 
@@ -3247,7 +3348,7 @@ function renderNotifPanel() {
       const n = lastNotifications.find((x) => x.id === row.dataset.notifId);
       if (!n) return;
       closeNotifPanel();
-      handleNotificationRouting(n.type, n.title, n.body);
+      handleNotificationRouting(n.type, n.title, n.body, n.data?.preset_id);
     });
   });
 }
@@ -3265,11 +3366,13 @@ function renderNotifPanel() {
 // whole of "seeing" that notification for those, per the original explicit ask.
 const LEADERBOARD_PASS_TYPES = new Set(["global_leaderboard_pass", "club_leaderboard_pass", "club_passed"]);
 const BANNER_TYPES = new Set(["daily_tip", "evening_nudge", "nudge"]);
-function handleNotificationRouting(type, title, body) {
+// presetId (added 08-25) rides along purely so showTipBanner can play the sender's chosen mascot
+// for a routed "nudge" — see bannerIconHtml()'s doc comment above for the full story.
+function handleNotificationRouting(type, title, body, presetId) {
   if (LEADERBOARD_PASS_TYPES.has(type)) {
     switchTab("leaderboard");
   } else if (BANNER_TYPES.has(type)) {
-    showTipBanner(title, body);
+    showTipBanner(type, title, body, presetId);
   }
 }
 
@@ -3277,19 +3380,26 @@ function handleNotificationRouting(type, title, body) {
 // showNotifToast's ambient 5s toast) — reuses the same .nudge-banner visual language since the
 // user asked for this "in a banner" specifically, just with a close button since opening it was a
 // deliberate action (clicking a notification), not a passive ambient ping.
-function showTipBanner(title, body) {
+function showTipBanner(type, title, body, presetId) {
   const banner = document.createElement("div");
   banner.className = "nudge-banner tip-banner";
+  const icon = bannerIconHtml({ type, data: { preset_id: presetId } });
   banner.innerHTML = `
-    ${bellIconSvg()}
+    ${icon.html}
     <span><strong>${escapeHtml(title || "KeepUp")}</strong>${body ? ` — ${escapeHtml(body)}` : ""}</span>
     <button type="button" class="tip-banner-close" aria-label="Close">&times;</button>
   `;
   document.body.appendChild(banner);
+  const mascotAnim = loadBannerMascot(icon.mascotId, icon.presetId);
+  const unpin = pinBannerToViewport(banner);
   requestAnimationFrame(() => banner.classList.add("show"));
   const dismiss = () => {
     banner.classList.remove("show");
-    setTimeout(() => banner.remove(), 300);
+    setTimeout(() => {
+      unpin();
+      if (mascotAnim) mascotAnim.destroy();
+      banner.remove();
+    }, 300);
   };
   banner.querySelector(".tip-banner-close").addEventListener("click", dismiss);
 }
@@ -3300,7 +3410,7 @@ if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event.data && event.data.source === "keepup-notification-click") {
       const d = event.data.data || {};
-      handleNotificationRouting(d.type, d.title, d.body);
+      handleNotificationRouting(d.type, d.title, d.body, d.preset_id);
     }
   });
 }
@@ -3317,10 +3427,11 @@ function checkUrlNotificationParams() {
   const type = params.get("notifType");
   if (!type) return;
   notifRoutingHandledFromUrl = true;
-  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"));
+  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"), params.get("notifPreset"));
   params.delete("notifType");
   params.delete("notifTitle");
   params.delete("notifBody");
+  params.delete("notifPreset");
   const newSearch = params.toString();
   history.replaceState(null, "", location.pathname + (newSearch ? `?${newSearch}` : "") + location.hash);
 }

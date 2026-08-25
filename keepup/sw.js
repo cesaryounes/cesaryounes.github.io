@@ -71,6 +71,11 @@ self.addEventListener("notificationclick", (event) => {
         if (data.type) params.set("notifType", data.type);
         if (data.title) params.set("notifTitle", data.title);
         if (data.body) params.set("notifBody", data.body);
+        // FIX (user report 08-25: received nudges play no mascot animation on web) — the
+        // already-open-tab path above forwards the whole `data` object as-is (preset_id included),
+        // but this fresh-tab fallback used to only carry type/title/body, so a nudge opened this
+        // way fell back to the plain bell even though the sender did pick a preset.
+        if (data.preset_id) params.set("notifPreset", data.preset_id);
         const qs = params.toString();
         return self.clients.openWindow(qs ? `./?${qs}` : "./");
       }
