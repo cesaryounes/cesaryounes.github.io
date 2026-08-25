@@ -1518,6 +1518,16 @@
       </label>
     </div>
     <p class="muted hidden" id="settings-push-message" style="margin-top:8px; color:var(--danger);"></p>
+
+    <!-- FIX (user request 08-25: "align the permissions with the android app") — SettingsScreen.kt
+         has 7 per-type toggles under its master switch (fn_set_notification_preference, same RPC
+         used here); this page only ever exposed the one master Push notifications switch above.
+         Same labels, same pref ids, same "greyed out + non-interactive while the master switch is
+         off, but the stored choice underneath is untouched" behavior (row-disabled, toggled live by
+         both refreshNotificationPrefToggles() and the push toggle's own change handler below) —
+         see NOTIFICATION_PREF_TOGGLES. No row for the inactivity nudge, matching Android — that
+         one's mandatory, no per-type opt-out there either. -->
+    <div id="settings-notify-prefs"></div>
   </div>
 
   <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
@@ -3376,10 +3386,13 @@ function handleNotificationRouting(type, title, body, presetId) {
   }
 }
 
-// A deliberately-opened, manually-dismissed banner (no auto-dismiss timer, unlike
-// showNotifToast's ambient 5s toast) — reuses the same .nudge-banner visual language since the
-// user asked for this "in a banner" specifically, just with a close button since opening it was a
-// deliberate action (clicking a notification), not a passive ambient ping.
+// FIX (user report 08-25: "when opened, the notification stays up until we close it — it should
+// close alone maybe after 1 or 2 sec") — used to have no auto-dismiss timer at all, on purpose
+// (see the removed comment this replaced), since opening it was a deliberate click rather than an
+// ambient ping. In practice that read as a stuck/stale banner once you'd already read it, so it
+// now auto-dismisses too, just slower than showNotifToast's ambient 5s toast — the close button
+// stays for dismissing it early.
+const TIP_BANNER_AUTO_DISMISS_MS = 2000;
 function showTipBanner(type, title, body, presetId) {
   const banner = document.createElement("div");
   banner.className = "nudge-banner tip-banner";
@@ -3393,7 +3406,9 @@ function showTipBanner(type, title, body, presetId) {
   const mascotAnim = loadBannerMascot(icon.mascotId, icon.presetId);
   const unpin = pinBannerToViewport(banner);
   requestAnimationFrame(() => banner.classList.add("show"));
+  let autoDismissTimer = null;
   const dismiss = () => {
+    if (autoDismissTimer) clearTimeout(autoDismissTimer);
     banner.classList.remove("show");
     setTimeout(() => {
       unpin();
@@ -3401,6 +3416,7 @@ function showTipBanner(type, title, body, presetId) {
       banner.remove();
     }, 300);
   };
+  autoDismissTimer = setTimeout(dismiss, TIP_BANNER_AUTO_DISMISS_MS);
   banner.querySelector(".tip-banner-close").addEventListener("click", dismiss);
 }
 
@@ -3581,8 +3597,82 @@ el("settings-push-toggle").addEventListener("change", async (e) => {
     show("settings-push-message");
   } finally {
     e.target.disabled = false;
+    setNotifyPrefRowsDisabled(!e.target.checked);
   }
 });
+
+// ---------- Per-type notification preferences (user request 08-25: "align the permissions with
+// the android app") — SettingsScreen.kt's exact 7 rows (label, pref id, order), same
+// fn_set_notification_preference RPC AppViewModel.kt's setNotifyXxx() functions already call, so a
+// choice made here is the same server-side row the Android app reads/writes too. ----------
+const NOTIFICATION_PREF_TOGGLES = [
+  { pref: "global_leaderboard", column: "notify_global_leaderboard", label: "Global Leaderboard changes" },
+  { pref: "club_leaderboard", column: "notify_club_leaderboard", label: "People passing me in my club" },
+  { pref: "streak_loss", column: "notify_streak_loss", label: "Losing my streak" },
+  { pref: "club_passed", column: "notify_club_passed", label: "My club being passed by another club" },
+  { pref: "nudges", column: "notify_nudges", label: "Nudges from clubmates" },
+  { pref: "daily_tip", column: "notify_daily_tip", label: "Daily motivation tip (7 AM)" },
+  { pref: "evening_nudge", column: "notify_evening_nudge", label: "Evening reminder if no workout logged (8 PM)" },
+];
+
+function renderNotifyPrefRows() {
+  el("settings-notify-prefs").innerHTML = NOTIFICATION_PREF_TOGGLES.map((t) => `
+    <div class="toggle-row" id="notify-pref-row-${t.pref}">
+      <div><div class="toggle-label">${escapeHtml(t.label)}</div></div>
+      <label class="switch">
+        <input type="checkbox" id="notify-pref-${t.pref}" data-pref="${t.pref}" />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
+  `).join("");
+  NOTIFICATION_PREF_TOGGLES.forEach((t) => {
+    el(`notify-pref-${t.pref}`).addEventListener("change", async (e) => {
+      const enabled = e.target.checked;
+      e.target.disabled = true;
+      try {
+        const { error } = await supabase.rpc("fn_set_notification_preference", { p_pref: t.pref, p_enabled: enabled });
+        if (error) throw error;
+      } catch (err) {
+        console.error(`Couldn't update ${t.pref} preference:`, err);
+        e.target.checked = !enabled;
+      } finally {
+        e.target.disabled = false;
+      }
+    });
+  });
+}
+renderNotifyPrefRows();
+
+// Mirrors SettingsScreen.kt's NotificationTypeRow(masterEnabled = notificationsEnabled) — greyed
+// out and non-interactive whenever the master Push notifications switch is off, without touching
+// the stored value underneath (row-disabled is purely visual/pointer-events, see its CSS).
+function setNotifyPrefRowsDisabled(disabled) {
+  NOTIFICATION_PREF_TOGGLES.forEach((t) => {
+    el(`notify-pref-row-${t.pref}`).classList.toggle("row-disabled", disabled);
+  });
+}
+
+// Called whenever Settings opens, right after refreshPushToggleState() — reflects the real stored
+// values (not assumed defaults) and syncs the greyed-out state to the master switch's current
+// (just-refreshed) checked state.
+async function refreshNotifyPrefToggles() {
+  const columns = NOTIFICATION_PREF_TOGGLES.map((t) => t.column).join(", ");
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select(columns)
+    .eq("id", currentSession.user.id)
+    .single();
+  if (error) {
+    console.error("Couldn't load notification preferences:", error);
+    return;
+  }
+  NOTIFICATION_PREF_TOGGLES.forEach((t) => {
+    // All 7 columns are `not null default true` server-side — coalescing here too just guards
+    // against an unexpected null rather than leaving a toggle in query's own default (unchecked).
+    el(`notify-pref-${t.pref}`).checked = profile?.[t.column] ?? true;
+  });
+  setNotifyPrefRowsDisabled(!el("settings-push-toggle").checked);
+}
 
 // ---------- Create a club (user request 08-21, item 2) ----------
 //
@@ -4973,7 +5063,16 @@ el("more-menu-membership").addEventListener("click", () => {
   // too so the status is always fresh regardless of tab-visit history.
   loadProfile();
 });
-el("more-menu-settings").addEventListener("click", () => { openScreen("screen-settings"); openAppearanceSettings(); refreshPushToggleState(); });
+el("more-menu-settings").addEventListener("click", () => {
+  openScreen("screen-settings");
+  openAppearanceSettings();
+  // Sequenced, not fire-and-forget in parallel — refreshNotifyPrefToggles() reads the push
+  // toggle's just-refreshed checked state to decide whether the 7 rows below it start greyed out.
+  (async () => {
+    await refreshPushToggleState();
+    await refreshNotifyPrefToggles();
+  })();
+});
 // Profile is a real tab (#tab-profile, part of TAB_ORDER), not an overlay like Membership/Shop/
 // Settings — so this closes the popover and switches to it directly, rather than going through
 // openScreen()'s overlay machinery.
