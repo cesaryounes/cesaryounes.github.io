@@ -76,6 +76,9 @@ self.addEventListener("notificationclick", (event) => {
         // but this fresh-tab fallback used to only carry type/title/body, so a nudge opened this
         // way fell back to the plain bell even though the sender did pick a preset.
         if (data.preset_id) params.set("notifPreset", data.preset_id);
+        // FIX (user report 08-25: nudge now shows a full-screen overlay with "<sender> nudged
+        // you!" — needs the real sender name, same reasoning as preset_id above).
+        if (data.sender_name) params.set("notifSender", data.sender_name);
         const qs = params.toString();
         return self.clients.openWindow(qs ? `./?${qs}` : "./");
       }

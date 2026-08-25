@@ -494,6 +494,32 @@
     background: transparent; color: var(--text-muted); font-size: 18px; line-height: 1;
   }
 
+  /* FIX (user report 08-25, video attached: "the nudge animation is showing inside the small
+     notification on top, we need it to show in the middle of the screen, similarly to how it
+     shows in the android app") — a received nudge specifically (not daily_tip/evening_nudge,
+     those keep the small .nudge-banner toast) now gets its own full-screen centered overlay,
+     matching Motion.kt's NudgeBannerOverlay 1:1: a dimmed full-screen backdrop (tap anywhere to
+     dismiss), a centered card with a big mascot animation, bold accent "X nudged you!" title,
+     muted message below. showNudgeOverlay() below builds this; pinBannerToViewport doesn't apply
+     here since this is already viewport-relative (position: fixed + fillMaxSize-equivalent), not
+     anchored to a scrolling page position the way the top toast was. */
+  .nudge-overlay-backdrop {
+    position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0); transition: background 0.25s ease; padding: 24px;
+  }
+  .nudge-overlay-backdrop.show { background: rgba(0,0,0,0.55); }
+  .nudge-overlay-card {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: var(--card); border-radius: 24px; padding: 24px 28px; max-width: 340px;
+    transform: scale(0.85); opacity: 0; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  }
+  .nudge-overlay-backdrop.show .nudge-overlay-card { transform: scale(1); opacity: 1; }
+  .nudge-overlay-mascot { width: 200px; height: 200px; flex-shrink: 0; }
+  .nudge-overlay-mascot svg { display: block; }
+  .nudge-overlay-mascot.fallback-bell { width: 64px; height: 64px; color: var(--accent); }
+  .nudge-overlay-title { font-size: 16px; font-weight: 800; color: var(--accent); margin-top: 14px; }
+  .nudge-overlay-message { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
   /* ---- Stat cluster, in the top banner (mirrors HomeScreen.kt's TopBanner: streak/freeze/
      gems/multiplier, icon+number only, no labels — always visible across every tab, not just
      Dashboard, same as the app since the 08-19 "show it on all screens" fix). ---- */
@@ -554,6 +580,9 @@
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     color: var(--accent); font-weight: 800; font-size: 11px;
   }
+  /* categoryIconSvg()'s raw <svg> has no width/height of its own (viewBox only) — sized here to
+     match the tile, same pattern .category-pick-icon svg already uses for the picker itself. */
+  .workout-icon-tile svg { width: 22px; height: 22px; }
 
   /* ---- Profile tab ---- */
   .profile-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -3246,13 +3275,13 @@ function bannerIconHtml(n) {
   }
   return { html: bellIconSvg(), mascotId: null, presetId: null };
 }
-function loadBannerMascot(mascotId, presetId) {
+function loadBannerMascot(mascotId, presetId, loop = true) {
   if (!mascotId) return null;
   try {
     return window.lottie.loadAnimation({
       container: el(mascotId),
       renderer: "svg",
-      loop: true,
+      loop,
       autoplay: true,
       path: `mascots/nudge_${presetId}.json`,
     });
@@ -3260,6 +3289,48 @@ function loadBannerMascot(mascotId, presetId) {
     console.error(`Couldn't load banner mascot for ${presetId}:`, e);
     return null;
   }
+}
+
+// FIX (user report 08-25, video attached: "the nudge animation is showing inside the small
+// notification on top, we need it to show in the middle of the screen, similarly to how it shows
+// in the android app") — full-screen centered overlay for a received nudge specifically, matching
+// Motion.kt's NudgeBannerOverlay: dimmed backdrop (tap to dismiss early), a centered card with a
+// big mascot animation playing once (not looped — Android's own comment notes its clips already
+// "hold a settled pose at the end"; looping would just get cut off mid-replay by the 5s auto-
+// dismiss below), bold title, message. Falls back to a plain bell icon if there's no preset or the
+// lottie CDN didn't load, same graceful-degradation every other banner on this page already uses.
+const NUDGE_OVERLAY_AUTO_DISMISS_MS = 5000;
+function showNudgeOverlay(senderName, message, presetId) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "nudge-overlay-backdrop";
+  const mascotAvailable = presetId && typeof window.lottie !== "undefined";
+  const mascotId = mascotAvailable ? `nudge-overlay-mascot-${++bannerMascotSeq}` : null;
+  backdrop.innerHTML = `
+    <div class="nudge-overlay-card">
+      ${mascotId
+        ? `<div class="nudge-overlay-mascot" id="${mascotId}"></div>`
+        : `<div class="nudge-overlay-mascot fallback-bell">${bellIconSvg()}</div>`}
+      <div class="nudge-overlay-title">${escapeHtml(senderName)} nudged you!</div>
+      <div class="nudge-overlay-message">${escapeHtml(message)}</div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const mascotAnim = mascotId ? loadBannerMascot(mascotId, presetId, false) : null;
+  requestAnimationFrame(() => backdrop.classList.add("show"));
+  let dismissed = false;
+  let dismissTimer = null;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    if (dismissTimer) clearTimeout(dismissTimer);
+    backdrop.classList.remove("show");
+    setTimeout(() => {
+      if (mascotAnim) mascotAnim.destroy();
+      backdrop.remove();
+    }, 300);
+  };
+  backdrop.addEventListener("click", dismiss);
+  dismissTimer = setTimeout(dismiss, NUDGE_OVERLAY_AUTO_DISMISS_MS);
 }
 
 async function refreshNotifications() {
@@ -3300,6 +3371,16 @@ function updateNotifBadge(count) {
 }
 
 function showNotifToast(n) {
+  // FIX (user report 08-25): a received nudge gets the full-screen centered overlay instead of
+  // the small top toast, matching the Android app — see showNudgeOverlay()'s own doc comment.
+  // sender_name/message ride in notifications.data (send-notifications/index.ts's notifyData);
+  // falling back to title/body covers the (should-never-happen) case data is missing.
+  if (n.type === "nudge") {
+    const senderName = n.data?.sender_name ?? (n.title || "Someone").replace(/ nudged you!$/, "");
+    const message = n.data?.message ?? n.body ?? "Time to get moving — log a workout!";
+    showNudgeOverlay(senderName, message, n.data?.preset_id ?? null);
+    return;
+  }
   const banner = document.createElement("div");
   banner.className = "nudge-banner";
   const icon = bannerIconHtml(n);
@@ -3358,7 +3439,7 @@ function renderNotifPanel() {
       const n = lastNotifications.find((x) => x.id === row.dataset.notifId);
       if (!n) return;
       closeNotifPanel();
-      handleNotificationRouting(n.type, n.title, n.body, n.data?.preset_id);
+      handleNotificationRouting(n.type, n.title, n.body, n.data?.preset_id, n.data?.sender_name);
     });
   });
 }
@@ -3375,12 +3456,15 @@ function renderNotifPanel() {
 // defined destination and stay a no-op here — the panel/toast the user already saw is itself the
 // whole of "seeing" that notification for those, per the original explicit ask.
 const LEADERBOARD_PASS_TYPES = new Set(["global_leaderboard_pass", "club_leaderboard_pass", "club_passed"]);
-const BANNER_TYPES = new Set(["daily_tip", "evening_nudge", "nudge"]);
-// presetId (added 08-25) rides along purely so showTipBanner can play the sender's chosen mascot
-// for a routed "nudge" — see bannerIconHtml()'s doc comment above for the full story.
-function handleNotificationRouting(type, title, body, presetId) {
+// "nudge" split out of BANNER_TYPES (user report 08-25) — a routed nudge (panel row click, or a
+// real push notification tap) now gets the same full-screen centered overlay an ambient incoming
+// one does, instead of the small top banner daily_tip/evening_nudge still use.
+const BANNER_TYPES = new Set(["daily_tip", "evening_nudge"]);
+function handleNotificationRouting(type, title, body, presetId, senderName) {
   if (LEADERBOARD_PASS_TYPES.has(type)) {
     switchTab("leaderboard");
+  } else if (type === "nudge") {
+    showNudgeOverlay(senderName ?? (title || "Someone").replace(/ nudged you!$/, ""), body ?? "Time to get moving — log a workout!", presetId ?? null);
   } else if (BANNER_TYPES.has(type)) {
     showTipBanner(type, title, body, presetId);
   }
@@ -3426,7 +3510,7 @@ if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event.data && event.data.source === "keepup-notification-click") {
       const d = event.data.data || {};
-      handleNotificationRouting(d.type, d.title, d.body, d.preset_id);
+      handleNotificationRouting(d.type, d.title, d.body, d.preset_id, d.sender_name);
     }
   });
 }
@@ -3443,11 +3527,12 @@ function checkUrlNotificationParams() {
   const type = params.get("notifType");
   if (!type) return;
   notifRoutingHandledFromUrl = true;
-  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"), params.get("notifPreset"));
+  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"), params.get("notifPreset"), params.get("notifSender"));
   params.delete("notifType");
   params.delete("notifTitle");
   params.delete("notifBody");
   params.delete("notifPreset");
+  params.delete("notifSender");
   const newSearch = params.toString();
   history.replaceState(null, "", location.pathname + (newSearch ? `?${newSearch}` : "") + location.hash);
 }
@@ -4907,11 +4992,23 @@ function renderHistoryRow(w) {
   const li = document.createElement("li");
   li.className = "history-row";
 
-  const label = EXERCISE_TYPE_LABELS[w.exercise_type] || "Workout";
   const activityKey = categoryKeyForExerciseType(w.exercise_type);
-  const iconUrl = workoutIconUrl(w.exercise_type);
-  const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
   const isWebUpload = w.source === "web_photo";
+  // FIX (user report 08-26, screenshot: a Cardio/HIIT entry showed as "Running" in the history
+  // list, though the edit form correctly had "Cardio/HIIT" preselected) — the web's manual-log
+  // picker only offers 6 categories, each stored as one arbitrary "representative" exercise_type
+  // per CATEGORY_TO_CODE (cardio → 56/Running, purely because *something* concrete has to go in
+  // that column — it doesn't mean the user picked "Running" specifically). EXERCISE_TYPE_LABELS
+  // is the precise 60-type vocabulary meant for REAL Health-Connect-synced workouts, where the
+  // exercise_type genuinely is that exact sport — using it for a web_photo row showed the
+  // representative code's own specific label instead of the category the user actually chose.
+  // Only web_photo rows get the category label/icon; an app-synced row's exercise_type is real,
+  // so it keeps showing the precise sport as before.
+  const label = isWebUpload
+    ? (CATEGORY_ICON_LABEL[activityKey] || "Workout")
+    : (EXERCISE_TYPE_LABELS[w.exercise_type] || "Workout");
+  const iconUrl = isWebUpload ? null : workoutIconUrl(w.exercise_type);
+  const dateLabel = w.local_date || (w.created_at ? w.created_at.slice(0, 10) : "");
   const isRejected = !!w.rejected_at;
 
   // Score/status readout — mirrors LeaderboardScreen.kt's formatPoints (2 decimals) for a scored
@@ -4924,7 +5021,11 @@ function renderHistoryRow(w) {
   const main = document.createElement("div");
   main.className = "history-row-main";
   main.innerHTML = `
-    <div class="workout-icon-tile">${iconUrl ? `<img src="${iconUrl}" alt="" width="24" height="24"/>` : (CATEGORY_ABBR[activityKey] || "CIO")}</div>
+    <div class="workout-icon-tile">${
+      iconUrl ? `<img src="${iconUrl}" alt="" width="24" height="24"/>`
+      : isWebUpload ? categoryIconSvg(activityKey)
+      : (CATEGORY_ABBR[activityKey] || "CIO")
+    }</div>
     <div style="min-width:0; flex:1;">
       <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
       <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
