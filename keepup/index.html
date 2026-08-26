@@ -1791,6 +1791,15 @@
         <span class="track"></span><span class="thumb"></span>
       </label>
     </div>
+    <!-- FIX (user report 08-26: friend on iPhone Safari saw every notification-type row silently
+         greyed out with no master toggle anywhere in sight, no explanation why) — iOS Safari only
+         supports the Push API from a page opened off the Home Screen (standalone mode), never from
+         a plain browser tab; refreshPushToggleState() below already hides #settings-push-row
+         entirely in that case, which used to just leave a confusing gap. This fills that gap with
+         the actual actionable fix (or, if already installed and still unsupported — an old iOS
+         version — a different, non-actionable note instead of the same wrong advice). Hidden
+         entirely on any non-iOS unsupported browser, where "Add to Home Screen" wouldn't help. -->
+    <p class="muted hidden" id="settings-push-unsupported-note" style="margin-top:-4px; margin-bottom:14px; font-size:12px;"></p>
     <p class="muted hidden" id="settings-push-message" style="margin-top:8px; color:var(--danger);"></p>
 
     <!-- FIX (user request 08-25: "align the permissions with the android app") — SettingsScreen.kt
@@ -4411,11 +4420,41 @@ async function getExistingPushSubscription() {
 // Called whenever Settings opens — reflects whatever's actually true right now (a subscription
 // can go stale outside this page's control, e.g. the user revoked the permission in browser
 // settings) rather than trusting a locally-cached "on" state.
+//
+// isIOS/isStandalone (user report 08-26: friend on iPhone Safari saw the whole master toggle
+// silently vanish, no explanation) — the standard UA-sniffing check for "real" iPhone/iPod, plus
+// the well-known iPadOS-reports-as-Mac workaround (a touch-capable "MacIntel" is iPadOS 13+, no
+// real Mac has a touchscreen). isStandalone covers both iOS's own non-standard
+// navigator.standalone and the cross-browser display-mode media query, so this reads correctly
+// regardless of how the page was actually launched.
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isStandalone() {
+  return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+}
 async function refreshPushToggleState() {
   if (!pushSupported) {
     hide("settings-push-row");
+    const note = el("settings-push-unsupported-note");
+    if (isIOS() && !isStandalone()) {
+      // The actionable case — a plain Safari tab, which is exactly what's fixable here.
+      note.textContent = "To get notifications on iPhone/iPad: tap the Share icon in Safari, then \"Add to Home Screen\", and open KeepUp from there instead of Safari.";
+      show("settings-push-unsupported-note");
+    } else if (isIOS()) {
+      // Already installed and still unsupported — an iOS version older than 16.4, nothing this
+      // page can tell them to do about it beyond that.
+      note.textContent = "Notifications need iOS 16.4 or later. Update iOS to enable them.";
+      show("settings-push-unsupported-note");
+    } else {
+      // Some other unsupported browser (old Android WebView, an unusual desktop browser, etc.) —
+      // "Add to Home Screen" is iOS-specific and would be actively wrong advice here.
+      hide("settings-push-unsupported-note");
+    }
     return;
   }
+  hide("settings-push-unsupported-note");
   show("settings-push-row");
   const sub = await getExistingPushSubscription();
   el("settings-push-toggle").checked = Boolean(sub) && Notification.permission === "granted";
