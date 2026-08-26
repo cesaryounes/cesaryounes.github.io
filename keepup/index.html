@@ -440,6 +440,15 @@
   }
   .member-row:last-child { border-bottom: none; }
   .member-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* "See their past workouts" chevron (user request 08-26: "replace the long press with an arrow
+     to the far right") — historyChevronHtml()'s own button, shared between club member rows and
+     leaderboard list rows. */
+  .row-history-btn {
+    width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: none; border: none; padding: 0; margin: 0; color: var(--text-muted); cursor: pointer;
+  }
+  .row-history-btn svg { width: 20px; height: 20px; }
+  .row-history-btn:active { color: var(--text-main); }
   .owner-badge {
     font-size: 10px; font-weight: 800; color: var(--amber); text-transform: uppercase;
     letter-spacing: 0.03em; margin-left: 6px;
@@ -2976,16 +2985,22 @@ function renderLeaderboardRows(rows) {
       podiumWrap.appendChild(slot);
     });
     Array.from(podiumWrap.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
-      btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation(); // don't also trigger the avatar's own "see workouts" tap below
+        openNudgePicker(btn.dataset.uid, btn.dataset.name);
+      });
     });
-    // "See their past workouts" (user request 08-26) — same shared-club boundary as the nudge
-    // bell right above (canNudgeLeaderboardRow), so a long-press on a Global-scope stranger you
-    // don't actually share a club with never even attempts the round trip.
-    Array.from(podiumWrap.querySelectorAll(".podium-name")).forEach((nameEl, idx) => {
+    // "See their past workouts" (user request 08-26, moved to a tap on the avatar itself 08-26 —
+    // "instead of the long press, can you make it as press on the avatar?") — same shared-club
+    // boundary as the nudge bell above (canNudgeLeaderboardRow), so tapping a Global-scope
+    // stranger's avatar never even attempts the round trip. The nudge badge sits inside this same
+    // avatar wrap, hence the stopPropagation() above — otherwise tapping it would also open the
+    // workout sheet a moment later.
+    Array.from(podiumWrap.querySelectorAll(".podium-avatar-wrap")).forEach((wrapEl, idx) => {
       const r = top3[displayOrder[idx]];
-      if (canNudgeLeaderboardRow(r.user_id)) {
-        attachLongPress(nameEl, () => openClubmateWorkouts(r.user_id, r.display_name || "Member"));
-      }
+      if (!canNudgeLeaderboardRow(r.user_id)) return;
+      wrapEl.style.cursor = "pointer";
+      wrapEl.addEventListener("click", () => openClubmateWorkouts(r.user_id, r.display_name || "Member"));
     });
     show("lb-podium");
   }
@@ -3007,21 +3022,21 @@ function renderLeaderboardRows(rows) {
   listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
+    const canSeeWorkouts = canNudgeLeaderboardRow(r.user_id);
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
-      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canNudgeLeaderboardRow(r.user_id))}
+      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canSeeWorkouts)}
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
+      ${canSeeWorkouts ? historyChevronHtml(r.user_id, r.display_name) : ""}
     `;
-    if (canNudgeLeaderboardRow(r.user_id)) {
-      attachLongPress(row.querySelector(".lb-name"), () => openClubmateWorkouts(r.user_id, r.display_name || "Member"));
-    }
     rowsWrap.appendChild(row);
   });
   Array.from(rowsWrap.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
   });
+  wireHistoryChevrons(rowsWrap);
 }
 
 // ---------- Club directory (join only — no create, no code needed) ----------
@@ -3379,16 +3394,17 @@ function renderClubMembers(members) {
     li.innerHTML = `
       ${avatarWithNudgeHtml(m.display_name, m.avatar_url, 34, m.user_id, !isMe)}
       <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}</div>
+      ${historyChevronHtml(m.user_id, m.display_name)}
     `;
     // "See their past workouts" (user request 08-26) — every row here is already a fellow member
     // of this same club (fn_get_club_members' own membership check), so this works on every row
     // including your own (harmless — "see your own past workouts" just saves a special case).
-    attachLongPress(li.querySelector(".member-row-name"), () => openClubmateWorkouts(m.user_id, m.display_name || "Member"));
     list.appendChild(li);
   });
   Array.from(list.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
   });
+  wireHistoryChevrons(list);
 }
 
 el("club-rename-btn").addEventListener("click", async () => {
@@ -3557,45 +3573,26 @@ function renderClubAuditList(rows) {
   });
 }
 
-// ---------- "See their past workouts" (user request 08-26) ----------
+// ---------- "See their past workouts" (user request 08-26, arrow-button 08-26) ----------
 //
-// Real long-press, not just a click — the web has no native equivalent of Android's
-// combinedClickable(onLongClick=...), so this is built from raw pointer events: hold for
-// LONG_PRESS_MS without enough movement to look like a scroll, and it fires; move past the
-// threshold (a real scroll attempt) or release early, and it's cancelled — never fires alongside
-// a normal tap on the same element, same "long-press is a DIFFERENT gesture from tap" behavior
-// combinedClickable gives Android for free.
-const LONG_PRESS_MS = 500;
-const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
-function attachLongPress(el, onLongPress) {
-  let timer = null;
-  let startX = 0;
-  let startY = 0;
-  let fired = false;
-  const clear = () => { if (timer) clearTimeout(timer); timer = null; };
-  const start = (x, y) => {
-    fired = false;
-    startX = x;
-    startY = y;
-    clear();
-    timer = setTimeout(() => { fired = true; onLongPress(); }, LONG_PRESS_MS);
-  };
-  const move = (x, y) => {
-    if (!timer) return;
-    if (Math.abs(x - startX) > LONG_PRESS_MOVE_TOLERANCE_PX || Math.abs(y - startY) > LONG_PRESS_MOVE_TOLERANCE_PX) clear();
-  };
-  el.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
-  el.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
-  el.addEventListener("touchend", clear);
-  el.addEventListener("touchcancel", clear);
-  // Mouse fallback for desktop/trackpad use of this same mobile-first page.
-  el.addEventListener("mousedown", (e) => start(e.clientX, e.clientY));
-  el.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
-  el.addEventListener("mouseup", clear);
-  el.addEventListener("mouseleave", clear);
-  // A long-press that fired shouldn't also fire the element's own click a moment later (touchend/
-  // mouseup naturally follow a long-press) — swallow exactly that one synthetic click.
-  el.addEventListener("click", (e) => { if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
+// FIX (user request 08-26: "replace the long press with an arrow to the far right") — this used
+// to be a real long-press (raw pointer-hold detection, no native equivalent of Android's
+// combinedClickable(onLongClick=...) on the web) — but a long-press is a hidden gesture here with
+// none of the ripple/haptic cues that make it at least discoverable on Android; a web visitor had
+// no way to know it existed. A plain visible chevron button is the same "see their workouts"
+// action, just an affordance you can actually see. Used on every row (club members, leaderboard
+// list rows) that offers this at all — see historyChevronHtml's own call sites for the shared-club
+// gating each one already applied to the old long-press.
+function historyChevronHtml(uid, name) {
+  const label = escapeHtml(name || "Member");
+  return `<button type="button" class="row-history-btn" data-uid="${uid}" data-name="${label}" aria-label="See ${label}'s workouts" title="See ${label}'s workouts">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </button>`;
+}
+function wireHistoryChevrons(container) {
+  Array.from(container.querySelectorAll(".row-history-btn")).forEach((btn) => {
+    btn.addEventListener("click", () => openClubmateWorkouts(btn.dataset.uid, btn.dataset.name));
+  });
 }
 
 async function openClubmateWorkouts(userId, displayName) {
