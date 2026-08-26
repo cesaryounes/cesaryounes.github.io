@@ -453,7 +453,7 @@
     display: flex; align-items: flex-end; justify-content: center;
   }
   .modal-backdrop .modal-card {
-    background: var(--card); border-radius: 20px 20px 0 0; padding: 20px;
+    background: var(--card); border-radius: 24px 24px 0 0; padding: 20px;
     width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto;
     padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     /* FIX (user report 08-26: "when we scroll down to close it, instead of it being closed, it
@@ -462,7 +462,21 @@
        up instead. `contain` stops that hand-off; attachSwipeDownToClose() below (see
        clubmate-workouts-backdrop) is what makes that same gesture actually close the sheet. */
     overscroll-behavior-y: contain;
+    /* FIX (user request 08-26: "container that opens... maybe with better edges") — a soft lift
+       off the backdrop instead of a hard flat edge, same reasoning ModalBottomSheet's default
+       elevation gives Android's own sheet. */
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.35);
   }
+  /* FIX (user request 08-26: "show the small white line at the top, similar to the app") —
+     ModalBottomSheet's own drag handle (Material3's default), reproduced here so a bottom sheet
+     reads as "swipeable" on the web too, not just functionally (attachSwipeDownToClose) but
+     visually. */
+  .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.28); margin: 0 auto 16px; flex-shrink: 0; }
+  /* FIX (user request 08-26: "make the workout list... smoother") — was an instant, un-animated
+     display:none/flex toggle; now a real slide-up-in / slide-down-out, same feel as
+     ModalBottomSheet's own open/close motion. Scoped to this one sheet (not the shared .hidden
+     helper every other modal/element uses) — see openClubmateWorkouts/closeClubmateWorkouts. */
+  #clubmate-workouts-card { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
@@ -860,6 +874,15 @@
              clearHeaderAction() below show/hide and retarget it on every tab switch. -->
         <button class="header-icon-btn hidden" id="header-action-btn" aria-label="Create a club" title="Create a club">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <!-- "Share leaderboard" (user request 08-26: "add a share leaderboard from the Leaderboard
+             screen similar to the application") — LeaderboardScreen.kt's own share action lives in
+             this same persistent header, shown only on the Leaderboard tab. No off-screen render-
+             then-screenshot trick here (there's no such thing as an off-screen DOM on the web the
+             way GraphicsLayer works) — shareLeaderboardImage() below draws the same card straight
+             onto a <canvas> instead, so it's always the full top-10 regardless of scroll position. -->
+        <button class="header-icon-btn hidden" id="header-share-btn" aria-label="Share leaderboard" title="Share leaderboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
         </button>
         <!-- Search toggle (user request 08-24, widened to the Club tab too 08-26 — "move the
              search next to the + and bell, same as the application") — shown on both Leaderboard
@@ -1517,6 +1540,7 @@
        openClubmateWorkouts() below for the shared long-press wiring. -->
   <div class="modal-backdrop hidden" id="clubmate-workouts-backdrop">
     <div class="modal-card" id="clubmate-workouts-card">
+      <div class="sheet-handle"></div>
       <p class="section-label" id="clubmate-workouts-title" style="margin-bottom:14px;">Workouts</p>
       <p class="muted" id="clubmate-workouts-empty">Loading…</p>
       <ul class="history-list hidden" id="clubmate-workouts-list"></ul>
@@ -2051,6 +2075,8 @@ function switchTab(tab) {
   }
   if (tab !== "leaderboard") closeLbSearch();
   if (tab !== "club") closeClubSearch();
+  // Share button (user request 08-26) — Leaderboard only, same as LeaderboardScreen.kt's own.
+  el("header-share-btn").classList.toggle("hidden", tab !== "leaderboard");
   if (tab === "dashboard") loadDashboard();
   if (tab === "club") loadClubDirectory();
   if (tab === "leaderboard") loadMyClubs();
@@ -2644,6 +2670,167 @@ el("header-search-btn").addEventListener("click", () => {
     if (el("lb-search-wrap").classList.contains("hidden")) openLbSearch(); else closeLbSearch();
   }
 });
+
+// ---------- Share leaderboard (user request 08-26) ----------
+//
+// Mirrors LeaderboardScreen.kt's own share action: a self-contained image (KEEPUP wordmark, scope
+// + period, top 10 ranked) plus a data-free invite caption — never the actual leaderboard rows
+// dumped as text, same reasoning buildLeaderboardShareCaption()'s own doc comment gives on
+// Android. Drawn straight onto a <canvas> rather than screenshotting any live DOM: the real
+// leaderboard list only renders what's scrolled into view, and there's no web equivalent of
+// GraphicsLayer's always-current off-screen render Android uses to guarantee a full top 10
+// regardless of scroll position.
+const SHARE_PERIOD_LABELS = { weekly: "Week", monthly: "Month", yearly: "Year", alltime: "All" };
+function scopeLabelForShare() {
+  if (currentScope.type === "global") return "Global";
+  if (currentScope.type === "region") return currentScope.code;
+  return currentScope.name || "Club";
+}
+function buildLeaderboardShareCaption() {
+  return "I'm putting in the work on KeepUp — come keep up with me: https://cesaryounes.github.io/";
+}
+function truncateForCanvas(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let cut = text;
+  while (cut.length > 1 && ctx.measureText(cut + "…").width > maxWidth) cut = cut.slice(0, -1);
+  return cut + "…";
+}
+
+async function shareLeaderboardImage() {
+  const top10 = lastLeaderboardRows.slice(0, 10);
+  if (top10.length === 0) {
+    alert("Nothing to share yet — no points logged for this period.");
+    return;
+  }
+
+  const btn = el("header-share-btn");
+  btn.disabled = true;
+  try {
+    const W = 720, PAD = 36, ROW_H = 76, HEADER_H = 130;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = HEADER_H + top10.length * ROW_H + PAD;
+    const ctx = canvas.getContext("2d");
+
+    // Background — same dark card tone the app's own share card uses.
+    ctx.fillStyle = "#0B0E14";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Logo mark — same chevron+spark as the top banner's own inline SVG, redrawn at canvas scale.
+    const markX = PAD, markY = 32, markSize = 40;
+    ctx.fillStyle = "#161B26";
+    roundRectPath(ctx, markX, markY, markSize, markSize, 10);
+    ctx.fill();
+    ctx.strokeStyle = "#CCFF00";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(markX + 13, markY + 26);
+    ctx.lineTo(markX + 20, markY + 17);
+    ctx.lineTo(markX + 27, markY + 26);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(markX + 20, markY + 11, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFC400";
+    ctx.fill();
+
+    ctx.fillStyle = "#F4F6FA";
+    ctx.font = "800 24px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("KEEPUP", markX + markSize + 12, markY + 27);
+
+    ctx.fillStyle = "#8A93A6";
+    ctx.font = "600 15px 'SFMono-Regular', Consolas, monospace";
+    ctx.fillText(`${scopeLabelForShare()} · ${SHARE_PERIOD_LABELS[currentPeriod] || currentPeriod}`, PAD, HEADER_H - 14);
+
+    let y = HEADER_H;
+    const medalColors = { 1: "#FFD54F", 2: "#C7CCD1", 3: "#CD8B4E" };
+    top10.forEach((r, idx) => {
+      const rank = idx + 1;
+      const medal = medalColors[rank];
+      const cy = y + ROW_H / 2;
+
+      ctx.beginPath();
+      ctx.arc(PAD + 20, cy, 20, 0, Math.PI * 2);
+      ctx.fillStyle = medal || "rgba(255,255,255,0.08)";
+      ctx.fill();
+      ctx.fillStyle = medal ? "#0B0E14" : "#8A93A6";
+      ctx.font = "800 16px 'SFMono-Regular', Consolas, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(rank), PAD + 20, cy + 1);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#F4F6FA";
+      ctx.font = "700 21px -apple-system, Segoe UI, Roboto, sans-serif";
+      const name = (r.display_name || "Member") + (r.user_id === currentSession.user.id ? " (You)" : "");
+      ctx.fillText(truncateForCanvas(ctx, name, 340), PAD + 56, cy - 6);
+
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#CCFF00";
+      ctx.font = "800 17px 'SFMono-Regular', Consolas, monospace";
+      ctx.fillText(`${Number(r.period_points ?? 0).toFixed(2)} pts`, W - PAD, cy + 6);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      y += ROW_H;
+      if (idx < top10.length - 1) {
+        ctx.strokeStyle = "rgba(255,255,255,0.07)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, y - 2);
+        ctx.lineTo(W - PAD, y - 2);
+        ctx.stroke();
+      }
+    });
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const caption = buildLeaderboardShareCaption();
+    const file = new File([blob], "keepup-leaderboard.png", { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text: caption, title: "KeepUp Leaderboard" });
+        return;
+      } catch (e) {
+        if (e.name === "AbortError") return; // user backed out of the share sheet — not an error
+        // Any other failure (unsupported target, etc.) falls through to the download below.
+      }
+    }
+    // No Web Share support (most desktop browsers) — download the image directly instead, and
+    // put the caption on the clipboard so it's one paste away from wherever they share it.
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "keepup-leaderboard.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    try {
+      await navigator.clipboard.writeText(caption);
+      alert("Leaderboard image downloaded — caption copied to your clipboard.");
+    } catch {
+      alert("Leaderboard image downloaded.");
+    }
+  } catch (e) {
+    console.error("Share leaderboard error:", e);
+    alert("Couldn't generate the share image — try again.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+el("header-share-btn").addEventListener("click", shareLeaderboardImage);
 
 // ---------- Rank-delta (user request 08-21, item 7) ----------
 //
@@ -3417,6 +3604,14 @@ async function openClubmateWorkouts(userId, displayName) {
   show("clubmate-workouts-empty");
   hide("clubmate-workouts-list");
   show("clubmate-workouts-backdrop");
+  // Slide-up entrance (see #clubmate-workouts-card's own transition, above) — start below the
+  // fold, force a reflow so the browser registers that starting position, then animate to 0 on
+  // the next frame. Doing all three in the same tick would just jump straight to the end state
+  // with no visible motion at all.
+  const card = el("clubmate-workouts-card");
+  card.style.transform = "translateY(100%)";
+  void card.offsetHeight;
+  requestAnimationFrame(() => { card.style.transform = "translateY(0)"; });
   const { data, error } = await supabase.rpc("fn_get_clubmate_workouts", { p_user_id: userId, p_limit: 20 });
   if (error) {
     // Most likely "not in one of your clubs" (a Global-scope stranger) — the RPC's own message
@@ -3470,7 +3665,13 @@ function renderClubmateWorkoutsList(rows) {
 }
 
 function closeClubmateWorkouts() {
-  hide("clubmate-workouts-backdrop");
+  // Slide back down first, then actually unmount once the transition finishes (matches the
+  // 0.28s duration on #clubmate-workouts-card above) — hiding immediately would cut the motion
+  // off before it's visible at all, same reasoning as the entrance animation in
+  // openClubmateWorkouts.
+  const card = el("clubmate-workouts-card");
+  card.style.transform = "translateY(100%)";
+  setTimeout(() => hide("clubmate-workouts-backdrop"), 280);
 }
 el("clubmate-workouts-close-btn").addEventListener("click", closeClubmateWorkouts);
 el("clubmate-workouts-backdrop").addEventListener("click", (e) => {
