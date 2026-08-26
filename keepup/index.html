@@ -320,7 +320,18 @@
   .lb-row.is-me { background: rgba(204,255,0,0.06); margin: 0 -8px; padding: 10px 8px; border-radius: 8px; }
   .lb-rank { width: 24px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
   .lb-row.is-me .lb-rank { color: var(--accent); }
-  .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* FIX (user request 08-26: "match how the users are listed" — LeaderboardScreen.kt's own row
+     shows a tier badge on the avatar and a "LV N · N-day streak" line under the name; this row
+     never showed either, just the bare name. */
+  .lb-avatar-wrap { position: relative; flex-shrink: 0; }
+  .lb-tier-badge {
+    position: absolute; bottom: -2px; left: -2px; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--card); border: 1.5px solid var(--bg); display: flex; align-items: center; justify-content: center;
+  }
+  .lb-tier-badge svg { width: 100%; height: 100%; display: block; }
+  .lb-name-col { flex: 1; min-width: 0; }
+  .lb-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-sub { font-size: 10.5px; color: var(--text-muted); font-family: 'SFMono-Regular', Consolas, monospace; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-points { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
   /* Bottom nav bar (user request 08-23) — fixed to the viewport bottom, icon+label per tab, same
@@ -3096,11 +3107,19 @@ function renderLeaderboardRows(rows) {
   listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
+    const tierId = statusTierObjFor(r.level ?? 1).id;
+    const subLabel = (r.current_streak ?? 0) > 0 ? `LV ${r.level ?? 1} · ${r.current_streak}-day streak` : `LV ${r.level ?? 1}`;
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
-      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canNudgeLeaderboardRow(r.user_id))}
-      <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
+      <div class="lb-avatar-wrap">
+        ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canNudgeLeaderboardRow(r.user_id))}
+        <span class="lb-tier-badge">${tierBadgeSvg(tierId, 13)}</span>
+      </div>
+      <div class="lb-name-col">
+        <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
+        <div class="lb-sub">${subLabel}</div>
+      </div>
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
       ${canViewLeaderboardRowHistory(r.user_id) ? historyChevronHtml(r.user_id, r.display_name) : ""}
     `;
