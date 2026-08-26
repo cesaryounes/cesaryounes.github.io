@@ -542,6 +542,20 @@
   }
   .nudge-banner.show { transform: translateY(0); opacity: 1; }
   .nudge-banner svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
+
+  /* Proactive Web Push prompt (user request 08-26) — an in-flow card, not a toast: this is a
+     decision to make, not a transient ping, so it stays put (no auto-dismiss) until Enable or
+     Not now is actually tapped. */
+  .push-prompt-banner {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: var(--card); border: 1px solid var(--accent); border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .push-prompt-banner svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+  .push-prompt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .push-prompt-text strong { font-size: 13px; color: var(--text-main); }
+  .push-prompt-text span { font-size: 12px; color: var(--text-muted); }
+  .push-prompt-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
   .nudge-banner span { font-size: 13px; color: var(--text-main); }
   /* FIX (user report 08-25: "received nudges on the web, is not playing or showing any animation")
      — a received nudge now swaps the plain bell for the same mascot lottie the sender picked
@@ -977,6 +991,28 @@
 
     <!-- Signed in -->
     <div id="signed-in-view" class="hidden">
+      <!-- Proactive Web Push prompt (user request 08-26: "check and make the web push prompt
+           proactive") — was entirely passive, a plain toggle sitting in Settings with nothing
+           pointing anyone there; someone had to already know it existed to ever turn it on, which
+           is exactly why real clubmates were showing up unreachable-by-nudge. Shown once per
+           account (dismiss persists in localStorage — never nags every session), and only when
+           there's actually something to gain: pushSupported, permission not already "denied"
+           (the browser silently refuses to re-prompt once denied — asking again here would just
+           be a button that visibly does nothing), and not already subscribed. Reuses
+           subscribeToPush() exactly, the same function the Settings toggle calls — one grant of
+           the real browser permission dialog either way. -->
+      <div class="push-prompt-banner hidden" id="push-prompt-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div class="push-prompt-text">
+          <strong>Turn on notifications</strong>
+          <span>Get nudges from your club and leaderboard updates, even when this tab is closed.</span>
+        </div>
+        <div class="push-prompt-actions">
+          <button class="btn-primary" id="push-prompt-enable-btn" style="width:auto; padding:8px 14px;">Enable</button>
+          <button class="btn-text" id="push-prompt-dismiss-btn" style="width:auto; padding:8px 6px;">Not now</button>
+        </div>
+      </div>
+
       <!-- FIX (user request 08-23: "have the main panel at the bottom and not at the top") — was a
            text-only row right under the header; now a real bottom nav bar (fixed to the viewport
            bottom) with icon+label per tab, mirroring HomeScreen.kt's own NavigationBar as closely
@@ -2037,8 +2073,13 @@ async function renderAuthState() {
     refreshNotifications();
     // Registers (or reuses, if already registered) the Service Worker so an existing Web Push
     // subscription keeps receiving pushes without the user having to revisit Settings every
-    // session — subscribing itself still only ever happens from an explicit toggle there.
+    // session — subscribing a NEW device still only happens from an explicit action (either the
+    // Settings toggle, or the proactive prompt right below, never silently).
     registerServiceWorker();
+    // Proactive Web Push prompt (user request 08-26) — see #push-prompt-banner's own HTML comment
+    // for the eligibility checks. Fire-and-forget: it's just deciding whether to reveal a banner,
+    // nothing else on this page waits on it.
+    maybeShowPushPrompt();
     // Runs after switchTab(lastActiveTab()) above so a leaderboard-routed notification click
     // (a fresh tab opened from an OS-level push, see sw.js) overrides that default tab choice
     // rather than the other way around.
@@ -4410,6 +4451,66 @@ el("settings-push-toggle").addEventListener("change", async (e) => {
   } finally {
     e.target.disabled = false;
     setNotifyPrefRowsDisabled(!e.target.checked);
+  }
+});
+
+// ---------- Proactive Web Push prompt (user request 08-26: "check and make the web push prompt
+// proactive") ----------
+//
+// The toggle above still exists and still works the same way — this just gives it a second,
+// louder entry point so someone doesn't have to already know Settings has a notifications row to
+// ever find it. Shown at most once per account: dismissing (or enabling) sets a localStorage flag
+// so it never comes back and nags every session, same "one-time nicety, not a recurring ask"
+// shape RANK_SNAPSHOT_KEY/LAST_TAB_KEY above already use elsewhere on this page.
+const PUSH_PROMPT_DISMISSED_KEY = "keepup_push_prompt_dismissed";
+
+async function maybeShowPushPrompt() {
+  if (!pushSupported) return;
+  // Once denied, calling requestPermission() again just silently re-resolves to "denied" with no
+  // dialog shown at all in every major browser — showing our own banner here would be a button
+  // that visibly does nothing when tapped, worse than not offering it.
+  if (Notification.permission === "denied") return;
+  try {
+    if (localStorage.getItem(PUSH_PROMPT_DISMISSED_KEY) === "1") return;
+  } catch {
+    // Storage disabled (private browsing, etc.) — falls through and shows the prompt every visit
+    // in that case, same "this one nicety doesn't work" fallback the other localStorage uses on
+    // this page already accept.
+  }
+  const existing = await getExistingPushSubscription();
+  if (existing && Notification.permission === "granted") return; // already on, nothing to ask
+  show("push-prompt-banner");
+}
+
+function dismissPushPrompt() {
+  hide("push-prompt-banner");
+  try {
+    localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+  } catch {
+    // Storage full/disabled — just means this banner might show again next visit. Not worth
+    // surfacing an error for.
+  }
+}
+
+el("push-prompt-dismiss-btn").addEventListener("click", dismissPushPrompt);
+el("push-prompt-enable-btn").addEventListener("click", async () => {
+  const btn = el("push-prompt-enable-btn");
+  btn.disabled = true;
+  btn.textContent = "Enabling…";
+  try {
+    await subscribeToPush();
+    dismissPushPrompt();
+    // No need to touch Settings' own toggle here — refreshPushToggleState() re-derives it from
+    // the actual browser subscription state (not a locally-cached guess) every time Settings
+    // opens, so it'll already show correctly whenever that tab is next visited.
+  } catch (err) {
+    // Permission denied or genuinely unsupported — dismiss for good rather than leaving a banner
+    // whose button just failed the same way again on a retry.
+    dismissPushPrompt();
+    alert(err.message || "Couldn't enable notifications right now.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enable";
   }
 });
 
