@@ -94,9 +94,16 @@
   }
   body {
     display: flex; flex-direction: column; align-items: center;
-    /* Bottom padding cleared for the fixed bottom nav bar (user request 08-23) — enough room for
-       its own height plus a device's safe-area inset, so page content never sits underneath it. */
-    padding: 24px 16px calc(84px + env(safe-area-inset-bottom, 0px));
+    /* FIX (user request 08-26: "make the web full screen, removing the part I highlighted") — was
+       24px 16px, a noticeably wide frame of bare page background around every screen (top banner
+       included) that isn't there on the Android app at all. Cut down to a small, mostly-cosmetic
+       minimum instead — not all the way to 0: several elements that sit directly in .wrap rather
+       than inside a .card (the top banner's icons, the search fields) have no padding of their
+       own and rely entirely on this for breathing room, so 0 here would leave them flush against
+       the true screen edge with no margin at all, not an intentional edge-to-edge look.
+       Bottom padding unchanged — still cleared for the fixed bottom nav bar's own height plus a
+       device's safe-area inset, so page content never sits underneath it. */
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 8px calc(84px + env(safe-area-inset-bottom, 0px));
   }
   .wrap { width: 100%; max-width: 420px; }
 
