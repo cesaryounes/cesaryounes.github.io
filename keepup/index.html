@@ -173,6 +173,11 @@
     background: var(--card); border: 1px solid var(--hairline); border-radius: 16px;
     padding: 20px; margin-bottom: 16px;
   }
+  /* FIX (user request 08-26: "match the visuals of the app" — no bordered/padded outer box on
+     LeaderboardScreen.kt at all) — .card minus its background/border/radius, just enough
+     horizontal room (body already contributes its own small edge padding, see body's own comment)
+     to keep pills/rows off the true screen edge, same as this screen's old .card padding did. */
+  .leaderboard-flat { padding: 0 8px; margin-bottom: 16px; }
 
   button {
     font-family: inherit; font-size: 15px; font-weight: 700; border: none; border-radius: 12px;
@@ -308,7 +313,11 @@
 
   .lb-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
   .lb-row:last-child { border-bottom: none; }
-  .lb-row.is-me { background: rgba(204,255,0,0.06); margin: 0 -20px; padding: 10px 20px; border-radius: 8px; }
+  /* FIX (user request 08-26, .leaderboard-flat) — was margin:-20px/padding:20px, tuned to bleed
+     out to the edge of the old .card's 20px padding; that container's padding is 8px now, so this
+     needs to match or the highlighted row overflows past the rest of the list instead of lining
+     up flush with it. */
+  .lb-row.is-me { background: rgba(204,255,0,0.06); margin: 0 -8px; padding: 10px 8px; border-radius: 8px; }
   .lb-rank { width: 24px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
   .lb-row.is-me .lb-rank { color: var(--accent); }
   .lb-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1309,8 +1318,15 @@
            08-21). Podium (top 3), rank-delta arrows, and search are the same request's item 7 —
            same visual idea as LeaderboardScreen.kt's LeaderboardPodium/RankDeltaIndicator, a flat
            HTML/CSS version instead of Compose. -->
+      <!-- FIX (user request 08-26: "the web I can still see the bulky container on all sides, can
+           the web match the visuals of the app") — LeaderboardScreen.kt has no outer card at all:
+           scope chips, period pills, podium and rows all sit directly on the screen background,
+           each with its own shape (pill, hairline-separated row, avatar circle). This used to wrap
+           all of that in one big bordered/padded .card, which is exactly the "bulky container" —
+           Clubs' own My Clubs/Discover cards further up this file are untouched (not part of this
+           complaint, and GroupsScreen.kt's own Clubs screen actually does use card-like sections). -->
       <div id="tab-leaderboard" class="tab-view hidden">
-        <div class="card">
+        <div class="leaderboard-flat">
           <p class="section-label" style="margin-bottom:12px;">Leaderboard</p>
           <div class="club-pills" id="club-pills"></div>
           <p class="muted hidden" id="no-clubs-hint" style="margin-bottom:14px;">Join a club from the Club tab to see its own leaderboard too.</p>
