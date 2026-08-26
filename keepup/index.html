@@ -2582,6 +2582,15 @@ function canNudgeLeaderboardRow(userId) {
   return currentScope.type === "club" || clubmateUserIds.has(userId);
 }
 
+// FIX (user request 08-26: "i also need to show for the user login in") — canNudgeLeaderboardRow
+// deliberately excludes your own row (you can't nudge yourself), but that same check was also
+// gating the "see their workouts" chevron/avatar-tap, which hid it from your own row for no real
+// reason — fn_get_clubmate_workouts has no such self-exclusion, it just needs you to share a club
+// with the target, which your own row trivially satisfies as long as you're in at least one club.
+function canViewLeaderboardRowHistory(userId) {
+  return userId === currentSession.user.id || canNudgeLeaderboardRow(userId);
+}
+
 async function loadMyClubs() {
   myClubs = await fetchMyClubs();
   await refreshClubmateUserIds();
@@ -2998,7 +3007,7 @@ function renderLeaderboardRows(rows) {
     // workout sheet a moment later.
     Array.from(podiumWrap.querySelectorAll(".podium-avatar-wrap")).forEach((wrapEl, idx) => {
       const r = top3[displayOrder[idx]];
-      if (!canNudgeLeaderboardRow(r.user_id)) return;
+      if (!canViewLeaderboardRowHistory(r.user_id)) return;
       wrapEl.style.cursor = "pointer";
       wrapEl.addEventListener("click", () => openClubmateWorkouts(r.user_id, r.display_name || "Member"));
     });
@@ -3022,14 +3031,13 @@ function renderLeaderboardRows(rows) {
   listRows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lb-row" + (r.user_id === currentSession.user.id ? " is-me" : "");
-    const canSeeWorkouts = canNudgeLeaderboardRow(r.user_id);
     row.innerHTML = `
       <div class="lb-rank">${r.rank}</div>
-      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canSeeWorkouts)}
+      ${avatarWithNudgeHtml(r.display_name, r.avatar_url, 28, r.user_id, canNudgeLeaderboardRow(r.user_id))}
       <div class="lb-name">${escapeHtml(r.display_name || "Member")}</div>
       ${rankDeltaHtml(r._delta)}
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
-      ${canSeeWorkouts ? historyChevronHtml(r.user_id, r.display_name) : ""}
+      ${canViewLeaderboardRowHistory(r.user_id) ? historyChevronHtml(r.user_id, r.display_name) : ""}
     `;
     rowsWrap.appendChild(row);
   });
