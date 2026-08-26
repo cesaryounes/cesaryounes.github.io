@@ -476,6 +476,14 @@
   }
   .row-history-btn svg { width: 20px; height: 20px; }
   .row-history-btn:active { color: var(--text-main); }
+  /* Remove-member button (user request 08-26) — same shape as .row-history-btn, tinted danger
+     since this one's destructive. */
+  .row-remove-btn {
+    width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: none; border: none; padding: 0; margin: 0; color: var(--danger); cursor: pointer;
+  }
+  .row-remove-btn svg { width: 17px; height: 17px; }
+  .row-remove-btn:disabled { opacity: 0.5; cursor: default; }
   .owner-badge {
     font-size: 10px; font-weight: 800; color: var(--amber); text-transform: uppercase;
     letter-spacing: 0.03em; margin-left: 6px;
@@ -3528,10 +3536,15 @@ function renderClubMembers(members) {
     // fn_get_club_members only ever succeeds for an actual member of this club (its own membership
     // check) — so unlike the leaderboard's canNudgeLeaderboardRow, no clubmate check is needed here,
     // just "not yourself", same as the app's isViewerMember-gated member dialog.
+    // Remove a member (user request 08-26: "give the owner of the group to remove user from the
+    // group") — owner-only, never on their own row (that's Leave, handled elsewhere — an owner
+    // leaving deletes the whole club instead, same as GroupsScreen.kt's own leaveGroup()).
+    const canRemove = currentClubDetail?.owner_id === currentSession.user.id && !isMe;
     li.innerHTML = `
       ${avatarWithNudgeHtml(m.display_name, m.avatar_url, 34, m.user_id, !isMe)}
       <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}</div>
       ${historyChevronHtml(m.user_id, m.display_name)}
+      ${canRemove ? `<button type="button" class="row-remove-btn" data-uid="${m.user_id}" data-name="${escapeHtml(m.display_name || "Member")}" aria-label="Remove ${escapeHtml(m.display_name || "Member")} from the club" title="Remove from club"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>` : ""}
     `;
     // "See their past workouts" (user request 08-26) — every row here is already a fellow member
     // of this same club (fn_get_club_members' own membership check), so this works on every row
@@ -3540,6 +3553,21 @@ function renderClubMembers(members) {
   });
   Array.from(list.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
+  });
+  Array.from(list.querySelectorAll(".row-remove-btn")).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { uid, name } = btn.dataset;
+      if (!confirm(`Remove ${name} from ${currentClubDetail.name}? They'll lose access to this club's leaderboard, audit, and nudges right away.`)) return;
+      btn.disabled = true;
+      const { data, error } = await supabase.rpc("fn_club_remove_member", { p_group_id: currentClubDetail.id, p_member_user_id: uid });
+      const result = Array.isArray(data) ? data[0] : data;
+      if (error || !result?.success) {
+        alert((error && error.message) || result?.message || "Couldn't remove them.");
+        btn.disabled = false;
+        return;
+      }
+      btn.closest("li")?.remove();
+    });
   });
   wireHistoryChevrons(list);
 }
