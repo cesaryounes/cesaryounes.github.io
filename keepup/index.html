@@ -3524,10 +3524,23 @@ async function openClubDetail(group) {
     el("club-members-empty").textContent = "Couldn't load members right now.";
     return;
   }
-  renderClubMembers(data || []);
+  // Invited, hasn't responded yet (user request 08-27) — own call, own error handling, so a
+  // failure here doesn't take down the real member list above. fn_get_club_pending_invites
+  // (0121_club_pending_invites_list.sql) only ever returns status='pending' rows, so a declined
+  // invite just stops appearing on the next reload; an accepted one already shows up in `data`
+  // above (fn_respond_to_email_invite inserts straight into group_members on accept).
+  let pendingInvites = [];
+  try {
+    const pendingRes = await supabase.rpc("fn_get_club_pending_invites", { p_group_id: group.id });
+    if (pendingRes.error) throw pendingRes.error;
+    pendingInvites = pendingRes.data || [];
+  } catch (e) {
+    console.error("Couldn't load pending club invites:", e);
+  }
+  renderClubMembers(data || [], pendingInvites);
 }
 
-function renderClubMembers(members) {
+function renderClubMembers(members, pendingInvites = []) {
   const list = el("club-members-list");
   list.innerHTML = "";
   if (members.length === 0) {
@@ -3558,6 +3571,22 @@ function renderClubMembers(members) {
     // "See their past workouts" (user request 08-26) — every row here is already a fellow member
     // of this same club (fn_get_club_members' own membership check), so this works on every row
     // including your own (harmless — "see your own past workouts" just saves a special case).
+    list.appendChild(li);
+  });
+  // Invited, hasn't responded yet (user request 08-27) — same list as real members, visually muted
+  // (dimmed avatar, no nudge/history/remove actions since they're not a member yet) with a PENDING
+  // badge in place of the owner badge. Declining needs no removal step here — the pendingInvites
+  // array only ever contains status='pending' rows, so it just stops appearing on the next reload;
+  // accepting already lands them in `members` above on the next load, same as any other member.
+  pendingInvites.forEach((inv) => {
+    const li = document.createElement("li");
+    li.className = "member-row";
+    li.style.opacity = "0.6";
+    li.innerHTML = `
+      ${avatarWithNudgeHtml(inv.display_name, inv.avatar_url, 34, inv.user_id, false)}
+      <div class="member-row-name">${escapeHtml(inv.display_name || "Member")}</div>
+      <span class="badge badge-medium">Pending</span>
+    `;
     list.appendChild(li);
   });
   Array.from(list.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
@@ -3913,7 +3942,14 @@ el("club-invite-btn").addEventListener("click", async () => {
   el("club-manage-message").textContent = error ? error.message : (result?.message || (success ? "Invited" : "Something went wrong"));
   el("club-manage-message").style.color = success ? "var(--success)" : "var(--danger)";
   show("club-manage-message");
-  if (success) el("club-invite-input").value = "";
+  if (success) {
+    el("club-invite-input").value = "";
+    // So the invite shows up in the members list immediately, not just on the next time this
+    // screen happens to reopen — see renderClubMembers' own pendingInvites comment. Re-running the
+    // whole open (not just a targeted re-fetch) also correctly closes the invite field back down,
+    // same as a normal "submitted" state.
+    await openClubDetail(currentClubDetail);
+  }
 });
 
 // ---------- Nudge (user request 08-24: "the bell should also appear in the leaderboard... add the
