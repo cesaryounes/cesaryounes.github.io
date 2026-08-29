@@ -629,51 +629,116 @@
        - One-shot: #streak-celeb-backdrop, a dimmed full-screen centered card, same shape/easing
          .nudge-overlay-backdrop already established (spring-ish cubic-bezier(0.34,1.56,0.64,1)) —
          shown right after a workout save actually extends the streak. */
+  /* Claude Design redesign (08-29, see Streak animation/design_handoff_streak_redesign/README.md)
+     — replaces the flame-over-number totem + plain circle week-dots above (both read as WHOOP's
+     own Day Streak screen, just recolored) with: the number sitting IN FRONT of the flame instead
+     of stacked below it, a new two-part flame shape (body + inner core, ships everywhere — see
+     .streak-flame-svg), and week cells that use the launcher's own chevron mark for a trained day
+     instead of a second flame icon. */
   .streak-visual { display: flex; flex-direction: column; align-items: center; text-align: center; }
   .streak-visual .eyebrow-label {
     font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
   }
-  .streak-glyph-box { width: 84px; height: 84px; margin-top: 16px; position: relative; }
-  .streak-glyph-box svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .streak-flame-outer { color: var(--amber); animation: streakFlameSway 1.4s ease-in-out infinite alternate; transform-origin: 50% 90%; }
-  .streak-flame-inner { color: rgba(255,255,255,0.42); width: 55% !important; height: 55% !important; inset: 22.5% !important; animation: streakFlameFlicker 0.62s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+  .streak-header-row { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .streak-hero { position: relative; width: 100%; height: 168px; margin-top: 4px; display: flex; align-items: center; justify-content: center; }
+  .streak-hero-glow {
+    position: absolute; width: 184px; height: 184px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,196,0,0.32) 0%, rgba(255,196,0,0.12) 44%, rgba(255,196,0,0) 70%);
+  }
+  .streak-flame-svg { position: absolute; width: 118px; height: 128px; color: var(--amber); opacity: 0.5; animation: streakFlameSway 1.4s ease-in-out infinite alternate; transform-origin: 50% 92%; }
+  .streak-flame-svg .core { color: #fff; opacity: 0.42; }
   @keyframes streakFlameSway {
-    from { transform: rotate(-2.5deg) scale(0.95); }
-    to   { transform: rotate(2.5deg) scale(1.07); }
+    from { transform: rotate(-2.2deg) scale(1); }
+    to   { transform: rotate(2.2deg) scale(1.07); }
   }
-  @keyframes streakFlameFlicker {
-    from { transform: rotate(1.5deg) scale(0.88); }
-    to   { transform: rotate(-1.5deg) scale(1.04); }
-  }
-  .streak-freeze-glyph { color: var(--accent); animation: streakFreezePulse 1.6s ease-in-out infinite alternate; }
+  .streak-freeze-glyph { position: absolute; width: 74px; height: 74px; color: var(--accent); animation: streakFreezePulse 1.6s ease-in-out infinite alternate; }
   @keyframes streakFreezePulse {
     from { transform: scale(0.97); }
-    to   { transform: scale(1.04); }
+    to   { transform: scale(1.05); }
   }
-  .streak-visual .streak-number { font-size: 40px; font-weight: 900; color: var(--text-main); line-height: 1; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  .streak-visual .streak-number { position: relative; font-size: 84px; font-weight: 900; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+  .streak-unit-label { margin-top: 2px; }
   .streak-gems-badge {
-    display: flex; align-items: center; gap: 4px; margin-top: 8px;
-    font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; font-weight: 800; color: var(--amber);
+    display: flex; align-items: center; gap: 4px;
+    font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--amber); background: rgba(255,196,0,0.13); border-radius: 999px; padding: 6px 11px;
   }
-  .streak-gems-badge svg { width: 13px; height: 13px; }
-  .streak-stats-row { display: flex; justify-content: space-between; width: 100%; margin-top: 20px; }
+  .streak-gems-badge svg { width: 12px; height: 12px; }
+  .streak-stats-row { display: flex; justify-content: space-between; width: 100%; margin-top: 18px; }
   .streak-stats-row .stat-block:last-child { text-align: right; }
-  .streak-stats-row .stat-block .value { font-size: 13px; font-weight: 800; color: var(--text-main); }
-  .streak-stats-row .stat-block .label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
-  .streak-divider { width: 100%; height: 1px; background: var(--hairline); margin: 16px 0; }
-  .streak-week-strip { width: 100%; }
+  .streak-stats-row .stat-block .value { font-size: 17px; font-weight: 800; color: var(--text-main); font-variant-numeric: tabular-nums; }
+  .streak-stats-row .stat-block .label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 7px; }
+  .streak-week-strip { width: 100%; margin-top: 20px; }
   .streak-week-strip .eyebrow-label { display: block; text-align: left; margin-bottom: 10px; }
   .streak-week-row { display: flex; justify-content: space-between; }
   .streak-day-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .streak-day-cell .day-label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 9px; font-weight: 700; color: var(--text-muted); }
-  .streak-day-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  .streak-day-dot svg { width: 14px; height: 14px; }
-  .streak-day-dot.workout { background: rgba(255,196,0,0.16); color: var(--amber); }
-  .streak-day-dot.frozen { background: var(--accent-soft); color: var(--accent); }
-  .streak-day-dot.missed, .streak-day-dot.future { background: rgba(255,255,255,0.05); }
+  .streak-day-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+  .streak-day-dot svg { width: 15px; height: 15px; }
+  .streak-day-dot.workout { background: var(--accent); }
+  .streak-day-dot.workout svg { color: #0B0E14; }
+  .streak-day-dot.frozen { border: 2px solid var(--accent); color: var(--accent); }
+  .streak-day-dot.missed { background: rgba(255,255,255,0.05); }
+  .streak-day-dot.future { border: 1px dashed rgba(240,246,252,0.22); }
+  .streak-share-row { display: flex; justify-content: flex-end; width: 100%; margin-top: 16px; }
+  .streak-share-circle-btn {
+    width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid rgba(240,246,252,0.14); color: var(--text-muted); cursor: pointer;
+  }
+  .streak-share-circle-btn:hover { border-color: rgba(204,255,0,0.45); color: var(--accent); }
+  .streak-share-circle-btn svg { width: 18px; height: 18px; }
+  .streak-dismiss-hint {
+    margin-top: 22px; font-size: 10px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase;
+    color: rgba(139,148,158,0.6); text-align: center;
+  }
 
   #streak-detail-backdrop .modal-card { padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ---- Celebration: Leo pop-in + title wipe (see README §3 for the full timeline this
+     approximates) — Leo plays his existing champion nudge clip (real asset, already proven via
+     the nudge system) rather than a fully custom frame-by-frame rig; everything else (tag,
+     slide-left, title wipe, fade, ignite, stagger-in) is bespoke to this celebration. ---- */
+  .streak-leo-stage { position: relative; height: 190px; width: 100%; }
+  .streak-leo-mascot {
+    position: absolute; left: 50%; top: 4px; width: 168px; height: 190px; margin-left: -84px;
+    transform-origin: 50% 88%; opacity: 0; transform: scale(0.35);
+  }
+  .streak-leo-mascot.pop { animation: streakLeoIn 0.5s cubic-bezier(.2,1.5,.4,1) forwards; }
+  .streak-leo-mascot.slide { animation: streakLeoSlide 0.55s cubic-bezier(.4,0,.2,1) 1.0s forwards; }
+  .streak-leo-mascot.out { animation: streakFadeOut 0.6s ease forwards; }
+  @keyframes streakLeoIn {
+    0% { opacity: 0; transform: scale(0.35); }
+    60% { opacity: 1; transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes streakLeoSlide {
+    to { transform: translate(-106px, 14px) scale(0.72); }
+  }
+  @keyframes streakFadeOut { to { opacity: 0; } }
+  .streak-leo-tag {
+    position: absolute; left: 50%; top: -6px; margin-left: -70px; width: 140px; text-align: center;
+    background: var(--accent); color: #0B0E14; font-weight: 900; font-size: 15px; border-radius: 12px;
+    padding: 6px 10px; transform: rotate(-7deg) scale(0.4); opacity: 0;
+  }
+  .streak-leo-tag.pop { animation: streakTagPop 0.42s cubic-bezier(.2,1.6,.35,1) 0.3s forwards; }
+  .streak-leo-tag.out { animation: streakFadeOut 0.35s ease forwards; }
+  @keyframes streakTagPop {
+    0% { opacity: 0; transform: rotate(-7deg) scale(0.4); }
+    60% { opacity: 1; transform: rotate(-7deg) scale(1.1); }
+    100% { opacity: 1; transform: rotate(-7deg) scale(1); }
+  }
+  .streak-title-col { position: absolute; left: 152px; top: 24px; right: 8px; text-align: left; }
+  .streak-title-row { overflow: hidden; }
+  .streak-title-row span {
+    display: block; transform: translateY(110%) skewY(3deg); opacity: 0;
+  }
+  .streak-title-row.in span { animation: streakTitleWipe 0.6s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes streakTitleWipe { to { transform: translateY(0) skewY(0deg); opacity: 1; } }
+  .streak-title-big { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; color: var(--text-main); line-height: 1.15; }
+  .streak-title-big.accent { color: var(--accent); }
+  .streak-title-sub { font-size: 14px; color: var(--text-muted); line-height: 1.4; margin-top: 6px; max-width: 30ch; }
+  .streak-leo-stage.out { animation: streakFadeOut 0.6s ease forwards; }
 
   .streak-celeb-backdrop {
     position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center;
@@ -1007,7 +1072,10 @@
       <div class="top-banner-center">
         <div class="stat-cluster hidden" id="stat-cluster">
           <div class="stat-cell" id="stat-streak-cell" style="color:var(--text-muted);">
-            <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
+            <svg id="stat-flame-icon" viewBox="0 0 100 100">
+              <path fill="currentColor" d="M62,3 C74,20 88,42 88,62 C88,82 71,97 50,97 C29,97 13,83 13,66 C13,52 22,40 33,32 C31,44 33,52 41,56 C48,60 55,55 55,47 C55,36 52,24 62,3 Z" />
+              <path fill="#fff" opacity="0.42" d="M50,63 C59,70 65,76 65,82 C65,89.5 58,94.5 50,94.5 C42,94.5 35,89.5 35,82 C35,76 41,70 50,63 Z" />
+            </svg>
             <span id="stat-streak">0</span>
           </div>
           <div class="stat-cell hidden" id="stat-freeze-cell" style="color:var(--accent);">
@@ -1795,21 +1863,28 @@
     </div>
   </div>
 
-  <!-- WHOOP-inspired streak celebration (user request 08-29 — web equivalent of
-       Celebrations.kt's StreakCelebration) — one-shot, shown right after a saved workout
-       actually extends the streak (see the save-btn handler below). Same dimmed-overlay +
-       spring-scale shape .nudge-overlay-backdrop already established. Share redraws the same
-       card onto a <canvas>, same navigator.share-with-download-fallback pattern
-       shareLeaderboardImage() already uses. -->
+  <!-- Claude Design redesign (user request 08-29 — web equivalent of Celebrations.kt's
+       StreakCelebration, rebuilt from Streak animation/design_handoff_streak_redesign/README.md)
+       — one-shot, shown right after a saved workout actually extends the streak. Leo (#streak-leo-
+       stage) pops in on his own real nudge-champion clip, a "LET'S GO!" tag, then the title wipes
+       in beside him and everything fades — after that the settled #streak-visual-celeb ignites,
+       same content block the sheet uses. Tap anywhere dismisses; no separate button row — share
+       is the icon inside the stats row (renderStreakVisual). -->
   <div class="streak-celeb-backdrop" id="streak-celeb-backdrop">
     <div class="streak-celeb-card">
       <div class="streak-celeb-panel">
-        <div class="streak-visual" id="streak-visual-celeb"></div>
+        <div class="streak-leo-stage hidden" id="streak-leo-stage">
+          <div class="streak-leo-tag" id="streak-leo-tag">LET'S GO!</div>
+          <div class="streak-leo-mascot" id="streak-leo-mascot"></div>
+          <div class="streak-title-col">
+            <div class="streak-title-row"><span class="streak-title-big" id="streak-title-1"></span></div>
+            <div class="streak-title-row"><span class="streak-title-big accent" id="streak-title-2"></span></div>
+            <div class="streak-title-row"><span class="streak-title-sub" id="streak-title-sub"></span></div>
+          </div>
+        </div>
+        <div class="streak-visual hidden" id="streak-visual-celeb"></div>
       </div>
-      <div class="streak-celeb-actions">
-        <button class="btn-text" id="streak-celeb-dismiss-btn">Dismiss</button>
-        <button class="btn-primary" id="streak-celeb-share-btn">Share</button>
-      </div>
+      <div class="streak-dismiss-hint">TAP ANYWHERE TO DISMISS</div>
     </div>
   </div>
 
@@ -2637,10 +2712,28 @@ async function loadHeaderStats() {
 
 const STREAK_MILESTONES = [7, 30, 100];
 const WEEK_DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-// Same shapes as the small top-banner flame/snowflake icons above, just reused at a bigger size —
-// one visual language throughout, not a second icon set.
-const FLAME_PATH_D = "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z";
+// New two-part flame (Claude Design redesign, 08-29) — same shape as the top-banner tile's own
+// #stat-flame-icon above, reused at every size per the redesign's own rule ("ships everywhere").
+const FLAME_BODY_D = "M62,3 C74,20 88,42 88,62 C88,82 71,97 50,97 C29,97 13,83 13,66 C13,52 22,40 33,32 C31,44 33,52 41,56 C48,60 55,55 55,47 C55,36 52,24 62,3 Z";
+const FLAME_CORE_D = "M50,63 C59,70 65,76 65,82 C65,89.5 58,94.5 50,94.5 C42,94.5 35,89.5 35,82 C35,76 41,70 50,63 Z";
 const FREEZE_SVG_INNER = '<g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g>';
+// The launcher mark's own chevron, used for a "trained" week cell instead of a second flame icon
+// — one of the concrete "why this isn't WHOOP" touches from the redesign (see that doc's own
+// "why this isn't WHOOP" notes): a KeepUp-only glyph woven into the week strip, not a generic one.
+const CHEVRON_PATH_D = "M36,70 L54,46 L72,70";
+
+// Mirrors the README §3a tier table exactly — same STREAK_MILESTONES breakpoints (7/30/100) the
+// gems badge already uses, so the celebration's title-wipe subtext escalates in step with it.
+// Only ever shown during the celebration's transient Leo/title sequence, never in the settled
+// sheet content (see renderStreakVisual's headerLabel/isCeleb split below).
+function streakSubtextForLength(n) {
+  if (n < 3) return "This is how every streak starts.";
+  if (n < 7) return "You're building something.";
+  if (n < 30) return "This is becoming a habit now.";
+  if (n < 100) return "This is who you are now.";
+  return "You didn't chase the streak — you became it.";
+}
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function mondayOf(date) {
   const d = new Date(date);
@@ -2691,25 +2784,31 @@ function formatStreakDate(date) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// Shared visual block — mirrors StreakVisualContent (StreakDetailScreen.kt), used by both the
-// on-demand sheet and the one-shot celebration card.
-function renderStreakVisual(container, { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned }) {
-  const glyphSvg = isFrozenToday
+// Shared settled composition — mirrors StreakVisualContent (StreakDetailScreen.kt) post-redesign:
+// the count sits IN FRONT of the flame instead of stacked below it, and a "trained" week cell uses
+// the launcher chevron instead of a second flame icon. Used by both the on-demand sheet
+// (headerLabel "THIS WEEK", isCeleb false — no share icon needed there, no dismiss hint) and the
+// one-shot celebration's settled state (headerLabel "STREAK EXTENDED", isCeleb true) once Leo's
+// intro sequence finishes. onShare receives the same data this call was rendered with.
+function renderStreakVisual(container, { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned, headerLabel, isCeleb, onShare }) {
+  const heroGlyph = isFrozenToday
     ? `<svg class="streak-freeze-glyph" viewBox="0 0 24 24">${FREEZE_SVG_INNER}</svg>`
-    : `<svg class="streak-flame-outer" viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>
-       <svg class="streak-flame-outer streak-flame-inner" viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>`;
+    : `<svg class="streak-flame-svg" viewBox="0 0 100 100">
+         <path d="${FLAME_BODY_D}" fill="currentColor" />
+         <path class="core" d="${FLAME_CORE_D}" fill="currentColor" />
+       </svg>`;
 
   const gemsBadge = (milestoneGemsEarned && milestoneGemsEarned > 0)
     ? `<div class="streak-gems-badge">
          <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
          +${milestoneGemsEarned} gems
        </div>`
-    : "";
+    : `<span></span>`;
 
   const weekRow = WEEK_DAY_LABELS.map((label, i) => {
     const state = dayStates[i] || "future";
     const icon = state === "workout"
-      ? `<svg viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>`
+      ? `<svg viewBox="0 0 108 108"><path d="${CHEVRON_PATH_D}" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg>`
       : state === "frozen"
         ? `<svg viewBox="0 0 24 24">${FREEZE_SVG_INNER}</svg>`
         : "";
@@ -2720,11 +2819,19 @@ function renderStreakVisual(container, { streak, maxStreak, streakStartDate, day
   }).join("");
 
   container.innerHTML = `
-    <span class="eyebrow-label">DAY STREAK</span>
-    <div class="streak-glyph-box">${glyphSvg}</div>
-    <div class="streak-number">${streak}</div>
-    <span class="eyebrow-label">DAY STREAK</span>
-    ${gemsBadge}
+    <div class="streak-header-row">
+      <span class="eyebrow-label">${headerLabel}</span>
+      ${gemsBadge}
+    </div>
+    <div class="streak-hero">
+      <div class="streak-hero-glow"></div>
+      ${heroGlyph}
+      <div class="streak-number">${streak}</div>
+    </div>
+    <span class="eyebrow-label streak-unit-label">DAYS IN A ROW</span>
+    <div class="streak-week-strip">
+      <div class="streak-week-row">${weekRow}</div>
+    </div>
     <div class="streak-stats-row">
       <div class="stat-block">
         <div class="value">${formatStreakDate(streakStartDate)}</div>
@@ -2735,12 +2842,16 @@ function renderStreakVisual(container, { streak, maxStreak, streakStartDate, day
         <div class="label">Max streak</div>
       </div>
     </div>
-    <div class="streak-divider"></div>
-    <div class="streak-week-strip">
-      <span class="eyebrow-label">THIS WEEK</span>
-      <div class="streak-week-row">${weekRow}</div>
+    <div class="streak-share-row">
+      <button class="streak-share-circle-btn" aria-label="Share" title="Share">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
+      </button>
     </div>
   `;
+  container.querySelector(".streak-share-circle-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    onShare();
+  });
 }
 
 // Fetches this week's real local_date/freeze data fresh — can be opened any time, not just right
@@ -2773,14 +2884,13 @@ async function openStreakDetail() {
   const { workoutLocalDates, freezeDatesThisWeek } = await fetchThisWeekStreakData();
   const dayStates = computeWeekDayStates(workoutLocalDates, freezeDatesThisWeek);
   const isFrozenToday = [...dayStates].reverse().find((s) => s !== "future") === "frozen";
-
-  renderStreakVisual(el("streak-visual-detail"), {
+  const data = {
     streak: profile.current_streak ?? 0,
     maxStreak: profile.longest_streak ?? 0,
     streakStartDate: estimateStreakStartDate(profile.current_streak, profile.last_workout_date),
-    dayStates,
-    isFrozenToday,
-  });
+    dayStates, isFrozenToday, headerLabel: "THIS WEEK", isCeleb: false,
+  };
+  renderStreakVisual(el("streak-visual-detail"), { ...data, onShare: () => shareStreakImage(data) });
   show("streak-detail-backdrop");
 }
 function closeStreakDetail() {
@@ -2791,25 +2901,91 @@ el("streak-detail-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "streak-detail-backdrop") closeStreakDetail();
 });
 
-let lastStreakCelebrationData = null; // for the Share button — set right before the overlay shows
+// ---- Celebration: Leo's intro (real nudge-champion clip + tag + title wipe), then the settled
+// composition ignites. celebSeq is a token so a mid-sequence dismiss (tap backdrop) can cancel
+// cleanly — each stage checks it's still the current sequence before touching the DOM. ----
+let celebSeq = 0;
+let celebLottieAnim = null;
+
+function resetLeoStage() {
+  const stage = el("streak-leo-stage");
+  stage.classList.remove("out");
+  el("streak-leo-mascot").className = "streak-leo-mascot";
+  el("streak-leo-tag").className = "streak-leo-tag";
+  document.querySelectorAll("#streak-leo-stage .streak-title-row").forEach((r) => r.classList.remove("in"));
+  if (celebLottieAnim) { try { celebLottieAnim.destroy(); } catch {} celebLottieAnim = null; }
+  el("streak-leo-mascot").innerHTML = "";
+}
 
 async function showStreakCelebration(streak, maxStreak, streakStartDate, milestoneGemsEarned) {
+  const mySeq = ++celebSeq;
   const { workoutLocalDates, freezeDatesThisWeek } = await fetchThisWeekStreakData();
+  if (mySeq !== celebSeq) return; // dismissed while that fetch was in flight
   const dayStates = computeWeekDayStates(workoutLocalDates, freezeDatesThisWeek);
   const isFrozenToday = [...dayStates].reverse().find((s) => s !== "future") === "frozen";
+  const data = { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned, headerLabel: "STREAK EXTENDED", isCeleb: true };
 
-  const data = { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned };
-  lastStreakCelebrationData = data;
-  renderStreakVisual(el("streak-visual-celeb"), data);
+  resetLeoStage();
+  show("streak-leo-stage");
+  hide("streak-visual-celeb");
   el("streak-celeb-backdrop").classList.add("show");
+
+  // Leo pops in on his own real champion-nudge clip (real asset, already proven via the nudge
+  // system — see this file's mascots/ section) rather than a fully custom-authored rig; "LET'S
+  // GO!" pops alongside him.
+  if (typeof window.lottie !== "undefined") {
+    try {
+      celebLottieAnim = window.lottie.loadAnimation({
+        container: el("streak-leo-mascot"), renderer: "svg", loop: false, autoplay: true,
+        path: "mascots/nudge_champion.json",
+      });
+    } catch (e) { console.error("Leo lottie load error:", e); }
+  }
+  el("streak-leo-mascot").classList.add("pop");
+  el("streak-leo-tag").classList.add("pop");
+
+  // Title wipes in, one row at a time, next to Leo.
+  const streakWord = String(streak).toUpperCase();
+  el("streak-title-1").textContent = streakWord;
+  el("streak-title-2").textContent = "DAYS.";
+  el("streak-title-sub").textContent = streakSubtextForLength(streak);
+  const rows = document.querySelectorAll("#streak-leo-stage .streak-title-row");
+  await sleep(900);
+  if (mySeq !== celebSeq) return;
+  for (const row of rows) {
+    row.classList.add("in");
+    await sleep(120);
+    if (mySeq !== celebSeq) return;
+  }
+
+  // Leo slides left and settles smaller, clearing room for the title.
+  el("streak-leo-mascot").classList.add("slide");
+  el("streak-leo-tag").classList.add("out");
+
+  await sleep(1400);
+  if (mySeq !== celebSeq) return;
+
+  // Everything fades on opacity alone, then the settled composition ignites in its place.
+  el("streak-leo-stage").classList.add("out");
+  await sleep(650);
+  if (mySeq !== celebSeq) return;
+  hide("streak-leo-stage");
+  resetLeoStage();
+
+  renderStreakVisual(el("streak-visual-celeb"), { ...data, onShare: () => shareStreakImage(data) });
+  show("streak-visual-celeb");
 }
+
 function closeStreakCelebration() {
+  celebSeq++; // cancels any in-flight sequence
   el("streak-celeb-backdrop").classList.remove("show");
+  resetLeoStage();
+  hide("streak-leo-stage");
 }
-el("streak-celeb-dismiss-btn").addEventListener("click", closeStreakCelebration);
-el("streak-celeb-backdrop").addEventListener("click", (e) => {
-  if (e.target.id === "streak-celeb-backdrop") closeStreakCelebration();
-});
+// "Tap anywhere to dismiss" — literally anywhere, per the redesign (the old "Dismiss" button is
+// gone). The share button's own handler calls stopPropagation() so a share tap doesn't also
+// close the card; every other click on the backdrop or card bubbles up here.
+el("streak-celeb-backdrop").addEventListener("click", closeStreakCelebration);
 
 // Checked right after a workout save (see save-btn handler) — mirrors AppViewModel.kt's own
 // justExtendedStreak wiring: fires on ANY streak-increasing sync, not just a milestone crossing;
@@ -2836,12 +3012,10 @@ async function checkStreakExtensionAndCelebrate(prevStreak, prevGems) {
   );
 }
 
-async function shareStreakImage() {
-  if (!lastStreakCelebrationData) return;
-  const btn = el("streak-celeb-share-btn");
-  btn.disabled = true;
+async function shareStreakImage(data) {
+  if (!data) return;
   try {
-    const { streak, maxStreak, streakStartDate, isFrozenToday } = lastStreakCelebrationData;
+    const { streak, maxStreak, streakStartDate, isFrozenToday } = data;
     const W = 480, H = 620;
     const canvas = document.createElement("canvas");
     canvas.width = W;
@@ -2944,11 +3118,8 @@ async function shareStreakImage() {
   } catch (e) {
     console.error("Share streak error:", e);
     alert("Couldn't generate the share image — try again.");
-  } finally {
-    btn.disabled = false;
   }
 }
-el("streak-celeb-share-btn").addEventListener("click", shareStreakImage);
 
 async function loadDashboard() {
   // FIX (user request 08-23): loadHistory() no longer runs eagerly on every Dashboard visit — the
