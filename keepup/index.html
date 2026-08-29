@@ -678,8 +678,16 @@
   .streak-celeb-backdrop {
     position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0); transition: background 0.25s ease; padding: 24px;
+    /* FIX (real production bug, 08-29): this element sits in the DOM permanently (unlike
+       nudge-overlay-backdrop, which is only ever created on demand via JS and removed after) so
+       that its background can transition smoothly on open. But a `position:fixed;inset:0` box
+       captures pointer events across the ENTIRE viewport by default even at zero opacity —
+       every click/tap on the whole site was silently swallowed by this invisible layer the
+       moment it shipped, regardless of whether a celebration was showing. pointer-events:none
+       here (auto only once .show is applied below) is what actually gates that, not opacity. */
+    pointer-events: none;
   }
-  .streak-celeb-backdrop.show { background: rgba(0,0,0,0.65); }
+  .streak-celeb-backdrop.show { background: rgba(0,0,0,0.65); pointer-events: auto; }
   .streak-celeb-card {
     width: 100%; max-width: 320px;
     transform: scale(0.85); opacity: 0; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
