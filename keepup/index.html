@@ -683,7 +683,16 @@
   .streak-day-dot.future { border: 1px dashed rgba(240,246,252,0.22); }
   .streak-share-row { display: flex; justify-content: flex-end; width: 100%; margin-top: 16px; }
   .streak-share-circle-btn {
-    width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    /* FIX (user report 08-29 — "extra circle... writing not good"): two compounding bugs left
+       only the empty circular border visible, no icon inside.
+       1. The global `button` rule (padding: 14px 20px; min-height: 48px) was never overridden
+          here, and min-height always wins over a smaller explicit height — with box-sizing:
+          border-box that ate nearly the whole box, leaving ~2px for the icon.
+       2. This button sits inside a flex row (.streak-share-row) — a flex item's default
+          min-width is `auto` (its own content's min-content size), not 0, so even the explicit
+          width: 42px was getting silently shrunk on the main axis. min-width: 42px + flex-shrink:
+          0 pin it so neither the button nor its box-sizing math can compress again. */
+    width: 42px; height: 42px; min-width: 42px; flex-shrink: 0; padding: 0; min-height: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: transparent; border: 1px solid rgba(240,246,252,0.14); color: var(--text-muted); cursor: pointer;
   }
   .streak-share-circle-btn:hover { border-color: rgba(204,255,0,0.45); color: var(--accent); }
@@ -1860,6 +1869,13 @@
     <div class="modal-card">
       <div class="sheet-handle"></div>
       <div class="streak-visual" id="streak-visual-detail"></div>
+      <!-- FIX (user report 08-29 — "once opened, i cant close it"): tap-outside-the-card was the
+           only way to dismiss this sheet, same as clubmate-workouts-backdrop's own pattern — but
+           this card's taller content (the redesign's 168px hero etc.) leaves much less backdrop
+           area to actually tap outside of on a real phone. Explicit Close button, same
+           clubmate-workouts-close-btn shape, so dismissing never depends on hitting a precise
+           sliver of backdrop. -->
+      <button class="btn-text" id="streak-detail-close-btn" style="margin-top:14px;">Close</button>
     </div>
   </div>
 
@@ -2897,6 +2913,7 @@ function closeStreakDetail() {
   hide("streak-detail-backdrop");
 }
 el("stat-streak-cell").addEventListener("click", openStreakDetail);
+el("streak-detail-close-btn").addEventListener("click", closeStreakDetail);
 el("streak-detail-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "streak-detail-backdrop") closeStreakDetail();
 });
