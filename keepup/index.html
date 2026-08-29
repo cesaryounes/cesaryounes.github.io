@@ -678,7 +678,13 @@
     color: var(--amber); background: rgba(255,196,0,0.13); border-radius: 999px; padding: 6px 11px;
   }
   .streak-gems-badge svg { width: 12px; height: 12px; }
-  .streak-stats-row { display: flex; justify-content: space-between; width: 100%; margin-top: 18px; }
+  .streak-stats-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 18px; }
+  /* FIX (user report 08-29 — "text, share and numbers are not aligned"): Share used to sit alone
+     on its own row below the stats, with nothing beside it — a lone circle floating on an
+     otherwise-empty row reads as disconnected/misaligned even with a small, technically-correct
+     margin. Grouped it with the "Max streak" block instead (.streak-stats-row-right), sharing the
+     same row and vertical center as the numbers it's attached to. */
+  .streak-stats-row-right { display: flex; align-items: center; gap: 14px; }
   .streak-stats-row .stat-block:last-child { text-align: right; }
   .streak-stats-row .stat-block .value { font-size: 17px; font-weight: 800; color: var(--text-main); font-variant-numeric: tabular-nums; }
   .streak-stats-row .stat-block .label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 7px; }
@@ -694,17 +700,16 @@
   .streak-day-dot.frozen { border: 2px solid var(--accent); color: var(--accent); }
   .streak-day-dot.missed { background: rgba(255,255,255,0.05); }
   .streak-day-dot.future { border: 1px dashed rgba(240,246,252,0.22); }
-  .streak-share-row { display: flex; justify-content: flex-end; width: 100%; margin-top: 16px; }
   .streak-share-circle-btn {
     /* FIX (user report 08-29 — "extra circle... writing not good"): two compounding bugs left
        only the empty circular border visible, no icon inside.
        1. The global `button` rule (padding: 14px 20px; min-height: 48px) was never overridden
           here, and min-height always wins over a smaller explicit height — with box-sizing:
           border-box that ate nearly the whole box, leaving ~2px for the icon.
-       2. This button sits inside a flex row (.streak-share-row) — a flex item's default
-          min-width is `auto` (its own content's min-content size), not 0, so even the explicit
-          width: 42px was getting silently shrunk on the main axis. min-width: 42px + flex-shrink:
-          0 pin it so neither the button nor its box-sizing math can compress again. */
+       2. This button sits inside a flex row (now .streak-stats-row-right) — a flex item's
+          default min-width is `auto` (its own content's min-content size), not 0, so even the
+          explicit width: 42px was getting silently shrunk on the main axis. min-width: 42px +
+          flex-shrink: 0 pin it so neither the button nor its box-sizing math can compress again. */
     width: 42px; height: 42px; min-width: 42px; flex-shrink: 0; padding: 0; min-height: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: transparent; border: 1px solid rgba(240,246,252,0.14); color: var(--text-muted); cursor: pointer;
   }
@@ -1879,7 +1884,7 @@
        renderStreakVisual() (JS below) fills #streak-visual-detail with the shared flame/number/
        stats/week-strip block. -->
   <div class="modal-backdrop hidden" id="streak-detail-backdrop">
-    <div class="modal-card">
+    <div class="modal-card" id="streak-detail-card">
       <div class="sheet-handle"></div>
       <div class="streak-visual" id="streak-visual-detail"></div>
       <!-- FIX (user report 08-29 — "once opened, i cant close it"): tap-outside-the-card was the
@@ -2866,15 +2871,15 @@ function renderStreakVisual(container, { streak, maxStreak, streakStartDate, day
         <div class="value">${formatStreakDate(streakStartDate)}</div>
         <div class="label">Streak started</div>
       </div>
-      <div class="stat-block">
-        <div class="value">${maxStreak}</div>
-        <div class="label">Max streak</div>
+      <div class="streak-stats-row-right">
+        <div class="stat-block">
+          <div class="value">${maxStreak}</div>
+          <div class="label">Max streak</div>
+        </div>
+        <button class="streak-share-circle-btn" aria-label="Share" title="Share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
+        </button>
       </div>
-    </div>
-    <div class="streak-share-row">
-      <button class="streak-share-circle-btn" aria-label="Share" title="Share">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
-      </button>
     </div>
   `;
   container.querySelector(".streak-share-circle-btn").addEventListener("click", (e) => {
@@ -4559,6 +4564,9 @@ function attachSwipeDownToClose(cardEl, onClose) {
   cardEl.addEventListener("touchend", () => { dragging = false; });
 }
 attachSwipeDownToClose(el("clubmate-workouts-card"), closeClubmateWorkouts);
+// User request 08-29: "scrolling down should close it" — same swipe-to-dismiss gesture
+// clubmate-workouts-card already has, just not wired up here yet.
+attachSwipeDownToClose(el("streak-detail-card"), closeStreakDetail);
 
 el("club-invite-btn").addEventListener("click", async () => {
   if (!currentClubDetail) return;
