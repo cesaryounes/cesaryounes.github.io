@@ -618,6 +618,76 @@
     background: var(--accent-soft); color: var(--accent); border-radius: 6px;
     padding: 2px 6px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
   }
+  #stat-streak-cell { cursor: pointer; }
+
+  /* ---- WHOOP-inspired streak status view + celebration (user request 08-29: "were all these
+     done for web too?" — StreakDetailScreen.kt/Celebrations.kt's StreakCelebration on Android had
+     no web equivalent; this brings both). Two chrome shapes sharing one visual block
+     (.streak-visual, built by renderStreakVisual() below) — same split as the app:
+       - On-demand: #streak-detail-backdrop, the existing .modal-backdrop/.modal-card bottom-sheet
+         pattern (clubmate-workouts-backdrop etc.), opened by tapping the streak cell above.
+       - One-shot: #streak-celeb-backdrop, a dimmed full-screen centered card, same shape/easing
+         .nudge-overlay-backdrop already established (spring-ish cubic-bezier(0.34,1.56,0.64,1)) —
+         shown right after a workout save actually extends the streak. */
+  .streak-visual { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .streak-visual .eyebrow-label {
+    font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .streak-glyph-box { width: 84px; height: 84px; margin-top: 16px; position: relative; }
+  .streak-glyph-box svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .streak-flame-outer { color: var(--amber); animation: streakFlameSway 1.4s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+  .streak-flame-inner { color: rgba(255,255,255,0.42); width: 55% !important; height: 55% !important; inset: 22.5% !important; animation: streakFlameFlicker 0.62s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+  @keyframes streakFlameSway {
+    from { transform: rotate(-2.5deg) scale(0.95); }
+    to   { transform: rotate(2.5deg) scale(1.07); }
+  }
+  @keyframes streakFlameFlicker {
+    from { transform: rotate(1.5deg) scale(0.88); }
+    to   { transform: rotate(-1.5deg) scale(1.04); }
+  }
+  .streak-freeze-glyph { color: var(--accent); animation: streakFreezePulse 1.6s ease-in-out infinite alternate; }
+  @keyframes streakFreezePulse {
+    from { transform: scale(0.97); }
+    to   { transform: scale(1.04); }
+  }
+  .streak-visual .streak-number { font-size: 40px; font-weight: 900; color: var(--text-main); line-height: 1; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  .streak-gems-badge {
+    display: flex; align-items: center; gap: 4px; margin-top: 8px;
+    font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; font-weight: 800; color: var(--amber);
+  }
+  .streak-gems-badge svg { width: 13px; height: 13px; }
+  .streak-stats-row { display: flex; justify-content: space-between; width: 100%; margin-top: 20px; }
+  .streak-stats-row .stat-block:last-child { text-align: right; }
+  .streak-stats-row .stat-block .value { font-size: 13px; font-weight: 800; color: var(--text-main); }
+  .streak-stats-row .stat-block .label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+  .streak-divider { width: 100%; height: 1px; background: var(--hairline); margin: 16px 0; }
+  .streak-week-strip { width: 100%; }
+  .streak-week-strip .eyebrow-label { display: block; text-align: left; margin-bottom: 10px; }
+  .streak-week-row { display: flex; justify-content: space-between; }
+  .streak-day-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .streak-day-cell .day-label { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 9px; font-weight: 700; color: var(--text-muted); }
+  .streak-day-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .streak-day-dot svg { width: 14px; height: 14px; }
+  .streak-day-dot.workout { background: rgba(255,196,0,0.16); color: var(--amber); }
+  .streak-day-dot.frozen { background: var(--accent-soft); color: var(--accent); }
+  .streak-day-dot.missed, .streak-day-dot.future { background: rgba(255,255,255,0.05); }
+
+  #streak-detail-backdrop .modal-card { padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+
+  .streak-celeb-backdrop {
+    position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0); transition: background 0.25s ease; padding: 24px;
+  }
+  .streak-celeb-backdrop.show { background: rgba(0,0,0,0.65); }
+  .streak-celeb-card {
+    width: 100%; max-width: 320px;
+    transform: scale(0.85); opacity: 0; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  }
+  .streak-celeb-backdrop.show .streak-celeb-card { transform: scale(1); opacity: 1; }
+  .streak-celeb-panel { background: var(--card); border-radius: 20px; padding: 26px 22px; }
+  .streak-celeb-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .streak-celeb-actions button { flex: 1; }
 
   /* ---- Dashboard: level + XP card (user request 08-21 — "XP should be dashboard and not
      profile", "are we able to show the level too") — mirrors DashboardScreen.kt's
@@ -928,7 +998,7 @@
            middle section, right-icons is its own fixed-width trailing group. -->
       <div class="top-banner-center">
         <div class="stat-cluster hidden" id="stat-cluster">
-          <div class="stat-cell" style="color:var(--text-muted);">
+          <div class="stat-cell" id="stat-streak-cell" style="color:var(--text-muted);">
             <svg id="stat-flame-icon" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>
             <span id="stat-streak">0</span>
           </div>
@@ -1702,6 +1772,36 @@
       </div>
       <button class="btn-text" id="nudge-cancel-btn" style="margin-top:10px;">Cancel</button>
       <p class="muted hidden" id="nudge-modal-message" style="margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <!-- WHOOP-inspired streak status view (user request 08-29 — web equivalent of
+       StreakDetailScreen.kt) — on-demand, opened by tapping the flame stat cell in the top
+       banner. Same .modal-backdrop bottom-sheet shape as clubmate-workouts-backdrop above;
+       renderStreakVisual() (JS below) fills #streak-visual-detail with the shared flame/number/
+       stats/week-strip block. -->
+  <div class="modal-backdrop hidden" id="streak-detail-backdrop">
+    <div class="modal-card">
+      <div class="sheet-handle"></div>
+      <div class="streak-visual" id="streak-visual-detail"></div>
+    </div>
+  </div>
+
+  <!-- WHOOP-inspired streak celebration (user request 08-29 — web equivalent of
+       Celebrations.kt's StreakCelebration) — one-shot, shown right after a saved workout
+       actually extends the streak (see the save-btn handler below). Same dimmed-overlay +
+       spring-scale shape .nudge-overlay-backdrop already established. Share redraws the same
+       card onto a <canvas>, same navigator.share-with-download-fallback pattern
+       shareLeaderboardImage() already uses. -->
+  <div class="streak-celeb-backdrop" id="streak-celeb-backdrop">
+    <div class="streak-celeb-card">
+      <div class="streak-celeb-panel">
+        <div class="streak-visual" id="streak-visual-celeb"></div>
+      </div>
+      <div class="streak-celeb-actions">
+        <button class="btn-text" id="streak-celeb-dismiss-btn">Dismiss</button>
+        <button class="btn-primary" id="streak-celeb-share-btn">Share</button>
+      </div>
     </div>
   </div>
 
@@ -2521,6 +2621,326 @@ async function loadHeaderStats() {
     hide("stat-freeze-cell");
   }
 }
+
+// ---------- WHOOP-inspired streak status view + celebration (web equivalent of
+// StreakDetailScreen.kt / Celebrations.kt's StreakCelebration — see those files' own doc
+// comments for the full design context; every function below mirrors its Kotlin counterpart of
+// the same name so the two stay in lockstep if the scoring/streak logic ever changes). ----------
+
+const STREAK_MILESTONES = [7, 30, 100];
+const WEEK_DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+// Same shapes as the small top-banner flame/snowflake icons above, just reused at a bigger size —
+// one visual language throughout, not a second icon set.
+const FLAME_PATH_D = "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z";
+const FREEZE_SVG_INNER = '<g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g>';
+
+function mondayOf(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Mirrors StreakDetailScreen.kt's computeWeekDayStates() exactly: Monday..Sunday, FROZEN takes
+// priority over MISSED for a freeze-covered day (still "kept the streak alive").
+function computeWeekDayStates(workoutLocalDates, freezeDatesThisWeek) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = mondayOf(today);
+  const workoutDates = new Set(workoutLocalDates);
+  const freezeDates = new Set(freezeDatesThisWeek);
+  const states = [];
+  for (let offset = 0; offset < 7; offset++) {
+    const day = new Date(monday);
+    day.setDate(day.getDate() + offset);
+    const iso = isoDate(day);
+    if (day > today) states.push("future");
+    else if (workoutDates.has(iso)) states.push("workout");
+    else if (freezeDates.has(iso)) states.push("frozen");
+    else states.push("missed");
+  }
+  return states;
+}
+
+// Mirrors StreakDetailScreen.kt's estimateStreakStartDate() exactly.
+function estimateStreakStartDate(currentStreak, lastWorkoutDateIso) {
+  if (!currentStreak || currentStreak <= 0 || !lastWorkoutDateIso) return null;
+  try {
+    const d = new Date(lastWorkoutDateIso + "T00:00:00");
+    d.setDate(d.getDate() - (currentStreak - 1));
+    return d;
+  } catch {
+    return null;
+  }
+}
+function formatStreakDate(date) {
+  if (!date) return "—";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Shared visual block — mirrors StreakVisualContent (StreakDetailScreen.kt), used by both the
+// on-demand sheet and the one-shot celebration card.
+function renderStreakVisual(container, { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned }) {
+  const glyphSvg = isFrozenToday
+    ? `<svg class="streak-freeze-glyph" viewBox="0 0 24 24">${FREEZE_SVG_INNER}</svg>`
+    : `<svg class="streak-flame-outer" viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>
+       <svg class="streak-flame-outer streak-flame-inner" viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>`;
+
+  const gemsBadge = (milestoneGemsEarned && milestoneGemsEarned > 0)
+    ? `<div class="streak-gems-badge">
+         <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg>
+         +${milestoneGemsEarned} gems
+       </div>`
+    : "";
+
+  const weekRow = WEEK_DAY_LABELS.map((label, i) => {
+    const state = dayStates[i] || "future";
+    const icon = state === "workout"
+      ? `<svg viewBox="0 0 24 24"><path d="${FLAME_PATH_D}" fill="currentColor"/></svg>`
+      : state === "frozen"
+        ? `<svg viewBox="0 0 24 24">${FREEZE_SVG_INNER}</svg>`
+        : "";
+    return `<div class="streak-day-cell">
+        <span class="day-label">${label}</span>
+        <div class="streak-day-dot ${state}">${icon}</div>
+      </div>`;
+  }).join("");
+
+  container.innerHTML = `
+    <span class="eyebrow-label">DAY STREAK</span>
+    <div class="streak-glyph-box">${glyphSvg}</div>
+    <div class="streak-number">${streak}</div>
+    <span class="eyebrow-label">DAY STREAK</span>
+    ${gemsBadge}
+    <div class="streak-stats-row">
+      <div class="stat-block">
+        <div class="value">${formatStreakDate(streakStartDate)}</div>
+        <div class="label">Streak started</div>
+      </div>
+      <div class="stat-block">
+        <div class="value">${maxStreak}</div>
+        <div class="label">Max streak</div>
+      </div>
+    </div>
+    <div class="streak-divider"></div>
+    <div class="streak-week-strip">
+      <span class="eyebrow-label">THIS WEEK</span>
+      <div class="streak-week-row">${weekRow}</div>
+    </div>
+  `;
+}
+
+// Fetches this week's real local_date/freeze data fresh — can be opened any time, not just right
+// after a streak-extending save, same reasoning StreakDetailScreen.kt's own LaunchedEffect gives.
+async function fetchThisWeekStreakData() {
+  const monday = mondayOf(new Date());
+  const mondayIso = isoDate(monday);
+
+  const [{ data: workoutRows }, { data: freezeRows }] = await Promise.all([
+    supabase.from("workouts").select("local_date").eq("user_id", currentSession.user.id)
+      .is("rejected_at", null).gte("local_date", mondayIso),
+    // streak_freeze_uses has its own "auth.uid() = user_id" SELECT policy — no RPC needed, same
+    // as the Android app's own direct read (see 0017_premium_accounts.sql).
+    supabase.from("streak_freeze_uses").select("freeze_date").eq("user_id", currentSession.user.id)
+      .gte("freeze_date", mondayIso),
+  ]);
+
+  return {
+    workoutLocalDates: (workoutRows || []).map((w) => w.local_date).filter(Boolean),
+    freezeDatesThisWeek: (freezeRows || []).map((f) => f.freeze_date),
+  };
+}
+
+async function openStreakDetail() {
+  const { data: profile } = await supabase.from("profiles")
+    .select("current_streak, longest_streak, last_workout_date")
+    .eq("id", currentSession.user.id).single();
+  if (!profile) return;
+
+  const { workoutLocalDates, freezeDatesThisWeek } = await fetchThisWeekStreakData();
+  const dayStates = computeWeekDayStates(workoutLocalDates, freezeDatesThisWeek);
+  const isFrozenToday = [...dayStates].reverse().find((s) => s !== "future") === "frozen";
+
+  renderStreakVisual(el("streak-visual-detail"), {
+    streak: profile.current_streak ?? 0,
+    maxStreak: profile.longest_streak ?? 0,
+    streakStartDate: estimateStreakStartDate(profile.current_streak, profile.last_workout_date),
+    dayStates,
+    isFrozenToday,
+  });
+  show("streak-detail-backdrop");
+}
+function closeStreakDetail() {
+  hide("streak-detail-backdrop");
+}
+el("stat-streak-cell").addEventListener("click", openStreakDetail);
+el("streak-detail-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "streak-detail-backdrop") closeStreakDetail();
+});
+
+let lastStreakCelebrationData = null; // for the Share button — set right before the overlay shows
+
+async function showStreakCelebration(streak, maxStreak, streakStartDate, milestoneGemsEarned) {
+  const { workoutLocalDates, freezeDatesThisWeek } = await fetchThisWeekStreakData();
+  const dayStates = computeWeekDayStates(workoutLocalDates, freezeDatesThisWeek);
+  const isFrozenToday = [...dayStates].reverse().find((s) => s !== "future") === "frozen";
+
+  const data = { streak, maxStreak, streakStartDate, dayStates, isFrozenToday, milestoneGemsEarned };
+  lastStreakCelebrationData = data;
+  renderStreakVisual(el("streak-visual-celeb"), data);
+  el("streak-celeb-backdrop").classList.add("show");
+}
+function closeStreakCelebration() {
+  el("streak-celeb-backdrop").classList.remove("show");
+}
+el("streak-celeb-dismiss-btn").addEventListener("click", closeStreakCelebration);
+el("streak-celeb-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "streak-celeb-backdrop") closeStreakCelebration();
+});
+
+// Checked right after a workout save (see save-btn handler) — mirrors AppViewModel.kt's own
+// justExtendedStreak wiring: fires on ANY streak-increasing sync, not just a milestone crossing;
+// milestoneGemsEarned mirrors DashboardScreen.kt's exact call-site expression
+// (justExtendedStreakMilestone?.let { justExtendedStreakGems }) — non-null (the real gems delta
+// for this save) only when a STREAK_MILESTONES value was actually crossed, null otherwise.
+async function checkStreakExtensionAndCelebrate(prevStreak, prevGems) {
+  const { data: profile } = await supabase.from("profiles")
+    .select("current_streak, longest_streak, last_workout_date, gems")
+    .eq("id", currentSession.user.id).single();
+  if (!profile) return;
+
+  loadHeaderStats();
+
+  if (prevStreak == null || profile.current_streak <= prevStreak) return;
+  const milestoneCrossed = STREAK_MILESTONES.filter((m) => prevStreak < m && profile.current_streak >= m).pop();
+  const milestoneGemsEarned = milestoneCrossed !== undefined ? Math.max(0, (profile.gems ?? 0) - (prevGems ?? 0)) : null;
+
+  await showStreakCelebration(
+    profile.current_streak,
+    profile.longest_streak ?? profile.current_streak,
+    estimateStreakStartDate(profile.current_streak, profile.last_workout_date),
+    milestoneGemsEarned
+  );
+}
+
+async function shareStreakImage() {
+  if (!lastStreakCelebrationData) return;
+  const btn = el("streak-celeb-share-btn");
+  btn.disabled = true;
+  try {
+    const { streak, maxStreak, streakStartDate, isFrozenToday } = lastStreakCelebrationData;
+    const W = 480, H = 620;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#161B22";
+    roundRectPath(ctx, 0, 0, W, H, 20);
+    ctx.fill();
+
+    ctx.fillStyle = "#8B949E";
+    ctx.font = "700 12px 'SFMono-Regular', Consolas, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("DAY STREAK", W / 2, 56);
+
+    // Simple hand-drawn-ish flame silhouette (or a snowflake if frozen today) — not the exact
+    // Compose Canvas path, but the same amber/accent palette and general shape.
+    const cx = W / 2, cy = 150;
+    if (isFrozenToday) {
+      ctx.strokeStyle = "#CCFF00";
+      ctx.lineWidth = 7;
+      ctx.lineCap = "round";
+      [0, 60, 120].forEach((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        ctx.beginPath();
+        ctx.moveTo(cx - 45 * Math.cos(rad), cy - 45 * Math.sin(rad));
+        ctx.lineTo(cx + 45 * Math.cos(rad), cy + 45 * Math.sin(rad));
+        ctx.stroke();
+      });
+    } else {
+      ctx.fillStyle = "#FFC400";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 55);
+      ctx.bezierCurveTo(cx + 42, cy - 20, cx + 30, cy + 20, cx + 22, cy + 30);
+      ctx.bezierCurveTo(cx + 40, cy + 15, cx + 48, cy + 45, cx + 30, cy + 68);
+      ctx.bezierCurveTo(cx + 42, cy + 55, cx + 44, cy + 20, cx + 20, cy - 5);
+      ctx.bezierCurveTo(cx + 22, cy + 20, cx + 8, cy + 30, cx, cy + 15);
+      ctx.bezierCurveTo(cx - 8, cy + 30, cx - 22, cy + 20, cx - 20, cy - 5);
+      ctx.bezierCurveTo(cx - 44, cy + 20, cx - 42, cy + 55, cx - 30, cy + 68);
+      ctx.bezierCurveTo(cx - 48, cy + 45, cx - 40, cy + 15, cx - 22, cy + 30);
+      ctx.bezierCurveTo(cx - 30, cy + 20, cx - 42, cy - 20, cx, cy - 55);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#F0F6FC";
+    ctx.font = "900 72px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText(String(streak), W / 2, cy + 130);
+    ctx.fillStyle = "#8B949E";
+    ctx.font = "700 12px 'SFMono-Regular', Consolas, monospace";
+    ctx.fillText("DAY STREAK", W / 2, cy + 155);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#F0F6FC";
+    ctx.font = "800 15px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText(formatStreakDate(streakStartDate), 40, H - 90);
+    ctx.fillStyle = "#8B949E";
+    ctx.font = "700 10px 'SFMono-Regular', Consolas, monospace";
+    ctx.fillText("STREAK STARTED", 40, H - 72);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#F0F6FC";
+    ctx.font = "800 15px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText(String(maxStreak), W - 40, H - 90);
+    ctx.fillStyle = "#8B949E";
+    ctx.font = "700 10px 'SFMono-Regular', Consolas, monospace";
+    ctx.fillText("MAX STREAK", W - 40, H - 72);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#8B949E";
+    ctx.font = "600 12px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText("keepup", W / 2, H - 24);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const caption = `${streak} days in a row on KeepUp — https://cesaryounes.github.io/`;
+    const file = new File([blob], "keepup-streak.png", { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text: caption, title: "KeepUp Streak" });
+        return;
+      } catch (e) {
+        if (e.name === "AbortError") return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "keepup-streak.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    try {
+      await navigator.clipboard.writeText(caption);
+      alert("Streak image downloaded — caption copied to your clipboard.");
+    } catch {
+      alert("Streak image downloaded.");
+    }
+  } catch (e) {
+    console.error("Share streak error:", e);
+    alert("Couldn't generate the share image — try again.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+el("streak-celeb-share-btn").addEventListener("click", shareStreakImage);
 
 async function loadDashboard() {
   // FIX (user request 08-23): loadHistory() no longer runs eagerly on every Dashboard visit — the
@@ -5767,6 +6187,12 @@ el("save-btn").addEventListener("click", async () => {
       throw new Error("Fill in duration, calories, and heart rate first.");
     }
 
+    // Fetched before the insert so checkStreakExtensionAndCelebrate (below) can tell whether this
+    // save actually extended the streak — same before/after comparison AppViewModel.kt's own
+    // profile-row listener does (previousStreak vs row.current_streak).
+    const { data: prevProfile } = await supabase.from("profiles")
+      .select("current_streak, gems").eq("id", currentSession.user.id).single();
+
     // Device's LOCAL calendar date — same reasoning as WorkoutEntry.local_date's doc comment in
     // the Android app: a workout just after local midnight must land on the right streak day.
     const now = new Date();
@@ -5789,6 +6215,7 @@ el("save-btn").addEventListener("click", async () => {
     if (error) throw error;
 
     await showSavedStep(duration, calories);
+    checkStreakExtensionAndCelebrate(prevProfile?.current_streak, prevProfile?.gems);
   } catch (err) {
     alert(err.message || "Couldn't save this workout — try again.");
   } finally {
