@@ -1789,6 +1789,16 @@
           <span class="club-icon-action-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
           <span>Rename</span>
         </button>
+        <!-- FIX (user report 08-31 — "lost the ability to change the club's picture"): owner-only
+             photo change, web edition. Android's Manage screen regained a Photo action the same
+             day; web never had one at all (thumbnails were letter-only until now). Simplified vs
+             Android's Avatar/Gallery/Camera picker: a straight file pick, same one-tap shape the
+             profile avatar edit already uses. -->
+        <button type="button" class="club-icon-action" id="club-photo-btn">
+          <span class="club-icon-action-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+          <span>Photo</span>
+        </button>
+        <input type="file" id="club-photo-input" accept="image/*" class="hidden" />
       </div>
 
       <div class="field hidden" id="club-invite-wrap">
@@ -3312,7 +3322,7 @@ let lbSearchQuery = "";
 async function fetchMyClubs() {
   const { data, error } = await supabase
     .from("group_members")
-    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads, allow_gear_multipliers, owner_id)")
+    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads, allow_gear_multipliers, owner_id, photo_url)")
     .eq("user_id", currentSession.user.id);
   if (error) {
     console.error("Couldn't load your clubs:", error);
@@ -3877,7 +3887,7 @@ async function loadClubDirectory() {
 
   const { data, error } = await supabase
     .from("groups")
-    .select("id, name, is_public, owner_id")
+    .select("id, name, is_public, owner_id, photo_url")
     .eq("allow_score_uploads", true)
     .order("name");
 
@@ -3974,11 +3984,16 @@ Array.from(el("club-directory-visibility-pills").children).forEach((pill) => {
 });
 
 // Same GroupThumbnail (GroupsScreen.kt) shape/colors: 44px rounded-square, accent-soft fill,
-// first-letter fallback, small public/private badge bottom-right. No club-photo upload on the web
-// dashboard, so always the letter fallback here, never a real photo.
-function groupThumbnailHtml(name) {
+// first-letter fallback, small public/private badge bottom-right.
+// FIX (user report 08-31): web now shows the club's real photo_url when one is set (and owners
+// can change it — see club-photo-btn below), instead of always the letter fallback. Same
+// photo-first-else-letter logic as GroupThumbnail's AsyncImage branch.
+function groupThumbnailHtml(name, photoUrl) {
   const letter = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
-  return `<div class="club-thumb"><span class="club-thumb-letter">${escapeHtml(letter)}</span></div>`;
+  const inner = photoUrl
+    ? `<img src="${escapeHtml(photoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" />`
+    : `<span class="club-thumb-letter">${escapeHtml(letter)}</span>`;
+  return `<div class="club-thumb">${inner}</div>`;
 }
 function visibilityBadgeSvg(isPublic) {
   return isPublic
@@ -3996,7 +4011,7 @@ function renderDirectoryRow(group) {
   li.className = "directory-row";
 
   const thumbWrap = document.createElement("div");
-  thumbWrap.innerHTML = groupThumbnailHtml(group.name);
+  thumbWrap.innerHTML = groupThumbnailHtml(group.name, group.photo_url);
   const thumb = thumbWrap.firstElementChild;
   thumb.insertAdjacentHTML("beforeend", `<span class="club-thumb-badge">${visibilityBadgeSvg(group.is_public)}</span>`);
   li.appendChild(thumb);
@@ -4114,7 +4129,7 @@ function renderMyClubRow(group) {
   const isOwner = group.owner_id === currentSession.user.id;
   const memberLabel = memberCountLabel(group.id);
   li.innerHTML = `
-    ${groupThumbnailHtml(group.name)}
+    ${groupThumbnailHtml(group.name, group.photo_url)}
     <div class="club-row-info">
       <div class="club-row-name">${escapeHtml(group.name)}${isOwner ? '<span class="owner-badge">Owner</span>' : ""}</div>
       ${memberLabel ? `<div class="my-club-meta"><span class="directory-row-sub">${memberLabel}</span></div>` : ""}
@@ -4285,6 +4300,41 @@ el("club-rename-btn").addEventListener("click", async () => {
   el("club-manage-message").style.color = "var(--success)";
   show("club-manage-message");
   await loadClubDirectory();
+});
+
+// Owner-only club photo (user report 08-31) — same storage path Android's uploadGroupPhoto()
+// uses (`<owner_id>/groups/<club_id>.jpg`, avatars bucket, upsert), so both platforms overwrite
+// the same object instead of piling up copies. The stored URL gets a ?v= timestamp because the
+// path is stable across re-uploads — without it, browsers keep serving the cached old image.
+el("club-photo-btn").addEventListener("click", () => el("club-photo-input").click());
+el("club-photo-input").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = ""; // same file can be picked again next time
+  if (!file || !currentClubDetail) return;
+  const msg = el("club-manage-message");
+  msg.textContent = "Uploading photo…";
+  msg.style.color = "var(--text-muted)";
+  show("club-manage-message");
+  try {
+    const path = `${currentSession.user.id}/groups/${currentClubDetail.id}.jpg`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      upsert: true,
+      contentType: file.type || "image/jpeg",
+    });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const photoUrl = `${data.publicUrl}?v=${Date.now()}`;
+    const { error: dbErr } = await supabase.from("groups").update({ photo_url: photoUrl }).eq("id", currentClubDetail.id);
+    if (dbErr) throw dbErr;
+    currentClubDetail.photo_url = photoUrl;
+    msg.textContent = "Photo updated";
+    msg.style.color = "var(--success)";
+    await loadClubDirectory();
+  } catch (err) {
+    console.error("Club photo upload failed:", err);
+    msg.textContent = err.message || "Couldn't upload that photo";
+    msg.style.color = "var(--danger)";
+  }
 });
 
 el("club-visibility-toggle").addEventListener("change", async (e) => {
