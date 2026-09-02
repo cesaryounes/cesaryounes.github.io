@@ -2151,6 +2151,16 @@ const hide = (id) => el(id).classList.add("hidden");
 let currentSession = null;
 let currentParse = null; // last successful parse-workout-photo response
 let currentPhotoDataUrl = null;
+// SHA-256 of the picked photo's ORIGINAL bytes (before downscaling) — sent as workouts.photo_hash
+// so the same picture can't be logged twice (0128_web_photo_dedup_hash.sql enforces it
+// server-side; the pick-time pre-check below is just the friendly early version of the same rule).
+let currentPhotoHash = null;
+
+async function sha256HexOfFile(file) {
+  const buf = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // ---------- Auth ----------
 //
@@ -5775,6 +5785,7 @@ el("log-another-btn").addEventListener("click", resetSubmitFlow);
 function resetSubmitFlow() {
   currentParse = null;
   currentPhotoDataUrl = null;
+  currentPhotoHash = null;
   el("photo-input").value = "";
   show("choice-step");
   hide("upload-step");
@@ -5801,6 +5812,7 @@ el("choose-manual-btn").addEventListener("click", () => {
 function showUploadStep() {
   currentParse = null;
   currentPhotoDataUrl = null;
+  currentPhotoHash = null;
   el("photo-input").value = "";
   show("upload-step");
   hide("parsing-step");
@@ -6306,6 +6318,30 @@ el("photo-input").addEventListener("change", async (e) => {
   hide("upload-step");
   show("parsing-step");
 
+  // Duplicate-photo pre-check (user request 09-02) — fingerprint the original file and look for
+  // an existing workout carrying the same hash BEFORE spending time on OCR. Best-effort UX only:
+  // if the hash or the lookup fails for any reason, the flow continues and the 0128 unique index
+  // still rejects an actual duplicate at insert time.
+  try {
+    currentPhotoHash = await sha256HexOfFile(file);
+    const { data: dup } = await supabase
+      .from("workouts")
+      .select("local_date")
+      .eq("user_id", currentSession.user.id)
+      .eq("photo_hash", currentPhotoHash)
+      .limit(1);
+    if (dup && dup.length > 0) {
+      hide("parsing-step");
+      show("upload-step");
+      el("photo-input").value = "";
+      alert(`This exact photo was already logged (${dup[0].local_date}). Pick a different one.`);
+      return;
+    }
+  } catch (hashErr) {
+    console.warn("Photo hash pre-check unavailable:", hashErr);
+    currentPhotoHash = null;
+  }
+
   try {
     const dataUrl = await downscaleImage(file);
     currentPhotoDataUrl = dataUrl;
@@ -6483,8 +6519,18 @@ el("save-btn").addEventListener("click", async () => {
       exercise_type: CATEGORY_TO_CODE[activity] ?? 0,
       local_date: localDate,
       source: "web_photo",
+      // Null for manual entries and whenever hashing wasn't available — the 0128 partial unique
+      // index only guards non-null hashes.
+      photo_hash: currentEntryMode === "photo" ? currentPhotoHash : null,
     });
-    if (error) throw error;
+    if (error) {
+      // The 0128 dedup index firing = this exact picture is already logged (the pick-time
+      // pre-check catches this earlier in the common case; this is the server-enforced backstop).
+      if (error.code === "23505" && (error.message || "").includes("photo_hash")) {
+        throw new Error("This exact photo was already logged as a workout — it can't be counted twice.");
+      }
+      throw error;
+    }
 
     await showSavedStep(duration, calories);
     checkStreakExtensionAndCelebrate(prevProfile?.current_streak, prevProfile?.gems);
