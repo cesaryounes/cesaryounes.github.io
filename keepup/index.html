@@ -1418,6 +1418,16 @@
               <label for="hr-input">Avg heart rate (bpm)</label>
               <input type="number" id="hr-input" min="30" max="220" inputmode="numeric" />
             </div>
+            <!-- Workout date (user request 09-02: "default today... user can change if needed to
+                 upload a missed entry"). min/max are set in JS on every confirm-step open (today,
+                 back to 7 days) — a bounded window rather than free backdating, since a workout
+                 dated into an old gap merges streak runs (fn_compute_streak counts all days), and
+                 an unbounded picker would reopen the retroactive-streak-repair hole 0126 closed,
+                 just manually. 7 days covers every honest "forgot to log it" case. -->
+            <div class="field">
+              <label for="workout-date-input">Workout date</label>
+              <input type="date" id="workout-date-input" />
+            </div>
 
             <button class="btn-primary" id="save-btn" style="margin-bottom:10px;">Save workout</button>
             <button class="btn-secondary" id="retake-btn">Choose a different photo</button>
@@ -5832,7 +5842,26 @@ function showManualEntryStep() {
   el("duration-input").value = "";
   el("calories-input").value = "";
   el("hr-input").value = "";
+  resetWorkoutDateInput();
   show("confirm-step");
+}
+
+// Local-time ISO date (device timezone, NOT toISOString's UTC — same reasoning as local_date's
+// own comment at the save site: a workout logged just after local midnight must land on the
+// right streak day).
+function localIsoDate(daysAgo = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Defaults the workout-date field to today and re-pins its allowed window (today back to 7 days)
+// on every confirm-step open — see the field's own HTML comment for why the window is bounded.
+function resetWorkoutDateInput() {
+  const input = el("workout-date-input");
+  input.max = localIsoDate(0);
+  input.min = localIsoDate(7);
+  input.value = localIsoDate(0);
 }
 
 // ---------- On-device workout-photo OCR (user request 08-24: "can we do something for free?" ->
@@ -6376,6 +6405,7 @@ function populateConfirmStep(result) {
   show("retake-btn");
   el("photo-preview").src = currentPhotoDataUrl;
   hide("parse-error");
+  resetWorkoutDateInput();
 
   const badgeClass = { high: "badge-high", medium: "badge-medium", low: "badge-low" }[result.confidence] || "badge-medium";
   el("confidence-row").innerHTML =
@@ -6503,8 +6533,14 @@ el("save-btn").addEventListener("click", async () => {
 
     // Device's LOCAL calendar date — same reasoning as WorkoutEntry.local_date's doc comment in
     // the Android app: a workout just after local midnight must land on the right streak day.
-    const now = new Date();
-    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    // FIX (user request 09-02): the date is now user-pickable (missed entries) via
+    // #workout-date-input, clamped to the same today-back-to-7-days window the input's min/max
+    // advertise — re-validated here because min/max on a date input are advisory, not enforced
+    // against typed/programmatic values. Empty or out-of-window falls back to today.
+    const pickedDate = el("workout-date-input").value;
+    const localDate = (pickedDate && pickedDate >= localIsoDate(7) && pickedDate <= localIsoDate(0))
+      ? pickedDate
+      : localIsoDate(0);
 
     // workouts.id has no server-side default — the Android app always generates this client-side
     // too (NewWorkout.id, Models.kt), which is exactly why this insert failed without it ("null
