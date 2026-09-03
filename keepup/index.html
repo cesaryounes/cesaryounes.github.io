@@ -1917,6 +1917,41 @@
     </div>
   </div>
 
+  <!-- "Free for 1 month" welcome modal (user request 09-02) — web equivalent of
+       OnboardingScreen.kt's showTrialStartedDialog. Shown once, the moment
+       fn_redeem_promo_code("WELCOME1MONTH") actually succeeds for this account (checked once per
+       sign-in in renderAuthState(), same idempotent-RPC gate the Android onboarding flow uses —
+       a repeat call just returns "already used" and nothing shows, so this is safe to attempt on
+       every session without an extra "is this a new account" check of its own). No close-by-
+       tapping-outside on purpose — this is the one moment the trial gets announced. -->
+  <div class="modal-backdrop hidden" id="trial-started-backdrop">
+    <div class="modal-card" id="trial-started-card">
+      <p class="membership-title" style="color:var(--accent); margin-top:0;">Free for 1 month</p>
+      <p class="membership-desc" style="margin-bottom:20px;">Your Premium trial just started — private clubs, streak freezes, nudges and more, no card needed. It runs for 30 days; you can always see how much is left in Membership.</p>
+      <button class="btn-primary" id="trial-started-ok-btn">Let's go</button>
+    </div>
+  </div>
+
+  <!-- "Your trial has ended" modal (user request 09-02) — web equivalent of DashboardScreen.kt's
+       showTrialEndedDialog. Checked once per sign-in (same once-per-session gate pattern as the
+       streak-recompute/timezone-sync calls in renderAuthState()), fires the moment premium_until
+       has genuinely lapsed and this exact value hasn't been acknowledged yet on this device
+       (localStorage, mirrors Android's SharedPreferences KEY_TRIAL_END_ACK_UNTIL) — a later
+       trial/code extending premium_until again naturally re-arms this for whenever THAT one
+       eventually lapses too. "See options" opens Membership (same screen the passive membership
+       card / promo-code field already live in) rather than a real checkout — Play Billing doesn't
+       exist on web, this is the honest equivalent of Android's "Upgrade" button here. -->
+  <div class="modal-backdrop hidden" id="trial-ended-backdrop">
+    <div class="modal-card" id="trial-ended-card">
+      <p class="membership-title" style="color:var(--accent); margin-top:0;">Your trial has ended</p>
+      <p class="membership-desc" style="margin-bottom:20px;">Private clubs, streak freezes, nudges and club leaderboards are Premium features from here on. Keep using the Standard plan, or see your options.</p>
+      <div class="btn-row">
+        <button class="btn-secondary" id="trial-ended-standard-btn" style="flex:1;">Continue with Standard</button>
+        <button class="btn-primary" id="trial-ended-upgrade-btn" style="flex:1;">See options</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Claude Design redesign (user request 08-29 — web equivalent of Celebrations.kt's
        StreakCelebration, rebuilt from Streak animation/design_handoff_streak_redesign/README.md)
        — one-shot, shown right after a saved workout actually extends the streak. Leo (#streak-leo-
@@ -2292,6 +2327,77 @@ let streakRecomputedThisSession = false;
 // timezone written at all. Same once-per-session gate as the streak recompute above, same reason
 // (renderAuthState fires on token refresh too, not just real sign-in).
 let timezoneSyncedThisSession = false;
+
+// Web/app parity (user request 09-02): Android's OnboardingScreen.kt auto-redeems the unlimited-
+// use WELCOME1MONTH code the moment onboarding finishes, then shows a one-time "Free for 1 month"
+// dialog; DashboardScreen.kt separately shows a proactive "Your trial has ended" dialog on every
+// launch once premium_until lapses. Web had neither — a web-only signup got no trial at all, and
+// an expired one only ever saw the passive membership-card text if they happened to open it. Both
+// gaps close here, same once-per-session gate shape as the two flags above.
+let trialGrantCheckedThisSession = false;
+let trialEndCheckedThisSession = false;
+const TRIAL_END_ACK_KEY = "keepup_trial_end_ack_until";
+
+async function checkAndGrantWelcomeTrial() {
+  try {
+    const { data, error } = await supabase.rpc("fn_redeem_promo_code", { p_code: "WELCOME1MONTH" }).single();
+    if (error) throw error;
+    // A false result here is almost always "you already used this code" (any account that's
+    // been through this before, on either platform) — nothing new to announce, proceed silently.
+    // Same reasoning as OnboardingScreen.kt's own redeemPromoCode callback.
+    if (data.success) {
+      show("trial-started-backdrop");
+      await Promise.all([loadProfile(), loadHeaderStats()]);
+    }
+  } catch (e) {
+    console.error("Welcome trial grant check failed:", e);
+  }
+}
+
+async function checkTrialEnded() {
+  try {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("premium_until")
+      .eq("id", currentSession.user.id)
+      .single();
+    if (error || !profile?.premium_until) return;
+    const isExpired = new Date(profile.premium_until) <= new Date();
+    if (!isExpired) return;
+    let ack = null;
+    try { ack = localStorage.getItem(TRIAL_END_ACK_KEY); } catch {
+      // Storage disabled — falls through to showing the modal every session rather than crashing;
+      // same "degrade, don't break" posture as switchTab()'s own localStorage try/catch.
+    }
+    if (ack === profile.premium_until) return;
+    show("trial-ended-backdrop");
+  } catch (e) {
+    console.error("Trial-end check failed:", e);
+  }
+}
+
+function acknowledgeTrialEnded() {
+  hide("trial-ended-backdrop");
+  supabase
+    .from("profiles")
+    .select("premium_until")
+    .eq("id", currentSession.user.id)
+    .single()
+    .then(({ data }) => {
+      if (!data?.premium_until) return;
+      try { localStorage.setItem(TRIAL_END_ACK_KEY, data.premium_until); } catch {}
+    });
+}
+
+el("trial-started-ok-btn").addEventListener("click", () => hide("trial-started-backdrop"));
+el("trial-ended-standard-btn").addEventListener("click", acknowledgeTrialEnded);
+el("trial-ended-upgrade-btn").addEventListener("click", () => {
+  acknowledgeTrialEnded();
+  openScreen("screen-membership");
+  renderCompareTable();
+  loadProfile();
+});
+
 async function syncTimezoneIfNeeded() {
   try {
     const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -2331,6 +2437,14 @@ async function renderAuthState() {
     if (!timezoneSyncedThisSession) {
       timezoneSyncedThisSession = true;
       syncTimezoneIfNeeded();
+    }
+    if (!trialGrantCheckedThisSession) {
+      trialGrantCheckedThisSession = true;
+      checkAndGrantWelcomeTrial();
+    }
+    if (!trialEndCheckedThisSession) {
+      trialEndCheckedThisSession = true;
+      checkTrialEnded();
     }
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
@@ -2377,6 +2491,8 @@ el("sign-out-btn").addEventListener("click", async () => {
   await supabase.auth.signOut();
   streakRecomputedThisSession = false;
   timezoneSyncedThisSession = false;
+  trialGrantCheckedThisSession = false;
+  trialEndCheckedThisSession = false;
   await refreshSession();
 });
 
