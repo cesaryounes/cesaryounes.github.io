@@ -476,6 +476,12 @@
   }
   .row-history-btn svg { width: 20px; height: 20px; }
   .row-history-btn:active { color: var(--text-main); }
+  /* FIX (user report 09-02, with a circled screenshot): .lb-row is a flex row, and this chevron
+     used to just be omitted entirely (empty string) for a row you don't share a club with — its
+     28px + gap simply didn't exist, so .lb-points' right edge landed in a different place per row
+     instead of a fixed column. Reserves the identical 28px whether or not the real button is
+     drawn inside it — same fixed-width-slot fix as LeaderboardScreen.kt's own version of this bug. */
+  .row-history-spacer { width: 28px; height: 28px; flex-shrink: 0; }
   /* Remove-member button (user request 08-26) — same shape as .row-history-btn, tinted danger
      since this one's destructive. */
   .row-remove-btn {
@@ -3964,7 +3970,7 @@ function renderLeaderboardRows(rows) {
         <div class="lb-sub">${subLabel}</div>
       </div>
       <div class="lb-points">${Number(r.period_points ?? 0).toFixed(2)}</div>
-      ${canViewLeaderboardRowHistory(r.user_id) ? historyChevronHtml(r.user_id, r.display_name) : ""}
+      ${canViewLeaderboardRowHistory(r.user_id) ? historyChevronHtml(r.user_id, r.display_name) : '<div class="row-history-spacer"></div>'}
     `;
     rowsWrap.appendChild(row);
   });
