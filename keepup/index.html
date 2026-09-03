@@ -961,6 +961,20 @@
   .gear-tier-label { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
   .gear-name { font-size: 14px; font-weight: 700; color: var(--text-main); margin: 2px 0; }
   .gear-material { font-size: 11px; color: var(--text-muted); }
+  /* FIX (user report 09-02): gear rows had no visible score-bonus line at all — frames already
+     showed theirs (renderFrames() reuses .gear-material for it), gear never did. Own accent-
+     colored class rather than reusing .gear-material, since a gear row's actual material line
+     ("Flat canvas construction", etc.) is a separate line this sits below, not a replacement —
+     matches RewardsShopScreen.kt's GearRow, which shows both a materialLabel line AND a
+     separate NeonAccent "+X% score bonus" line. */
+  .gear-bonus { font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+  /* Streak Freeze boost icon (user report 09-02 — "needs to show the freeze picture correctly"):
+     the Boosts tab had no art tile at all, just text — RewardsShopScreen.kt's BoostRow always
+     renders one (a snowflake glyph on a dark tile, 92x66dp). Same tile shape/size here, same
+     snowflake glyph the streak week-strip's own FROZEN day cells already draw
+     (renderStreakVisual's frozen-cell SVG), reused rather than inventing a second snowflake mark. */
+  .boost-art-tile { width: 92px; height: 66px; border-radius: 11px; background: #0E1218; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .boost-art-tile svg { width: 30px; height: 30px; color: var(--accent); }
   /* FIX (user report 08-24: "I also can't find Buy/Equipped buttons") — the whole row is already
      tappable (onGearRowClick), but the action area was plain colored text with no background/
      border, so nothing signaled it was interactive. Real pill styling now, same treatment
@@ -2118,12 +2132,22 @@
       <div id="gear-list"></div>
     </div>
     <div id="shop-tab-boosts" class="hidden">
-      <div class="card">
-        <p class="gear-name" style="margin-top:0;">Streak Freeze</p>
-        <p class="muted" style="margin-bottom:14px;">Protects your streak for one missed day. Used automatically the next time you'd otherwise lose it.</p>
-        <div class="btn-row">
-          <span class="muted" id="freeze-owned-count" style="align-self:center;">0 owned</span>
-          <button class="btn-primary" id="buy-freeze-btn">40 <svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px;"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg></button>
+      <!-- FIX (user report 09-02 — "needs to show the freeze picture correctly"): this card had
+           no art tile at all before, just text. Same shape/size as a gear row's art tile
+           (.boost-art-tile, 92x66), same snowflake mark (FREEZE_SVG_INNER) the streak week-strip's
+           own frozen-day cells already draw — matches RewardsShopScreen.kt's BoostRow, which
+           always renders an icon tile for this. -->
+      <div class="card" style="display:flex; align-items:center; gap:14px;">
+        <!-- Same snowflake mark as FREEZE_SVG_INNER (JS, streak-visual.js block below) — inlined
+             literally here since this card is static HTML, not built from a JS template. -->
+        <div class="boost-art-tile"><svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4.5" y1="7.5" x2="19.5" y2="16.5"/><line x1="19.5" y1="7.5" x2="4.5" y2="16.5"/></g></svg></div>
+        <div style="flex:1; min-width:0;">
+          <p class="gear-name" style="margin-top:0;">Streak Freeze</p>
+          <p class="muted" style="margin-bottom:10px;">Protects your streak for one missed day. Used automatically the next time you'd otherwise lose it.</p>
+          <div class="btn-row">
+            <span class="muted" id="freeze-owned-count" style="align-self:center;">0 owned</span>
+            <button class="btn-primary" id="buy-freeze-btn">40 <svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px;"><path d="M6 3h12l4 6-10 12L2 9z" fill="currentColor"/></svg></button>
+          </div>
         </div>
       </div>
     </div>
@@ -7363,6 +7387,13 @@ const GEAR_TIER_META = {
   legendary: { label: "Legendary", cost: 8000, color: "#7DF9FF", material: "Iridescent gradient, sheen", bonus: 3.0 },
 };
 const GEAR_TIER_ORDER = ["common", "rare", "elite", "pro", "legendary"];
+// "1" / "1.5" / "3" — unlike Kotlin's Double.toString() (which RewardsShopScreen.kt's
+// formatPercent() has to special-case to avoid a trailing ".0"), JS's own Number-to-string
+// coercion already drops it (String(1) === "1", String(1.5) === "1.5") — so this is just that
+// coercion, named to make the two platforms' matching output obvious at the call site.
+function formatGearBonus(value) {
+  return String(value);
+}
 const GEAR_LINES = [
   { id: "football",       displayName: "Keep Up Football",  itemNoun: "Football Boot" },
   { id: "basketball",     displayName: "Keep Up Basketball", itemNoun: "Basketball Hightop" },
@@ -7480,6 +7511,12 @@ function renderGearList() {
           <div class="gear-tier-label" style="color:${it.tier.color};">${it.tier.label}</div>
           <div class="gear-name">${escapeHtml(it.itemNoun)}</div>
           <div class="gear-material">${escapeHtml(it.tier.material)}</div>
+          <!-- FIX (user report 09-02 — "the gear must show the multiplier you win when buying
+               and equipping"): RewardsShopScreen.kt's GearRow already shows this on the row
+               itself (same +X% formatting, same NeonAccent/--accent color); web only ever showed
+               it on frames, never gear. formatGearBonus mirrors Android's formatPercent exactly
+               (see its own comment) so "1"/"1.5"/"2"/"2.5"/"3" match across both platforms. -->
+          <div class="gear-bonus">+${formatGearBonus(it.tier.bonus)}% score bonus</div>
         </div>
         ${actionHtml}
       </div>`;
@@ -7497,7 +7534,7 @@ async function onGearRowClick(itemId) {
       alert(`Need ${item.tier.cost - (shopProfile.gems || 0)} more gems for this item`);
       return;
     }
-    if (!confirm(`Buy ${item.itemNoun} (${item.tier.label}) for ${item.tier.cost} gems?`)) return;
+    if (!confirm(`Buy ${item.itemNoun} (${item.tier.label}) for ${item.tier.cost} gems?\n\n+${formatGearBonus(item.tier.bonus)}% score bonus in clubs that turn gear bonuses on — never on Global or Region.`)) return;
     const { error } = await supabase.rpc("fn_unlock_gear", { p_item_id: itemId, p_cost: item.tier.cost });
     if (error) { alert(error.message); return; }
     await loadShop();
