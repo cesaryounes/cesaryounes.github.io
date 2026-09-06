@@ -1422,6 +1422,7 @@
                 <option value="racket">Racket sport</option>
                 <option value="swim">Swimming</option>
                 <option value="recovery">Recovery</option>
+                <option value="walking">Walking</option>
               </select>
             </div>
             <div class="row">
@@ -6583,6 +6584,14 @@ function escapeHtml(s) {
 // Now one representative exercise_type per scoring category (0096_category_based_scoring_formula.sql
 // / fn_scoring_category_label()) — which specific type within a category gets stored doesn't
 // affect points, every type in the same category scores identically.
+// FIX (user report 09-06): Walking gets its own real category/exercise_type now, not folded into
+// Cardio (56/Running) — the on-device OCR already recognized "walking" as its own label
+// (PARSED_LABEL_TO_CATEGORY below), it just had nowhere real to land before this. Matters because
+// fn_scoring_category_weight (0129_walking_category_weight.sql) dampens Walking specifically
+// (79) — a walk stored as Running never got that correction and scored even MORE inflated, not
+// less (Running's cal/min expectations are higher). Android needs no equivalent change: Health
+// Connect already reports real per-sport exercise_type codes for automatic syncs, walking
+// included — this gap was web's manual/photo-upload picker only.
 const CATEGORY_TO_CODE = {
   cardio: 56,   // Running — representative Cardio/HIIT type
   weight: 70,   // Strength Training
@@ -6590,6 +6599,7 @@ const CATEGORY_TO_CODE = {
   racket: 50,   // Racquetball
   swim: 74,     // Swimming (pool)
   recovery: 83, // Yoga
+  walking: 79,  // Walking — its own category, see FIX above
 };
 
 // The photo-parser (parse-workout-photo/index.ts) still detects specific sports from a screenshot
@@ -6598,7 +6608,7 @@ const CATEGORY_TO_CODE = {
 // still auto-select the right option. Circuit/Racket sport have no representative among the
 // parser's labels, so a photo can never auto-land on those — a user can still pick either by hand.
 const PARSED_LABEL_TO_CATEGORY = {
-  running: "cardio", walking: "cardio", cycling: "cardio", hiking: "cardio",
+  running: "cardio", walking: "walking", cycling: "cardio", hiking: "cardio",
   rowing: "cardio", elliptical: "cardio", stair_climbing: "cardio", boxing: "cardio",
   dancing: "cardio", other_workout: "cardio",
   swimming: "swim",
@@ -6612,6 +6622,7 @@ const PARSED_LABEL_TO_CATEGORY = {
 // real hosted icon for that exercise_type.
 const CATEGORY_ABBR = {
   cardio: "CIO", weight: "WGT", circuit: "CIR", racket: "RKT", swim: "SWM", recovery: "RCV",
+  walking: "WLK",
 };
 
 // FIX (user request 08-24: "logos for the 6 categories, same for the app and web") — same six
@@ -6622,7 +6633,7 @@ const CATEGORY_ABBR = {
 // stopwatch (Circuit), racket (Racket sport), two wave lines (Swimming), leaf (Recovery).
 const CATEGORY_ICON_LABEL = {
   cardio: "Cardio/HIIT", weight: "Weight training", circuit: "Circuit",
-  racket: "Racket sport", swim: "Swimming", recovery: "Recovery",
+  racket: "Racket sport", swim: "Swimming", recovery: "Recovery", walking: "Walking",
 };
 function categoryIconSvg(key) {
   const shapes = {
@@ -6632,6 +6643,11 @@ function categoryIconSvg(key) {
     racket: `<ellipse cx="12" cy="7.92" rx="6" ry="6.96" stroke-width="2.16"/><line x1="12" y1="14.88" x2="12" y2="22.56" stroke-width="2.16"/><line x1="7.92" y1="7.92" x2="16.08" y2="7.92" stroke-width="1.2"/><line x1="12" y1="1.92" x2="12" y2="13.92" stroke-width="1.2"/>`,
     recovery: `<path d="M12 1.44C19.68 6.72 22.08 13.44 22.08 16.32C22.08 21.12 17.76 23.52 12 23.52C6.24 23.52 1.92 21.12 1.92 16.32C1.92 13.44 4.32 6.72 12 1.44Z" stroke-width="2.16"/>`,
     cardio: `<path d="M1.44 12L6.72 12L9.12 5.28L13.2 19.68L15.6 12L22.56 12" stroke-width="2.16"/>`,
+    // Simple walking-figure pictogram (head + a mid-stride leg/arm swing) — web-only mark, no
+    // Android CategoryIcon (AppTheme.kt) equivalent added, since Android has no manual-entry
+    // picker for this icon to ever appear in (see 09-06 FIX above CATEGORY_TO_CODE). Same
+    // minimal line-art style/stroke-width as the other six rather than a filled glyph.
+    walking: `<circle cx="12" cy="4.8" r="2.4" stroke-width="2.16"/><path d="M12 7.2L12 13.44L8.16 19.68" stroke-width="2.16"/><path d="M12 13.44L15.84 17.28" stroke-width="2.16"/><path d="M9.12 10.08L14.88 9.12" stroke-width="2.16"/>`,
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${shapes[key] || shapes.cardio}</svg>`;
 }
@@ -6843,6 +6859,10 @@ function categoryKeyForExerciseType(type) {
   if ([36, 13, 10, 34, 51].includes(type)) return "circuit";
   if ([2, 50, 66, 75, 76].includes(type)) return "racket";
   if ([33, 48, 71, 83].includes(type)) return "recovery";
+  // FIX (09-06): Walking (79) is now its own category (see CATEGORY_TO_CODE) — without this
+  // branch a genuinely-walking web_photo row would fall into the "cardio" catch-all below and
+  // silently show/default-edit as Cardio/HIIT instead of Walking.
+  if (type === 79) return "walking";
   return "cardio";
 }
 
