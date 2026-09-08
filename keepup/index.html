@@ -5707,6 +5707,12 @@ el("club-chat-emoji-btn").addEventListener("click", (e) => {
   }
   panel.classList.toggle("hidden");
   setClubChatEmojiToggleIcon(opening);
+  // FIX (user report 09-17: "when i am done with emojies, if i click keyboard, keyboard should
+  // open") — tapping this button while it shows the keyboard glyph (panel open) closed the panel
+  // but never actually brought the keyboard back up. Focusing the input is what does that; it
+  // also re-triggers the input's own focus listener below, which is a no-op here since the panel
+  // is already hidden and the icon already swapped.
+  if (!opening) el("club-chat-input").focus();
 });
 // Switching back to typing = switching back to the keyboard, same as WhatsApp's own picker —
 // tapping the message field closes the emoji panel instead of it just sitting there stacked
