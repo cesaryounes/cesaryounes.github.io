@@ -608,8 +608,7 @@
      black text for contrast — mirrors ClubChatBubble.kt's identical gradient exactly); "theirs"
      is a lighter translucent-white overlay instead of the flat card tone, plus a colored initial
      avatar per sender (see .club-chat-avatar / clubChatAvatarColorFor below) for visual variety. */
-  /* position:relative — the ::before tail below is positioned against this box.
-     FIX (user report 09-14 — "long press to react is confusing select text with reacting"): the
+  /* FIX (user report 09-14 — "long press to react is confusing select text with reacting"): the
      browser's own long-press-to-select-text gesture and this page's long-press-to-react gesture
      (JS, #club-chat-list's pointerdown handler) were both listening to the exact same input,
      racing each other — a hold could select text, open the reaction picker, or both, depending on
@@ -618,32 +617,20 @@
      Safari's separate "hold shows a callout menu" behavior specifically. Nothing here disables
      tapping a link inside a bubble (club-chat-link) or the reply-preview jump (below) — user-select
      only ever affects text selection, never click handling. */
-  .club-chat-bubble { position: relative; background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .club-chat-bubble { background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .club-chat-row.mine .club-chat-bubble {
     background: linear-gradient(135deg, var(--accent), var(--amber));
     color: #0B0E14; font-weight: 600;
   }
-  /* Speech-bubble tail (user request 09-11 — "make it like whatsapp... for the text... like in
-     the screenshot"): a small clipped corner on the outer bottom edge, same idea WhatsApp's own
-     bubbles use. "Theirs" reuses the exact same translucent fill via background:inherit — trivially
-     seamless since it's flat. "Mine" uses the gradient's own start color (--accent) rather than
-     inheriting the full gradient — inherit would recompute the 135deg gradient over the tail's own
-     tiny box instead of continuing the parent's, which reads as an unrelated color chunk rather
-     than a seamless corner; a flat accent tail sits close enough to the gradient's own corner to
-     read as part of the same shape. Only drawn on the LAST bubble differently would need
-     per-message grouping info this schema doesn't track yet, so every bubble gets one — matches
-     WhatsApp's own actual behavior for standalone (non-grouped) messages closely enough. */
-  .club-chat-bubble:not(.has-image)::before {
-    content: ""; position: absolute; bottom: 0; width: 10px; height: 12px;
-  }
-  .club-chat-row:not(.mine) .club-chat-bubble:not(.has-image)::before {
-    left: -6px; background: rgba(255,255,255,0.06);
-    clip-path: polygon(100% 0, 100% 100%, 20% 100%);
-  }
-  .club-chat-row.mine .club-chat-bubble:not(.has-image)::before {
-    right: -6px; background: var(--accent);
-    clip-path: polygon(0 0, 0 100%, 80% 100%);
-  }
+  /* REMOVED (user report 09-18 — sent 3 separate screenshots circling it: "i can still see the
+     green tick on button right of every message"): this used to be a small WhatsApp-style
+     speech-bubble tail (09-11) — a solid-accent-lime triangle clipped onto the bubble's own
+     bottom-right corner. At these sizes, especially on short/single-emoji bubbles, it read as a
+     floating checkmark icon rather than part of the bubble, which is exactly what kept getting
+     reported as a mystery "green tick" across three separate rounds before a screenshot finally
+     pinned down what it actually was. Gone entirely rather than re-tuned — a flat-cornered bubble
+     reads cleanly and unambiguously; a tail that's this easy to mistake for an unrelated icon
+     isn't worth keeping. */
   /* -webkit-user-drag:none stops a long-press-drag turning into an image-drag gesture; the real
      fix for Chrome Android's native "Copy image / Download image / Share image" long-press menu
      (user report 09-15) is the contextmenu preventDefault() below (JS) — this and
