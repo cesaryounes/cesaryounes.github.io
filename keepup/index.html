@@ -638,7 +638,12 @@
     right: -6px; background: var(--accent);
     clip-path: polygon(0 0, 0 100%, 80% 100%);
   }
-  .club-chat-bubble img { display: block; max-width: 220px; border-radius: 12px; }
+  /* -webkit-user-drag:none stops a long-press-drag turning into an image-drag gesture; the real
+     fix for Chrome Android's native "Copy image / Download image / Share image" long-press menu
+     (user report 09-15) is the contextmenu preventDefault() below (JS) — this and
+     draggable="false" on the <img> itself (clubChatBubbleHtml) are just belt-and-suspenders for
+     other browsers' own long-press-on-image affordances. */
+  .club-chat-bubble img { display: block; max-width: 220px; border-radius: 12px; -webkit-user-drag: none; user-drag: none; -webkit-touch-callout: none; }
   /* Auto-linked URL (user question 09-12: "how do links work?") — inherits the bubble's own text
      color (readable on both the dark "theirs" fill and the light "mine" gradient) rather than a
      fixed blue, underlined so it still reads as a link without changing color. */
@@ -5108,7 +5113,7 @@ function jumpToClubChatMessage(messageId) {
 function clubChatBubbleHtml(message) {
   const isMine = message.sender_id === currentSession.user.id;
   const inner = message.image_url
-    ? `<img src="${message.image_url}" alt="Shared screenshot" />`
+    ? `<img src="${message.image_url}" alt="Shared screenshot" draggable="false" />`
     : linkifyText(message.body || "");
   const senderLabel = clubChatSenderLabel(message.sender_id);
   const avatarHtml = isMine
@@ -5375,6 +5380,16 @@ el("club-chat-list").addEventListener("click", (e) => {
   const preview = e.target.closest(".club-chat-reply-preview");
   if (preview) jumpToClubChatMessage(preview.dataset.replyTo);
 });
+// FIX (user report 09-15 — "after long press, i should not get the copy image and
+// download...it should only show emoji"): a long-press on a shared photo was triggering BOTH
+// our own reaction picker (the pointerdown timer below) AND Chrome/Android's native
+// long-press-on-image menu (Copy image / Download image / Share image / Open in browser) at the
+// same time — draggable="false" and -webkit-user-drag:none (CSS) don't stop that menu on their
+// own, since it's driven by the browser's contextmenu event, not drag or text-selection. This
+// suppresses that event for any image inside the message list so only our own picker shows.
+el("club-chat-list").addEventListener("contextmenu", (e) => {
+  if (e.target.closest(".club-chat-bubble")) e.preventDefault();
+});
 el("club-chat-list").addEventListener("pointerdown", (e) => {
   const row = e.target.closest(".club-chat-row");
   if (!row) return;
@@ -5415,15 +5430,15 @@ function clubChatGestureEnd(e) {
 el("club-chat-list").addEventListener("pointerup", clubChatGestureEnd);
 el("club-chat-list").addEventListener("pointercancel", clubChatGestureEnd);
 
-// FIX (user report 09-13 — "i should be able to click many emoji, it should not close on the
-// first emoji"): used to hideClubChatReactionPicker() on every tap. Reacting itself is a single
-// upsert either way (toggleClubChatReaction), but closing forced a fresh long-press just to
-// change your mind about which emoji — now it stays open until you tap outside it or long-press
-// a different message.
+// REVERTED (user report 09-15 — "after a reaction is done, emoji list should disappear"): 09-13
+// had this stay open across multiple taps so changing your mind about which emoji didn't need a
+// fresh long-press. That's now explicitly unwanted — a tap picks a reaction and closes, same as
+// WhatsApp's own reaction picker, and re-reacting is just another long-press away.
 el("club-chat-reaction-picker").querySelectorAll("[data-emoji]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const emoji = btn.dataset.emoji;
     const messageId = clubChatReactionPickerTargetId;
+    hideClubChatReactionPicker();
     if (messageId) toggleClubChatReaction(messageId, emoji);
   });
 });
