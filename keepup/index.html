@@ -807,13 +807,23 @@
      already documents — this button just adds its own font-size/font-weight on top of that base. */
   .club-chat-gif-btn { font-size: 9px; font-weight: 800; letter-spacing: 0.02em; }
   .club-chat-gif-panel { padding-bottom: 0; }
+  /* FIX (user report 09-20, with a screenshot — tiles rendering as thin overlapping strips
+     instead of a real grid): grid-auto-rows was left at its default "auto", meaning each row's
+     height comes from its tallest item's OWN intrinsic size — which relied on .club-chat-gif-tile
+     below's aspect-ratio. Confirmed via getBoundingClientRect() that this genuinely breaks: every
+     tile individually computed a correct 252px height, but adjacent ROWS were only offset ~15px
+     from each other instead of ~258px — aspect-ratio on a <button> (a form/replaced element with
+     its own UA sizing quirks) isn't reliably feeding Grid's auto-row-track-sizing algorithm in
+     this browser engine. grid-auto-rows: 130px gives every row an explicit, unambiguous height
+     instead — same "stop deriving size, just state it" fix used for the identical class of issue
+     on Android's own GIF grid (ClubChatScreen.kt, same round). */
   .club-chat-gif-body {
     flex: 1; overflow-y: auto; padding: 10px 12px; min-height: 0;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start;
+    display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 130px; gap: 6px; align-content: start;
   }
   .club-chat-gif-hint { grid-column: 1 / -1; text-align: center; padding: 24px 0; font-size: 13px; }
   .club-chat-gif-tile {
-    width: 100%; aspect-ratio: 1.4; border-radius: 10px; overflow: hidden; cursor: pointer;
+    width: 100%; height: 100%; border-radius: 10px; overflow: hidden; cursor: pointer;
     background: var(--card); border: none; padding: 0; min-width: 0; min-height: 0;
   }
   .club-chat-gif-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -5931,24 +5941,28 @@ function clubChatGifGridHtml(gifs) {
     </button>
   `).join("");
 }
+// Runs a search immediately (no debounce) and renders it — shared by the panel-open default
+// search below and the debounced input handler further down, rather than duplicating the
+// "Searching…"/render/"No GIFs found" sequence in two places.
+async function runClubChatGifSearch(query) {
+  const body = el("club-chat-gif-body");
+  body.innerHTML = `<p class="muted club-chat-gif-hint">Searching…</p>`;
+  const gifs = await searchGiphyGifs(query);
+  body.innerHTML = gifs.length > 0
+    ? clubChatGifGridHtml(gifs)
+    : `<p class="muted club-chat-gif-hint">No GIFs found</p>`;
+}
 // Debounced (400ms) — each keystroke cancels the previous pending search rather than firing one
 // request per character, same restraint any type-ahead search needs.
 let clubChatGifSearchTimer = null;
 el("club-chat-gif-search").addEventListener("input", (e) => {
   const query = e.target.value;
   clearTimeout(clubChatGifSearchTimer);
-  const body = el("club-chat-gif-body");
   if (!query.trim()) {
-    body.innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
+    el("club-chat-gif-body").innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
     return;
   }
-  clubChatGifSearchTimer = setTimeout(async () => {
-    body.innerHTML = `<p class="muted club-chat-gif-hint">Searching…</p>`;
-    const gifs = await searchGiphyGifs(query);
-    body.innerHTML = gifs.length > 0
-      ? clubChatGifGridHtml(gifs)
-      : `<p class="muted club-chat-gif-hint">No GIFs found</p>`;
-  }, 400);
+  clubChatGifSearchTimer = setTimeout(() => runClubChatGifSearch(query), 400);
 });
 // Event delegation (not per-tile listeners) — same reasoning the reaction picker/reply-jump
 // delegates elsewhere in this file already use: tiles get replaced wholesale on every search,
@@ -5964,8 +5978,13 @@ el("club-chat-gif-btn").addEventListener("click", (e) => {
   if (opening) {
     hide("club-chat-emoji-panel"); // only one panel open at a time
     setClubChatEmojiToggleIcon(false);
-    el("club-chat-gif-search").value = "";
-    el("club-chat-gif-body").innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
+    // Defaults to a real search rather than an empty "type something" state (user request 09-20:
+    // "GIF by default should load a search 'celebrate' because now it is empty") — fits a
+    // workout-club chat's own reason for reaching for a GIF in the first place. Not debounced —
+    // this is the only search firing right now, no reason to wait 400ms for it.
+    el("club-chat-gif-search").value = "celebrate";
+    clearTimeout(clubChatGifSearchTimer);
+    runClubChatGifSearch("celebrate");
   }
   panel.classList.toggle("hidden");
 });
