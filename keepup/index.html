@@ -303,6 +303,14 @@
   }
   .club-pill.active { background: var(--accent); color: #0B0E14; border-color: var(--accent); }
 
+  /* Pending club invites addressed to me (user report 09-09) — same amber-tinted-row treatment
+     GroupsScreen.kt's own "CLUB INVITES" card uses. */
+  #club-invites-card { background: rgba(255,196,0,0.06); border: 1px solid rgba(255,196,0,0.25); }
+  .club-invite-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .club-invite-row:last-child { border-bottom: none; }
+  .club-invite-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .club-invite-by { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.02em; margin-top: 1px; }
+
   /* Club chat entry point on the leaderboard (user request 09-09) — same accent-soft clickable
      row shape used elsewhere on this page for a secondary-but-findable action. */
   .lb-chat-entry { margin-bottom: 14px; }
@@ -1577,6 +1585,22 @@
            takes the argument normally; this page just always passes true and never exposes the
            control. Gear-bonus stays a real optional toggle, same as the app. -->
       <div id="tab-club" class="tab-view hidden">
+        <!-- Pending club invites addressed to ME (user report 09-09: "i sent an invite to khaled
+             to join the group cy-kk, he got notified to request... he should get accept or
+             reject") — this UI already existed on Android (GroupsScreen.kt's "CLUB INVITES"
+             section) but had NO web equivalent at all: fn_respond_to_email_invite was never
+             called from anywhere in this file. Without it, a real invite (group_email_invites,
+             fn_invite_by_username) had nowhere to be accepted/declined on web — the only visible
+             path was Discover's "Request to Join" for a private club, which is a DIFFERENT flow
+             (fn_request_join_private_group, needs the OWNER's approval) that ignores the invite
+             that's already waiting. Same fn_my_pending_email_invites() / fn_respond_to_email_invite()
+             RPCs Android uses, so accepting/declining here and in the app both land in exactly the
+             same place. -->
+        <div class="card hidden" id="club-invites-card" style="margin-bottom:12px;">
+          <p class="section-label" style="margin-bottom:12px; color:var(--amber);" id="club-invites-label">CLUB INVITES</p>
+          <div id="club-invites-list"></div>
+        </div>
+
         <!-- FIX (user request 08-24: "no need for the big button...just a plus in the top banner
              to the right") — was a full-width "+ Create a club" button here; that action now lives
              in the header's "+" icon (see #header-action-btn, wired by setHeaderAction() below),
@@ -4228,8 +4252,63 @@ async function refreshGroupMemberCounts(ids) {
   (data || []).forEach((row) => { groupMemberCounts[row.group_id] = row.member_count; });
 }
 
+// Pending invites addressed to ME (user report 09-09) — same fn_my_pending_email_invites()/
+// fn_respond_to_email_invite() RPCs AppViewModel.kt uses, so this and the app land in the exact
+// same place on accept/decline, not two parallel implementations.
+async function loadPendingClubInvites() {
+  const { data, error } = await supabase.rpc("fn_my_pending_email_invites");
+  if (error) {
+    console.error("Couldn't load pending club invites:", error);
+    return;
+  }
+  renderPendingClubInvites(data || []);
+}
+
+function renderPendingClubInvites(invites) {
+  const card = el("club-invites-card");
+  const list = el("club-invites-list");
+  if (invites.length === 0) {
+    hide(card);
+    list.innerHTML = "";
+    return;
+  }
+  el("club-invites-label").textContent = `${invites.length} CLUB INVITE${invites.length === 1 ? "" : "S"}`;
+  list.innerHTML = invites.map((inv) => `
+    <div class="club-invite-row" data-id="${inv.invite_id}">
+      ${groupThumbnailHtml(inv.group_name, inv.group_photo_url)}
+      <div style="flex:1; min-width:0;">
+        <div class="club-invite-name">${escapeHtml(inv.group_name)}</div>
+        <div class="club-invite-by">INVITED BY ${escapeHtml((inv.inviter_name || "").toUpperCase())}</div>
+      </div>
+      <button type="button" class="btn-secondary club-invite-decline" style="width:auto; padding:8px 12px;">Decline</button>
+      <button type="button" class="btn-primary club-invite-accept" style="width:auto; padding:8px 12px;">Accept</button>
+    </div>
+  `).join("");
+  show(card);
+  list.querySelectorAll(".club-invite-row").forEach((row) => {
+    const inviteId = row.dataset.id;
+    row.querySelector(".club-invite-decline").addEventListener("click", () => respondToClubInvite(inviteId, false, row));
+    row.querySelector(".club-invite-accept").addEventListener("click", () => respondToClubInvite(inviteId, true, row));
+  });
+}
+
+async function respondToClubInvite(inviteId, accept, rowEl) {
+  rowEl.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  const { data, error } = await supabase.rpc("fn_respond_to_email_invite", { p_invite_id: inviteId, p_accept: accept });
+  const result = Array.isArray(data) ? data[0] : data;
+  if (error || !result?.success) {
+    alert((error && error.message) || result?.message || "Couldn't respond to that invite.");
+    rowEl.querySelectorAll("button").forEach((b) => (b.disabled = false));
+    return;
+  }
+  rowEl.remove();
+  if (el("club-invites-list").children.length === 0) hide(el("club-invites-card"));
+  if (accept) await loadClubDirectory(); // the new club now shows up under My Clubs
+}
+
 async function loadClubDirectory() {
   myClubs = await fetchMyClubs(); // refresh membership so Join/Joined state below is current
+  loadPendingClubInvites();
 
   const { data, error } = await supabase
     .from("groups")
@@ -5535,7 +5614,7 @@ function renderNotifPanel() {
       const n = lastNotifications.find((x) => x.id === row.dataset.notifId);
       if (!n) return;
       closeNotifPanel();
-      handleNotificationRouting(n.type, n.title, n.body, n.data?.preset_id, n.data?.sender_name);
+      handleNotificationRouting(n.type, n.title, n.body, n.data?.preset_id, n.data?.sender_name, n.data?.group_id);
     });
   });
 }
@@ -5556,13 +5635,30 @@ const LEADERBOARD_PASS_TYPES = new Set(["global_leaderboard_pass", "club_leaderb
 // real push notification tap) now gets the same full-screen centered overlay an ambient incoming
 // one does, instead of the small top banner daily_tip/evening_nudge still use.
 const BANNER_TYPES = new Set(["daily_tip", "evening_nudge"]);
-function handleNotificationRouting(type, title, body, presetId, senderName) {
+// FIX (user request 09-09: "i should know who sent the message") — club_message now routes
+// straight into that club's chat instead of being an unrouted no-op, same reasoning
+// MainActivity.kt's PendingClubChatBus applies on Android. async only for this one branch (a
+// fresh tab opened straight from the notification can beat myClubs' own first load, so this
+// re-fetches rather than assuming it's already populated) — every other branch stays synchronous,
+// callers don't need to await this either way.
+async function handleNotificationRouting(type, title, body, presetId, senderName, groupId) {
   if (LEADERBOARD_PASS_TYPES.has(type)) {
     switchTab("leaderboard");
   } else if (type === "nudge") {
     showNudgeOverlay(senderName ?? (title || "Someone").replace(/ nudged you!$/, ""), body ?? "Time to get moving — log a workout!", presetId ?? null);
   } else if (BANNER_TYPES.has(type)) {
     showTipBanner(type, title, body, presetId);
+  } else if (type === "club_message" && groupId) {
+    switchTab("club");
+    let club = myClubs.find((c) => c.id === groupId);
+    if (!club) {
+      myClubs = await fetchMyClubs();
+      club = myClubs.find((c) => c.id === groupId);
+    }
+    if (club) {
+      currentClubDetail = club;
+      openClubChat();
+    }
   }
 }
 
@@ -5606,7 +5702,7 @@ if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event.data && event.data.source === "keepup-notification-click") {
       const d = event.data.data || {};
-      handleNotificationRouting(d.type, d.title, d.body, d.preset_id, d.sender_name);
+      handleNotificationRouting(d.type, d.title, d.body, d.preset_id, d.sender_name, d.group_id);
     }
   });
 }
@@ -5623,12 +5719,13 @@ function checkUrlNotificationParams() {
   const type = params.get("notifType");
   if (!type) return;
   notifRoutingHandledFromUrl = true;
-  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"), params.get("notifPreset"), params.get("notifSender"));
+  handleNotificationRouting(type, params.get("notifTitle"), params.get("notifBody"), params.get("notifPreset"), params.get("notifSender"), params.get("notifGroupId"));
   params.delete("notifType");
   params.delete("notifTitle");
   params.delete("notifBody");
   params.delete("notifPreset");
   params.delete("notifSender");
+  params.delete("notifGroupId");
   const newSearch = params.toString();
   history.replaceState(null, "", location.pathname + (newSearch ? `?${newSearch}` : "") + location.hash);
 }

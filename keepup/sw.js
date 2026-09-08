@@ -79,6 +79,9 @@ self.addEventListener("notificationclick", (event) => {
         // FIX (user report 08-25: nudge now shows a full-screen overlay with "<sender> nudged
         // you!" — needs the real sender name, same reasoning as preset_id above).
         if (data.sender_name) params.set("notifSender", data.sender_name);
+        // Club chat (0134, user request 09-09: "i should know who sent the message") — lets a
+        // freshly-opened tab route straight into that club's chat, same reasoning as the others.
+        if (data.group_id) params.set("notifGroupId", data.group_id);
         const qs = params.toString();
         return self.clients.openWindow(qs ? `./?${qs}` : "./");
       }
