@@ -536,15 +536,29 @@
     height: 78vh; display: flex; flex-direction: column;
   }
   .club-chat-list { list-style: none; margin: 0; padding: 4px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-  .club-chat-row { display: flex; }
+  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; }
   .club-chat-row.mine { justify-content: flex-end; }
-  .club-chat-bubble-wrap { max-width: 78%; display: flex; flex-direction: column; }
+  .club-chat-bubble-wrap { max-width: 75%; display: flex; flex-direction: column; }
   .club-chat-row.mine .club-chat-bubble-wrap { align-items: flex-end; }
   .club-chat-sender { font-size: 10px; font-weight: 700; color: var(--text-muted); margin: 0 0 3px 10px; }
-  .club-chat-bubble { background: var(--card-raised); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; }
-  .club-chat-row.mine .club-chat-bubble { background: var(--accent-soft); }
+  /* FIX (user report 09-09 — "colour are very dark... make more fresh and appealing and sporty
+     feel"): was var(--card-raised) (theirs) / var(--accent-soft) (mine, a 12% tint) — flat and
+     low-contrast. "Mine" is now a solid accent→amber gradient (the app's own two brand colors,
+     black text for contrast — mirrors ClubChatBubble.kt's identical gradient exactly); "theirs"
+     is a lighter translucent-white overlay instead of the flat card tone, plus a colored initial
+     avatar per sender (see .club-chat-avatar / clubChatAvatarColorFor below) for visual variety. */
+  .club-chat-bubble { background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .club-chat-row.mine .club-chat-bubble {
+    background: linear-gradient(135deg, var(--accent), var(--amber));
+    color: #0B0E14; font-weight: 600;
+  }
   .club-chat-bubble img { display: block; max-width: 220px; border-radius: 12px; }
   .club-chat-bubble.has-image { padding: 4px; }
+  .club-chat-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #000;
+  }
   .club-chat-composer { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-shrink: 0; }
   .club-chat-composer input[type="text"] {
     flex: 1; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 20px;
@@ -562,7 +576,30 @@
     color: var(--text-muted);
   }
   .club-chat-icon-btn svg { width: 20px; height: 20px; }
-  .club-chat-send-btn { color: var(--accent); }
+  /* FIX (user request 09-09 — sporty send button, not a plain ghost icon): filled gradient circle,
+     same accent→amber pair as the "mine" bubble above, so sending itself feels like a real CTA
+     instead of a muted icon tap. */
+  .club-chat-send-btn {
+    background: linear-gradient(135deg, var(--accent), var(--amber)); color: #0B0E14;
+  }
+  /* "+" attachment menu (user request 09-09 — "replace the camera with a +, either gallery or
+     take a photo") — a tiny anchored popover, same shape as .more-menu elsewhere on this page,
+     just scoped to this one button. capture="environment" on club-chat-camera-input (see HTML)
+     is what routes that specific file input straight to the device camera on mobile instead of
+     the gallery picker — no separate native camera API exists on the web. */
+  .club-chat-attach-wrap { position: relative; }
+  .club-chat-attach-menu {
+    position: absolute; bottom: 48px; left: 0; background: var(--card-raised);
+    border: 1px solid var(--hairline); border-radius: 14px; padding: 6px; min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 10;
+  }
+  .club-chat-attach-menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none;
+    padding: 10px 12px; border-radius: 10px; color: var(--text-main); font-size: 13px; font-weight: 600;
+    text-align: left; cursor: pointer;
+  }
+  .club-chat-attach-menu button:active { background: rgba(255,255,255,0.06); }
+  .club-chat-attach-menu svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
@@ -1931,14 +1968,32 @@
       <p class="muted" id="club-chat-empty">Loading…</p>
       <ul class="club-chat-list hidden" id="club-chat-list"></ul>
       <div class="club-chat-composer">
-        <button type="button" class="club-chat-icon-btn" id="club-chat-image-btn" aria-label="Share a screenshot">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </button>
+        <!-- "+" attachment menu (user request 09-09: "replace the camera with a +, either
+             gallery or take a photo") — replaces the old single camera-icon button that only
+             ever opened the gallery picker. club-chat-camera-input's capture="environment" is
+             what routes straight to the device camera on mobile; there's no separate native
+             camera API on the web, a file input with that attribute is the real mechanism. -->
+        <div class="club-chat-attach-wrap">
+          <button type="button" class="club-chat-icon-btn" id="club-chat-attach-btn" aria-label="Attach a photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="club-chat-attach-menu hidden" id="club-chat-attach-menu">
+            <button type="button" id="club-chat-camera-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Take Photo
+            </button>
+            <button type="button" id="club-chat-gallery-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Choose from Gallery
+            </button>
+          </div>
+        </div>
         <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
         <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
         <input type="file" id="club-chat-image-input" accept="image/*" class="hidden" />
+        <input type="file" id="club-chat-camera-input" accept="image/*" capture="environment" class="hidden" />
       </div>
       <button class="btn-text" id="club-chat-close-btn" style="margin-top:6px;">Close</button>
     </div>
@@ -4589,15 +4644,30 @@ function clubChatSenderLabel(senderId) {
   return member?.display_name || "Member";
 }
 
+// Fixed, decorative-only 6-hue rotation for "theirs" bubble avatars (user request 09-09 — same
+// palette and same reasoning as ClubChatScreen.kt's avatarColorFor: deliberately NOT --accent/
+// --amber/--danger/--success, since those already carry meaning elsewhere on this page).
+const CLUB_CHAT_AVATAR_COLORS = ["#FF6B35", "#4FD1C5", "#A78BFA", "#F472B6", "#60A5FA", "#FBBF24"];
+function clubChatAvatarColorFor(senderId) {
+  let hash = 0;
+  for (let i = 0; i < senderId.length; i++) hash = (hash * 31 + senderId.charCodeAt(i)) | 0;
+  return CLUB_CHAT_AVATAR_COLORS[Math.abs(hash) % CLUB_CHAT_AVATAR_COLORS.length];
+}
+
 function clubChatBubbleHtml(message) {
   const isMine = message.sender_id === currentSession.user.id;
   const inner = message.image_url
     ? `<img src="${message.image_url}" alt="Shared screenshot" />`
     : escapeHtml(message.body || "");
+  const senderLabel = clubChatSenderLabel(message.sender_id);
+  const avatarHtml = isMine
+    ? ""
+    : `<div class="club-chat-avatar" style="background:${clubChatAvatarColorFor(message.sender_id)};">${escapeHtml(senderLabel.slice(0, 1).toUpperCase())}</div>`;
   return `
     <li class="club-chat-row ${isMine ? "mine" : ""}" data-id="${message.id}">
+      ${avatarHtml}
       <div class="club-chat-bubble-wrap">
-        ${isMine ? "" : `<p class="club-chat-sender">${escapeHtml(clubChatSenderLabel(message.sender_id))}</p>`}
+        ${isMine ? "" : `<p class="club-chat-sender">${escapeHtml(senderLabel)}</p>`}
         <div class="club-chat-bubble${message.image_url ? " has-image" : ""}">${inner}</div>
       </div>
     </li>
@@ -4689,8 +4759,29 @@ el("club-chat-send-btn").addEventListener("click", sendClubChatText);
 el("club-chat-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendClubChatText();
 });
-el("club-chat-image-btn").addEventListener("click", () => el("club-chat-image-input").click());
+// "+" attachment menu (user request 09-09: "replace the camera with a +, either gallery or take
+// a photo") — replaces the old single button that jumped straight to the gallery picker.
+el("club-chat-attach-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  el("club-chat-attach-menu").classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".club-chat-attach-wrap")) hide("club-chat-attach-menu");
+});
+el("club-chat-camera-btn").addEventListener("click", () => {
+  hide("club-chat-attach-menu");
+  el("club-chat-camera-input").click();
+});
+el("club-chat-gallery-btn").addEventListener("click", () => {
+  hide("club-chat-attach-menu");
+  el("club-chat-image-input").click();
+});
 el("club-chat-image-input").addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (file) sendClubChatImage(file);
+});
+el("club-chat-camera-input").addEventListener("change", (e) => {
   const file = e.target.files?.[0];
   e.target.value = "";
   if (file) sendClubChatImage(file);
@@ -5765,6 +5856,11 @@ const NOTIFICATION_PREF_TOGGLES = [
   { pref: "streak_loss", column: "notify_streak_loss", label: "Losing my streak" },
   { pref: "club_passed", column: "notify_club_passed", label: "My club being passed by another club" },
   { pref: "nudges", column: "notify_nudges", label: "Nudges from clubmates" },
+  // Club chat (0133_club_message_notifications.sql, user request 09-08) — same person-driven,
+  // opt-out-by-default shape as Nudges above. Purely array-driven (renderNotifyPrefRows/
+  // setNotifyPrefRowsDisabled/the initial-load query below all read this array), so this one
+  // entry is the whole web-side change.
+  { pref: "club_message", column: "notify_club_message", label: "New club chat messages" },
   { pref: "daily_tip", column: "notify_daily_tip", label: "Daily motivation tip (7 AM)" },
   { pref: "evening_nudge", column: "notify_evening_nudge", label: "Evening reminder if no workout logged (8 PM)" },
 ];
