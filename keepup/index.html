@@ -580,7 +580,17 @@
      composer input's own min-width fix above for what was actually doing that) turned into a real
      horizontal scrollbar on the whole screen rather than just being clipped. Setting overflow-x
      explicitly closes that off for good, regardless of whatever content ends up inside later. */
-  #screen-club-chat { display: flex; flex-direction: column; overflow-y: hidden; overflow-x: hidden; z-index: 50; }
+  /* Sporty background wash (user request 09-21: "simple shades of the app logo...so the chats
+     feel more sporty") — the exact same two colors the KeepUp mark's own gradient uses (the
+     favicon/apple-touch-icon <linearGradient> above: #7A9E00 → #CCFF00), not the accent/amber
+     pair the message bubbles already use — keeps this reading as "the room", not "another
+     bubble". Low alpha (4-8%) and layered UNDER the flat --bg rather than replacing it, so text
+     contrast inside bubbles is completely unaffected; this is a diagonal wash, not a shape, per
+     "simple" — a literal watermark of the chevron mark risked looking busy behind real messages. */
+  #screen-club-chat {
+    display: flex; flex-direction: column; overflow-y: hidden; overflow-x: hidden; z-index: 50;
+    background: linear-gradient(135deg, rgba(122,158,0,0.08), rgba(204,255,0,0.04)), var(--bg);
+  }
   /* scroll-behavior:smooth is what makes appendClubChatMessage's scrollTo (JS) actually ease
      down to a new message instead of snapping — the initial history load still jumps instantly
      since that one sets scrollTop directly, not scrollTo(). */
