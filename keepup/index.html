@@ -550,9 +550,16 @@
     flex: 1; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 20px;
     padding: 11px 16px; color: var(--text-main); font-size: 14px;
   }
+  /* FIX (user report 09-08, with a screenshot — "buttons are missing"): the generic `button`
+     rule's padding: 14px 20px (40px horizontal alone) left ZERO interior room in a 40px circle,
+     squeezing each SVG to 0 width — invisible, not missing. .club-icon-action-circle above (a
+     working icon-only button elsewhere on this page) sidesteps this by putting the circle on an
+     inner <span>, never the <button> itself; padding: 0/margin: 0 here does the same fix more
+     directly, explicitly overriding the generic rule instead of avoiding it. */
   .club-chat-icon-btn {
     width: 40px; height: 40px; border-radius: 50%; background: var(--card-raised); border: none;
-    flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted);
+    padding: 0; margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
   }
   .club-chat-icon-btn svg { width: 20px; height: 20px; }
   .club-chat-send-btn { color: var(--accent); }
@@ -919,9 +926,14 @@
     overflow-y: auto; padding: 16px;
   }
   .screen-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  /* FIX (found 09-08 while chasing the identical bug on .club-chat-icon-btn, see its own comment
+     for the full mechanism): this button never overrode the generic `button` rule's
+     padding: 14px 20px, which alone exceeds this tile's 36px width — the back arrow has been
+     rendering at 0 width (invisible, tap target still worked) this whole time, not just here. */
   .screen-back-btn {
     width: 36px; height: 36px; border-radius: 10px; background: var(--card);
-    border: 1px solid var(--hairline); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--hairline); padding: 0; margin: 0;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   }
   .screen-back-btn svg { width: 18px; height: 18px; }
   .screen-title { font-size: 19px; font-weight: 800; margin: 0; }
@@ -929,8 +941,8 @@
      accent since (unlike the plain back arrow) it opens something rather than navigating away. */
   .screen-header-btn {
     width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft);
-    border: 1px solid var(--hairline); flex-shrink: 0; display: flex; align-items: center;
-    justify-content: center; color: var(--accent);
+    border: 1px solid var(--hairline); padding: 0; margin: 0; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; color: var(--accent);
   }
   .screen-header-btn svg { width: 19px; height: 19px; }
 
