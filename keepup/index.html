@@ -584,7 +584,10 @@
      handling vertical scrolling natively while leaving horizontal movement to JS (see the
      pointerdown/move/up handlers on #club-chat-list) instead of the two fighting over the same
      gesture. */
-  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; animation: clubChatRowIn 0.22s ease-out; touch-action: pan-y; }
+  /* user-select:none here too (not just .club-chat-bubble) — a long-press starting on the sender
+     name or avatar, not just the bubble text itself, hit the same select-vs-react conflict
+     (user report 09-14). */
+  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; animation: clubChatRowIn 0.22s ease-out; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   @keyframes clubChatRowIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -599,8 +602,17 @@
      black text for contrast — mirrors ClubChatBubble.kt's identical gradient exactly); "theirs"
      is a lighter translucent-white overlay instead of the flat card tone, plus a colored initial
      avatar per sender (see .club-chat-avatar / clubChatAvatarColorFor below) for visual variety. */
-  /* position:relative — the ::before tail below is positioned against this box. */
-  .club-chat-bubble { position: relative; background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  /* position:relative — the ::before tail below is positioned against this box.
+     FIX (user report 09-14 — "long press to react is confusing select text with reacting"): the
+     browser's own long-press-to-select-text gesture and this page's long-press-to-react gesture
+     (JS, #club-chat-list's pointerdown handler) were both listening to the exact same input,
+     racing each other — a hold could select text, open the reaction picker, or both, depending on
+     timing. user-select:none removes the browser's own gesture entirely so there's only one
+     meaning left for a hold on a bubble; -webkit-touch-callout:none does the same for iOS
+     Safari's separate "hold shows a callout menu" behavior specifically. Nothing here disables
+     tapping a link inside a bubble (club-chat-link) or the reply-preview jump (below) — user-select
+     only ever affects text selection, never click handling. */
+  .club-chat-bubble { position: relative; background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .club-chat-row.mine .club-chat-bubble {
     background: linear-gradient(135deg, var(--accent), var(--amber));
     color: #0B0E14; font-weight: 600;
@@ -642,12 +654,23 @@
      WhatsApp's own quoted-reply block uses. Sits inside .club-chat-bubble so it inherits that
      bubble's own background/gradient — a slightly darker/lighter overlay reads as "quoted" without
      needing its own separate color. */
+  /* cursor:pointer (user request 09-14: "if reply message is clicked, it should take the user to
+     the message") — tapping this jumps to and briefly highlights the original (jumpToClubChatMessage,
+     JS). */
   .club-chat-reply-preview {
-    display: block; border-left: 3px solid currentColor; opacity: 0.75;
+    display: block; border-left: 3px solid currentColor; opacity: 0.75; cursor: pointer;
     padding: 3px 0 3px 8px; margin-bottom: 5px; font-size: 12px; line-height: 1.3;
   }
   .club-chat-reply-preview .club-chat-reply-sender { display: block; font-weight: 700; }
   .club-chat-reply-preview .club-chat-reply-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Jump-to-message highlight flash (user request 09-14) — a brief accent-tinted pulse on the
+     message a reply preview was tapped through to, same "here it is" signal WhatsApp/Telegram
+     give with their own jump-to-message flash. */
+  .club-chat-row-jump-highlight .club-chat-bubble { animation: clubChatJumpFlash 1.2s ease-out; }
+  @keyframes clubChatJumpFlash {
+    0% { box-shadow: 0 0 0 2px var(--accent); }
+    100% { box-shadow: 0 0 0 2px transparent; }
+  }
   /* Reply bar above the composer (user request 09-12) — same "quoted preview + X to cancel" shape
      WhatsApp's own reply bar uses, shown only while actively composing a reply
      (startClubChatReply/cancelClubChatReply, JS). */
@@ -681,6 +704,11 @@
     border-radius: 50%; cursor: pointer; min-width: 0;
   }
   .club-chat-reaction-picker button:active { background: rgba(255,255,255,0.12); transform: scale(1.15); }
+  .club-chat-reaction-picker-divider { width: 1px; align-self: stretch; background: var(--hairline); margin: 2px 2px; }
+  /* Delete (user request 09-13) — same picker strip, own tint so it visually reads as the
+     destructive one-off action rather than another reaction choice. */
+  .club-chat-reaction-picker-delete { color: var(--danger); display: flex; align-items: center; justify-content: center; }
+  .club-chat-reaction-picker-delete svg { width: 18px; height: 18px; }
   /* Composer (user request 09-11, with a WhatsApp screenshot — "can you make this? i dont like
      the current we have"): one rounded field/pill holds the emoji toggle, text input, attach and
      camera icons; Send is the only element outside it. Replaces the earlier version's 4 separate
@@ -704,21 +732,33 @@
   }
   /* Plain icon buttons living INSIDE the pill — no circle/background of their own, matching the
      reference exactly (only Send gets a filled circle, kept outside the pill below). */
+  /* FIX (user report 09-13 — "make the send button nicer...it does not fit now, it is not a
+     click"): the generic `button` rule's min-height: 48px was never overridden here — height:32px
+     alone doesn't beat a min-height floor, so this was actually rendering 32×48, an OVAL under
+     border-radius:50%, not a circle (confirmed via getComputedStyle: height came back 48px despite
+     the 32px declared here). Same bug class as .club-chat-icon-btn's own padding fix and the emoji
+     grid's min-width fix earlier this session — a THIRD spot the generic button reset reached into
+     that hadn't been explicitly closed off. min-height/min-width:0 is what actually fixes it. */
   .club-chat-pill-icon {
-    width: 32px; height: 32px; border-radius: 50%; background: none; border: none;
+    width: 32px; height: 32px; min-width: 0; min-height: 0; border-radius: 50%; background: none; border: none;
     padding: 0; margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     color: var(--text-muted); font-size: 18px; line-height: 1;
   }
   .club-chat-pill-icon svg { width: 21px; height: 21px; }
-  /* FIX (user request 09-09 — sporty send button, not a plain ghost icon): filled gradient circle,
-     same accent→amber pair as the "mine" bubble above, so sending itself feels like a real CTA
-     instead of a muted icon tap. */
+  /* FIX (user request 09-09/09-13 — sporty, clickable send button, not a plain ghost icon or a
+     misshapen oval): filled gradient circle, same accent→amber pair as the "mine" bubble above.
+     A soft glow (box-shadow, not a border) + a scale-down on press makes it read as a real
+     pressable CTA rather than a static icon — the "it is not a click" part of the same report. */
   .club-chat-send-btn {
-    width: 40px; height: 40px; border-radius: 50%; border: none; padding: 0; margin: 0;
+    width: 44px; height: 44px; min-width: 0; min-height: 0; border-radius: 50%; border: none; padding: 0; margin: 0;
     flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--accent), var(--amber)); color: #0B0E14;
+    box-shadow: 0 2px 10px rgba(204,255,0,0.35);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    cursor: pointer;
   }
-  .club-chat-send-btn svg { width: 20px; height: 20px; }
+  .club-chat-send-btn:active { transform: scale(0.92); box-shadow: 0 1px 4px rgba(204,255,0,0.3); }
+  .club-chat-send-btn svg { width: 21px; height: 21px; margin-left: 2px; }
   /* Emoji picker (user report 09-10/09-11 — "make it like whatsapp... for the text, emoji and
      all"): a full-width panel below the composer instead of a small anchored popover, same
      "replaces the keyboard" placement WhatsApp's own uses. #screen-club-chat's flex column gives
@@ -728,6 +768,11 @@
   .club-chat-emoji-panel {
     flex-shrink: 0; height: 38vh; max-height: 320px; display: flex; flex-direction: column;
     border-top: 1px solid var(--hairline); background: var(--card-raised);
+  }
+  .club-chat-emoji-search-wrap { flex-shrink: 0; padding: 8px 10px 0; }
+  #club-chat-emoji-search {
+    width: 100%; min-width: 0; background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 8px 12px; color: var(--text-main); font-size: 13px;
   }
   .club-chat-emoji-body { flex: 1; overflow-y: auto; padding: 10px 12px; min-height: 0; }
   .club-chat-emoji-section-label {
@@ -2193,13 +2238,24 @@
       <input type="file" id="club-chat-camera-input" accept="image/*" capture="environment" class="hidden" />
     </div>
     <div class="club-chat-emoji-panel hidden" id="club-chat-emoji-panel">
+      <!-- Search (user request 09-13: "should be able to search emojis") — filters across every
+           category by keyword (see CLUB_CHAT_EMOJI_CATEGORIES' own [glyph, keywords] shape and
+           filterClubChatEmoji, JS); the category sections/tabs stay hidden while a search is
+           active, replaced by one flat matching grid. -->
+      <div class="club-chat-emoji-search-wrap">
+        <input type="text" id="club-chat-emoji-search" placeholder="Search emoji" />
+      </div>
       <div class="club-chat-emoji-body" id="club-chat-emoji-body"></div>
       <div class="club-chat-emoji-tabs" id="club-chat-emoji-tabs"></div>
     </div>
-    <!-- Reaction picker (user request 09-12: "i should be able to long press and react to a
-         message") — a small floating strip positioned next to whichever bubble was long-pressed
-         (see showClubChatReactionPicker, JS). Fixed position so it can sit anywhere in the
-         viewport regardless of which bubble triggered it. -->
+    <!-- Reaction picker (user request 09-12/09-13: "long press and react" / "i should be able to
+         click many emoji, it should not close on the first emoji") — a small floating strip
+         positioned next to whichever bubble was long-pressed (see showClubChatReactionPicker, JS).
+         Fixed position so it can sit anywhere in the viewport regardless of which bubble triggered
+         it. Stays open after each tap now (tapping just changes/toggles your one reaction, see
+         toggleClubChatReaction) — closes on tap-outside or re-long-pressing, not automatically
+         after a single choice. The trash button (delete, user request 09-13) is shown/hidden per
+         message by showClubChatReactionPicker — only ever visible on your OWN messages. -->
     <div class="club-chat-reaction-picker hidden" id="club-chat-reaction-picker">
       <button type="button" data-emoji="👍">👍</button>
       <button type="button" data-emoji="❤️">❤️</button>
@@ -2207,6 +2263,10 @@
       <button type="button" data-emoji="😮">😮</button>
       <button type="button" data-emoji="😢">😢</button>
       <button type="button" data-emoji="🙏">🙏</button>
+      <span class="club-chat-reaction-picker-divider hidden" id="club-chat-reaction-picker-divider"></span>
+      <button type="button" class="club-chat-reaction-picker-delete hidden" id="club-chat-delete-btn" aria-label="Delete message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+      </button>
     </div>
   </div>
 
@@ -4936,6 +4996,14 @@ async function openClubChat() {
       { event: "INSERT", schema: "public", table: "club_messages", filter: `group_id=eq.${group.id}` },
       (payload) => appendClubChatMessage(payload.new)
     )
+    // Deletes (user request 09-13: "i should be able to delete a message") — syncs a delete live
+    // to everyone else currently looking at this chat, not just the device that did it (which
+    // already removed its own copy optimistically, see deleteClubChatMessage).
+    .on(
+      "postgres_changes",
+      { event: "DELETE", schema: "public", table: "club_messages", filter: `group_id=eq.${group.id}` },
+      (payload) => removeClubChatMessage(payload.old.id)
+    )
     .subscribe();
 
   if (clubChatReactionsChannel) {
@@ -5005,21 +5073,36 @@ function linkifyText(text) {
   });
 }
 
-/** Quoted-reply preview inside a bubble (user request 09-12: "swipe right to reply") — looks the
+/** Quoted-reply preview inside a bubble (user request 09-12/09-14: "swipe right to reply" / "if
+ *  reply message is clicked, it should take the user to the message in the chat") — looks the
  *  original message up in clubChatMessagesById rather than a fresh query; if it's not there (a
  *  reply to something outside the currently-loaded 200-message window, or genuinely deleted),
- *  this quietly renders nothing rather than a broken "message not found" block. */
+ *  this quietly renders nothing rather than a broken "message not found" block. data-reply-to is
+ *  what the click delegate below (jumpToClubChatMessage) reads to know which row to jump to. */
 function clubChatReplyPreviewHtml(replyToId) {
   const original = clubChatMessagesById.get(replyToId);
   if (!original) return "";
   const label = clubChatSenderLabel(original.sender_id);
   const preview = original.image_url ? "📷 Photo" : (original.body || "");
   return `
-    <span class="club-chat-reply-preview">
+    <span class="club-chat-reply-preview" data-reply-to="${replyToId}">
       <span class="club-chat-reply-sender">${escapeHtml(label)}</span>
       <span class="club-chat-reply-text">${escapeHtml(preview)}</span>
     </span>
   `;
+}
+
+/** Scrolls the original message into view and gives it a brief highlight flash — same "jump to
+ *  message" gesture WhatsApp/Telegram use for a tapped quoted reply (user request 09-14). If the
+ *  original isn't currently in the DOM (older than the loaded window, or deleted since), this is
+ *  a silent no-op rather than a dead tap with no feedback — nothing to jump to either way, and a
+ *  broken "message not found" toast would be more confusing than nothing for what's an edge case. */
+function jumpToClubChatMessage(messageId) {
+  const row = el("club-chat-list").querySelector(`.club-chat-row[data-id="${messageId}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.add("club-chat-row-jump-highlight");
+  setTimeout(() => row.classList.remove("club-chat-row-jump-highlight"), 1200);
 }
 
 function clubChatBubbleHtml(message) {
@@ -5150,11 +5233,40 @@ function showClubChatReactionPicker(messageId, rowEl) {
   const picker = el("club-chat-reaction-picker");
   const rect = rowEl.getBoundingClientRect();
   picker.style.top = `${Math.max(8, rect.top - 54)}px`;
+  // Delete (user request 09-13) — only ever offered on your own messages, matching the RLS DELETE
+  // policy (0136) which already restricts this server-side regardless; hiding it here is purely
+  // about not showing an action that would just fail.
+  const message = clubChatMessagesById.get(messageId);
+  const isMine = message?.sender_id === currentSession.user.id;
+  el("club-chat-delete-btn").classList.toggle("hidden", !isMine);
+  el("club-chat-reaction-picker-divider").classList.toggle("hidden", !isMine);
   picker.classList.remove("hidden");
 }
 function hideClubChatReactionPicker() {
   clubChatReactionPickerTargetId = null;
   hide("club-chat-reaction-picker");
+}
+
+/** Removes a message from the DOM + local index — called both for this device's own delete
+ *  (optimistic, before the DELETE round trip resolves) and the Realtime DELETE echo everyone else
+ *  gets (see clubChatChannel's subscription below). Harmless to call twice for the same id (the
+ *  querySelector just finds nothing the second time). */
+function removeClubChatMessage(messageId) {
+  clubChatMessagesById.delete(messageId);
+  clubChatReactionsByMessageId.delete(messageId);
+  el("club-chat-list").querySelector(`.club-chat-row[data-id="${messageId}"]`)?.remove();
+}
+async function deleteClubChatMessage(messageId) {
+  if (!confirm("Delete this message?")) return;
+  removeClubChatMessage(messageId);
+  const { error } = await supabase.from("club_messages").delete().eq("id", messageId);
+  if (error) {
+    console.error("Club chat delete error:", error);
+    alert("Couldn't delete that message.");
+    // Not restored on failure — a rare enough case (RLS already guarantees it can only fail for
+    // someone else's message, which the delete button is never even shown for) that reloading the
+    // chat is a fine enough recovery path rather than adding a restore-the-row-from-nothing path.
+  }
 }
 
 // FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
@@ -5256,6 +5368,13 @@ function cancelClubChatLongPress() {
     clubChatLongPressTimer = null;
   }
 }
+// Jump to the original message (user request 09-14: "if reply message is clicked, it should take
+// the user to the message in the chat") — event delegation, same reasoning as the gesture
+// handlers below (keeps working for rows appendClubChatMessage adds later too).
+el("club-chat-list").addEventListener("click", (e) => {
+  const preview = e.target.closest(".club-chat-reply-preview");
+  if (preview) jumpToClubChatMessage(preview.dataset.replyTo);
+});
 el("club-chat-list").addEventListener("pointerdown", (e) => {
   const row = e.target.closest(".club-chat-row");
   if (!row) return;
@@ -5296,16 +5415,25 @@ function clubChatGestureEnd(e) {
 el("club-chat-list").addEventListener("pointerup", clubChatGestureEnd);
 el("club-chat-list").addEventListener("pointercancel", clubChatGestureEnd);
 
-el("club-chat-reaction-picker").querySelectorAll("button").forEach((btn) => {
+// FIX (user report 09-13 — "i should be able to click many emoji, it should not close on the
+// first emoji"): used to hideClubChatReactionPicker() on every tap. Reacting itself is a single
+// upsert either way (toggleClubChatReaction), but closing forced a fresh long-press just to
+// change your mind about which emoji — now it stays open until you tap outside it or long-press
+// a different message.
+el("club-chat-reaction-picker").querySelectorAll("[data-emoji]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const emoji = btn.dataset.emoji;
     const messageId = clubChatReactionPickerTargetId;
-    hideClubChatReactionPicker();
     if (messageId) toggleClubChatReaction(messageId, emoji);
   });
 });
+el("club-chat-delete-btn").addEventListener("click", () => {
+  const messageId = clubChatReactionPickerTargetId;
+  hideClubChatReactionPicker();
+  if (messageId) deleteClubChatMessage(messageId);
+});
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#club-chat-reaction-picker")) hideClubChatReactionPicker();
+  if (!e.target.closest("#club-chat-reaction-picker") && !e.target.closest(".club-chat-row")) hideClubChatReactionPicker();
 });
 // Attach (paperclip) / Camera icons (user request 09-11, with a WhatsApp screenshot: "can you
 // make this?") — each is now its own direct one-tap trigger inside the input pill, same split
@@ -5328,44 +5456,110 @@ el("club-chat-camera-btn").addEventListener("click", () => {
 // (would need per-emoji keyword tagging for search to be worth adding, a bigger data-modeling
 // task) — this is a solid, representative few hundred across the categories a workout-club chat
 // actually reaches for, organized the way WhatsApp's own picker is.
+// Each emoji is [glyph, searchable keywords] — the keywords back the search box (user request
+// 09-13: "should be able to search emojis"), not shown anywhere themselves.
 const CLUB_CHAT_EMOJI_CATEGORIES = [
+  // Cheer (user request 09-13: "enrich the emojis, with ones that can be used to motivate and
+  // cheer others...or make fun in a friendly way") — the one category built specifically for a
+  // workout-club chat rather than a generic emoji set, so it leads the picker right after Recents
+  // instead of being buried after Smileys/Gestures/etc.
+  { id: "cheer", tab: "🔥", label: "Cheer", emojis: [
+    ["💪","muscle strong flex gains"], ["🔥","fire lit hot streak"], ["🏆","trophy win champion"],
+    ["🥇","gold medal first place"], ["🎉","party celebrate confetti"], ["👏","clap applause nice"],
+    ["🙌","praise hands up yes"], ["💯","hundred perfect on point"], ["🚀","rocket lets go launch"],
+    ["⭐","star great"], ["✨","sparkle nice shine"], ["👑","crown king queen goat"],
+    ["😤","determined pumped effort"], ["🥵","hot sweating working hard"], ["💦","sweat drops effort"],
+    ["🦾","strong arm robot gains"], ["🏋️","lifting weights gym"], ["🎯","bullseye on target nailed it"],
+    ["⚡","lightning energy fast"], ["🌟","glowing star awesome"], ["🐐","goat greatest of all time"],
+    ["😂","laughing lol funny"], ["🤣","rofl dying laughing"], ["😜","winky tongue joking"],
+    ["🙃","upside down silly"], ["🤡","clown joking fool"], ["👀","eyes suspicious watching"],
+    ["😏","smirk sly"], ["🐢","turtle slow"], ["🐌","snail slow"],
+    ["🦥","sloth lazy slow"], ["😴","sleepy lazy tired"], ["🍩","donut cheat day treat"],
+    ["🍕","pizza cheat day treat"], ["🫠","melting dying embarrassed"], ["💀","dead funny dying"],
+    ["🤦","facepalm oops"],
+  ]},
   { id: "smileys", tab: "😀", label: "Smileys", emojis: [
-    "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩",
-    "😘","😗","😚","😙","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","🤐","🤨",
-    "😐","😑","😶","😏","😒","🙄","😬","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢",
-    "🥵","🥶","🥴","😵","🤯","🥳","😎","🤓","🧐","😕","🙁","😮","😯","😲","🥺","😢",
-    "😭","😤","😡","😠","🤬","😱","😨","😰","😥","😓","🤗",
+    ["😀","grinning happy"], ["😃","smiley happy"], ["😄","happy joy"], ["😁","grin happy"],
+    ["😆","laughing happy"], ["😅","sweat smile nervous"], ["🤣","rofl laughing"], ["😂","joy laughing tears"],
+    ["🙂","smile slight"], ["🙃","upside down silly"], ["😉","wink"], ["😊","smile blush happy"],
+    ["😇","angel innocent halo"], ["🥰","love smiling hearts"], ["😍","heart eyes love"], ["🤩","star struck excited"],
+    ["😘","kiss"], ["😗","kissing"], ["😚","kiss closed eyes"], ["😙","kiss smile"],
+    ["😋","yum tongue delicious"], ["😛","tongue playful"], ["😜","winky tongue"], ["🤪","zany crazy silly"],
+    ["😝","tongue closed eyes"], ["🤑","money mouth rich"], ["🤗","hug"], ["🤭","giggle oops"],
+    ["🤫","shh quiet secret"], ["🤔","thinking"], ["🤐","zipper mouth quiet"], ["🤨","raised eyebrow suspicious"],
+    ["😐","neutral"], ["😑","expressionless blank"], ["😶","no mouth speechless"], ["😏","smirk sly"],
+    ["😒","unamused annoyed"], ["🙄","eye roll"], ["😬","grimace awkward"], ["😌","relieved content"],
+    ["😔","sad pensive"], ["😪","sleepy tired"], ["🤤","drooling"], ["😴","sleeping zzz"],
+    ["😷","mask sick"], ["🤒","sick thermometer"], ["🤕","hurt injured bandage"], ["🤢","nauseated sick"],
+    ["🥵","hot sweating"], ["🥶","cold freezing"], ["🥴","dizzy woozy"], ["😵","dizzy knocked out"],
+    ["🤯","mind blown shocked"], ["🥳","party celebrate birthday"], ["😎","cool sunglasses"], ["🤓","nerd glasses"],
+    ["🧐","monocle curious"], ["😕","confused"], ["🙁","frown sad"], ["😮","surprised open mouth"],
+    ["😯","hushed surprised"], ["😲","astonished shocked"], ["🥺","pleading puppy eyes"], ["😢","crying sad"],
+    ["😭","sobbing crying"], ["😤","determined frustrated"], ["😡","angry mad"], ["😠","angry mad"],
+    ["🤬","cursing furious"], ["😱","scream shocked"], ["😨","fearful scared"], ["😰","anxious sweat"],
+    ["😥","sad relieved"], ["😓","sweat stressed"],
   ]},
   { id: "gestures", tab: "👋", label: "Gestures", emojis: [
-    "👋","🤚","🖐️","✋","🖖","👌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","👇",
-    "☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🙏","💪","🦾","🧠","👀",
+    ["👋","wave hello bye"], ["🤚","raised back hand stop"], ["🖐️","hand splayed stop"], ["✋","hand raised stop"],
+    ["🖖","vulcan salute"], ["👌","ok perfect"], ["🤏","pinch small"], ["✌️","peace victory"],
+    ["🤞","fingers crossed luck hope"], ["🤟","love you gesture"], ["🤘","rock on horns"], ["🤙","call me hang loose"],
+    ["👈","point left"], ["👉","point right"], ["👆","point up"], ["👇","point down"],
+    ["☝️","point up one"], ["👍","thumbs up yes good"], ["👎","thumbs down no bad"], ["✊","fist power"],
+    ["👊","fist bump punch"], ["🤛","fist bump left"], ["🤜","fist bump right"], ["👏","clap applause"],
+    ["🙌","hands up praise"], ["👐","open hands"], ["🤲","palms up"], ["🙏","pray thanks please"],
+    ["💪","muscle strong flex"], ["🦾","strong arm robot"], ["🧠","brain smart"], ["👀","eyes look"],
   ]},
   { id: "hearts", tab: "❤️", label: "Hearts", emojis: [
-    "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖",
-    "💘","💝","💟",
+    ["❤️","red heart love"], ["🧡","orange heart love"], ["💛","yellow heart love"], ["💚","green heart love"],
+    ["💙","blue heart love"], ["💜","purple heart love"], ["🖤","black heart"], ["🤍","white heart"],
+    ["🤎","brown heart"], ["💔","broken heart sad"], ["❣️","heart exclamation"], ["💕","two hearts love"],
+    ["💞","revolving hearts love"], ["💓","beating heart love"], ["💗","growing heart love"], ["💖","sparkling heart love"],
+    ["💘","heart arrow cupid"], ["💝","heart gift love"], ["💟","heart decoration"],
   ]},
   { id: "animals", tab: "🐶", label: "Animals", emojis: [
-    "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔",
-    "🐧","🐦","🦆","🦅","🦉","🐺","🦄","🐝","🦋","🐢","🐍","🐙","🐬","🐳","🐊","🐘",
-    "🌵","🌲","🌴","🌸","🌻","🍀",
+    ["🐶","dog puppy"], ["🐱","cat kitten"], ["🐭","mouse"], ["🐹","hamster"], ["🐰","rabbit bunny"],
+    ["🦊","fox"], ["🐻","bear"], ["🐼","panda"], ["🐨","koala"], ["🐯","tiger"],
+    ["🦁","lion"], ["🐮","cow"], ["🐷","pig"], ["🐸","frog"], ["🐵","monkey"],
+    ["🐔","chicken"], ["🐧","penguin"], ["🐦","bird"], ["🦆","duck"], ["🦅","eagle"],
+    ["🦉","owl"], ["🐺","wolf"], ["🦄","unicorn"], ["🐝","bee"], ["🦋","butterfly"],
+    ["🐢","turtle slow"], ["🐍","snake"], ["🐙","octopus"], ["🐬","dolphin"], ["🐳","whale"],
+    ["🐊","crocodile"], ["🐘","elephant"], ["🌵","cactus"], ["🌲","tree evergreen"], ["🌴","palm tree"],
+    ["🌸","blossom flower"], ["🌻","sunflower"], ["🍀","clover luck"],
   ]},
   { id: "food", tab: "🍔", label: "Food", emojis: [
-    "🍏","🍎","🍌","🍉","🍇","🍓","🍒","🍑","🥑","🍅","🥕","🌽","🥐","🍞","🧀","🍳",
-    "🥓","🍔","🍟","🍕","🌭","🌮","🌯","🍝","🍜","🍣","🍦","🍩","🍪","🎂","🍫","🍿",
-    "🍯","☕","🍵","🥤","🍺","🍷",
+    ["🍏","green apple"], ["🍎","red apple"], ["🍌","banana"], ["🍉","watermelon"], ["🍇","grapes"],
+    ["🍓","strawberry"], ["🍒","cherries"], ["🍑","peach"], ["🥑","avocado"], ["🍅","tomato"],
+    ["🥕","carrot"], ["🌽","corn"], ["🥐","croissant"], ["🍞","bread"], ["🧀","cheese"],
+    ["🍳","fried egg cooking"], ["🥓","bacon"], ["🍔","burger"], ["🍟","fries"], ["🍕","pizza"],
+    ["🌭","hot dog"], ["🌮","taco"], ["🌯","burrito"], ["🍝","pasta spaghetti"], ["🍜","noodles ramen"],
+    ["🍣","sushi"], ["🍦","ice cream"], ["🍩","donut"], ["🍪","cookie"], ["🎂","cake birthday"],
+    ["🍫","chocolate"], ["🍿","popcorn"], ["🍯","honey"], ["☕","coffee"], ["🍵","tea"],
+    ["🥤","drink soda"], ["🍺","beer"], ["🍷","wine"],
   ]},
   { id: "activities", tab: "⚽", label: "Activities", emojis: [
-    "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸","🥊","🥋","🎽","🛹","🎿","⛷️",
-    "🏂","🏋️","🤼","🏇","🧘","🏄","🏊","🚴","🚵","🧗","🏆","🥇","🥈","🥉","🏅","🎖️",
-    "🎯","🎮","🎲",
+    ["⚽","soccer football"], ["🏀","basketball"], ["🏈","american football"], ["⚾","baseball"], ["🎾","tennis"],
+    ["🏐","volleyball"], ["🏉","rugby"], ["🎱","billiards pool"], ["🏓","ping pong table tennis"], ["🏸","badminton"],
+    ["🥊","boxing gloves"], ["🥋","martial arts karate"], ["🎽","running shirt race"], ["🛹","skateboard"], ["🎿","ski"],
+    ["⛷️","skiing"], ["🏂","snowboarding"], ["🏋️","weightlifting gym"], ["🤼","wrestling"], ["🏇","horse racing"],
+    ["🧘","yoga meditate"], ["🏄","surfing"], ["🏊","swimming"], ["🚴","cycling bike"], ["🚵","mountain biking"],
+    ["🧗","climbing"], ["🏆","trophy win"], ["🥇","gold medal first"], ["🥈","silver medal second"], ["🥉","bronze medal third"],
+    ["🏅","medal"], ["🎖️","medal honor"], ["🎯","bullseye target"], ["🎮","video game controller"], ["🎲","dice game"],
   ]},
   { id: "travel", tab: "✈️", label: "Travel", emojis: [
-    "🚗","🚕","🚌","🏎️","🚑","🚒","🚚","🚲","🛵","✈️","🚀","🚁","⛵","🚢","🚂","🚆",
-    "🗺️","🗽","🏰","🎡","⛰️","🏖️","🏕️","🏠","🏢","⛺","🌋","🌅",
+    ["🚗","car"], ["🚕","taxi"], ["🚌","bus"], ["🏎️","race car"], ["🚑","ambulance"],
+    ["🚒","fire truck"], ["🚚","truck"], ["🚲","bike bicycle"], ["🛵","scooter"], ["✈️","airplane flight"],
+    ["🚀","rocket launch"], ["🚁","helicopter"], ["⛵","sailboat"], ["🚢","ship boat"], ["🚂","train"],
+    ["🚆","train"], ["🗺️","map"], ["🗽","statue of liberty"], ["🏰","castle"], ["🎡","ferris wheel"],
+    ["⛰️","mountain"], ["🏖️","beach"], ["🏕️","camping tent"], ["🏠","house home"], ["🏢","building office"],
+    ["⛺","tent camping"], ["🌋","volcano"], ["🌅","sunrise sunset"],
   ]},
   { id: "objects", tab: "💡", label: "Objects", emojis: [
-    "⌚","📱","💻","📷","🎥","📞","🔋","💡","🔦","🕯️","💰","💵","💎","🔧","🔨","⚙️",
-    "🔑","🎁","🎈","🎉","✉️","📅","📌","✂️","🔒","🎵","🎧","📚","🧴","🛎️",
+    ["⌚","watch"], ["📱","phone mobile"], ["💻","laptop computer"], ["📷","camera photo"], ["🎥","video camera movie"],
+    ["📞","phone call"], ["🔋","battery"], ["💡","lightbulb idea"], ["🔦","flashlight torch"], ["🕯️","candle"],
+    ["💰","money bag"], ["💵","dollar cash money"], ["💎","gem diamond"], ["🔧","wrench tool"], ["🔨","hammer tool"],
+    ["⚙️","gear settings"], ["🔑","key"], ["🎁","gift present"], ["🎈","balloon"], ["🎉","party popper celebrate"],
+    ["✉️","envelope mail"], ["📅","calendar date"], ["📌","pin location"], ["✂️","scissors cut"], ["🔒","lock secure"],
+    ["🎵","music note"], ["🎧","headphones"], ["📚","books"], ["🧴","lotion bottle"], ["🛎️","bell service"],
   ]},
 ];
 // Recently used (user request 09-11 — matches WhatsApp's own "Recents" section, the first thing
@@ -5396,8 +5590,11 @@ function insertEmoji(emoji) {
   input.focus();
   addRecentEmoji(emoji);
 }
+// emojis: plain glyph strings (Recents/search results) OR [glyph, keywords] tuples (a category) —
+// only the glyph is ever rendered either way.
 function emojiGridHtml(emojis) {
-  return `<div class="club-chat-emoji-grid">${emojis.map((e) => `<button type="button">${e}</button>`).join("")}</div>`;
+  const glyphs = emojis.map((e) => (Array.isArray(e) ? e[0] : e));
+  return `<div class="club-chat-emoji-grid">${glyphs.map((g) => `<button type="button">${g}</button>`).join("")}</div>`;
 }
 function renderEmojiPanel() {
   const body = el("club-chat-emoji-body");
@@ -5431,6 +5628,31 @@ function renderEmojiPanel() {
   });
 }
 renderEmojiPanel();
+
+// Search (user request 09-13: "should be able to search emojis") — flattens every category's
+// [glyph, keywords] pairs once (not per-keystroke) and filters that on each input; matches are
+// shown as one flat grid with the tab bar hidden (there's no single "section" a mixed result set
+// belongs to) rather than trying to keep the section/tab structure while filtering it.
+const CLUB_CHAT_EMOJI_FLAT = CLUB_CHAT_EMOJI_CATEGORIES.flatMap((cat) => cat.emojis);
+function filterClubChatEmoji(query) {
+  const body = el("club-chat-emoji-body");
+  const tabs = el("club-chat-emoji-tabs");
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    tabs.classList.remove("hidden");
+    renderEmojiPanel();
+    return;
+  }
+  tabs.classList.add("hidden");
+  const matches = CLUB_CHAT_EMOJI_FLAT.filter(([, keywords]) => keywords.includes(q));
+  body.innerHTML = matches.length > 0
+    ? emojiGridHtml(matches)
+    : `<p class="club-chat-emoji-section-label">No matches</p>`;
+  body.querySelectorAll(".club-chat-emoji-grid button").forEach((btn) => {
+    btn.addEventListener("click", () => insertEmoji(btn.textContent));
+  });
+}
+el("club-chat-emoji-search").addEventListener("input", (e) => filterClubChatEmoji(e.target.value));
 // Swaps the emoji button's own glyph between smiley (closed) and a keyboard icon (open) — same
 // toggle WhatsApp's own field does, since the button's job flips between "open the emoji panel"
 // and "go back to typing" depending on state.
@@ -5442,7 +5664,10 @@ el("club-chat-emoji-btn").addEventListener("click", (e) => {
   e.stopPropagation();
   const panel = el("club-chat-emoji-panel");
   const opening = panel.classList.contains("hidden");
-  if (opening) renderEmojiPanel(); // picks up anything added to Recents since last render
+  if (opening) {
+    el("club-chat-emoji-search").value = ""; // start each open on the full picker, not a stale search
+    renderEmojiPanel(); // picks up anything added to Recents since last render
+  }
   panel.classList.toggle("hidden");
   setClubChatEmojiToggleIcon(opening);
 });
