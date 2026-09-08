@@ -5960,6 +5960,10 @@ async function runClubChatGifSearch(query) {
     ? clubChatGifGridHtml(gifs)
     : `<p class="muted club-chat-gif-hint">No GIFs found</p>`;
 }
+// Falls back to this whenever the search box is empty — same default shown right when the panel
+// opens (below), also re-shown if the user types something then clears it back out, rather than
+// that clearing to a dead "type something" hint.
+const CLUB_CHAT_GIF_DEFAULT_QUERY = "celebrate";
 // Debounced (400ms) — each keystroke cancels the previous pending search rather than firing one
 // request per character, same restraint any type-ahead search needs.
 let clubChatGifSearchTimer = null;
@@ -5967,7 +5971,7 @@ el("club-chat-gif-search").addEventListener("input", (e) => {
   const query = e.target.value;
   clearTimeout(clubChatGifSearchTimer);
   if (!query.trim()) {
-    el("club-chat-gif-body").innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
+    runClubChatGifSearch(CLUB_CHAT_GIF_DEFAULT_QUERY);
     return;
   }
   clubChatGifSearchTimer = setTimeout(() => runClubChatGifSearch(query), 400);
@@ -5986,13 +5990,14 @@ el("club-chat-gif-btn").addEventListener("click", (e) => {
   if (opening) {
     hide("club-chat-emoji-panel"); // only one panel open at a time
     setClubChatEmojiToggleIcon(false);
-    // Defaults to a real search rather than an empty "type something" state (user request 09-20:
-    // "GIF by default should load a search 'celebrate' because now it is empty") — fits a
-    // workout-club chat's own reason for reaching for a GIF in the first place. Not debounced —
-    // this is the only search firing right now, no reason to wait 400ms for it.
-    el("club-chat-gif-search").value = "celebrate";
+    // Defaults to real results rather than an empty "type something" state (user request 09-20:
+    // "GIF by default should load a search 'celebrate' because now it is empty" — then "keep the
+    // search showing search gif": the box itself stays empty/showing its own placeholder, only
+    // the results underneath default to a celebrate search, not the box's own text). Not
+    // debounced — this is the only search firing right now, no reason to wait 400ms for it.
+    el("club-chat-gif-search").value = "";
     clearTimeout(clubChatGifSearchTimer);
-    runClubChatGifSearch("celebrate");
+    runClubChatGifSearch(CLUB_CHAT_GIF_DEFAULT_QUERY);
   }
   panel.classList.toggle("hidden");
 });
