@@ -527,6 +527,35 @@
      ModalBottomSheet's own open/close motion. Scoped to this one sheet (not the shared .hidden
      helper every other modal/element uses) — see openClubmateWorkouts/closeClubmateWorkouts. */
   #clubmate-workouts-card { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+  /* ---- Club chat (0132_club_chat.sql, user request 09-08) — same slide-up .modal-card shape as
+     clubmate-workouts-card, just taller (a message list wants more room than a workout list) and
+     laid out as a column so the composer stays pinned under a scrolling message list. Bubble
+     colors mirror ClubChatBubble.kt's isMine ? AccentSoft : DarkBg exactly. ---- */
+  #club-chat-card {
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    height: 78vh; display: flex; flex-direction: column;
+  }
+  .club-chat-list { list-style: none; margin: 0; padding: 4px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .club-chat-row { display: flex; }
+  .club-chat-row.mine { justify-content: flex-end; }
+  .club-chat-bubble-wrap { max-width: 78%; display: flex; flex-direction: column; }
+  .club-chat-row.mine .club-chat-bubble-wrap { align-items: flex-end; }
+  .club-chat-sender { font-size: 10px; font-weight: 700; color: var(--text-muted); margin: 0 0 3px 10px; }
+  .club-chat-bubble { background: var(--card-raised); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .club-chat-row.mine .club-chat-bubble { background: var(--accent-soft); }
+  .club-chat-bubble img { display: block; max-width: 220px; border-radius: 12px; }
+  .club-chat-bubble.has-image { padding: 4px; }
+  .club-chat-composer { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-shrink: 0; }
+  .club-chat-composer input[type="text"] {
+    flex: 1; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 20px;
+    padding: 11px 16px; color: var(--text-main); font-size: 14px;
+  }
+  .club-chat-icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--card-raised); border: none;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted);
+  }
+  .club-chat-icon-btn svg { width: 20px; height: 20px; }
+  .club-chat-send-btn { color: var(--accent); }
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
@@ -896,6 +925,14 @@
   }
   .screen-back-btn svg { width: 18px; height: 18px; }
   .screen-title { font-size: 19px; font-weight: 800; margin: 0; }
+  /* Club chat's header entry point — same tile shape as .screen-back-btn, opposite side, tinted
+     accent since (unlike the plain back arrow) it opens something rather than navigating away. */
+  .screen-header-btn {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft);
+    border: 1px solid var(--hairline); flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--accent);
+  }
+  .screen-header-btn svg { width: 19px; height: 19px; }
 
   /* ---- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt's own table) ---- */
   .compare-table { border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
@@ -1762,6 +1799,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <p class="screen-title" id="club-detail-title" style="flex:1;">Club</p>
+      <!-- Club chat (0132_club_chat.sql, user request 09-08: "chat per club... share
+           screenshot... closest to whatsapp functionality") — every visitor to this screen is
+           already a member (openClubDetail() is only ever reached from a "Joined" club row, see
+           its own call sites), so unlike the owner-only actions below, this needs no visibility
+           gate at all. -->
+      <button class="screen-header-btn" id="club-chat-open-btn" aria-label="Club chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </button>
     </div>
 
     <!-- FIX (user request 08-26: "make the web one closer to the app, which is more compact") —
@@ -1857,6 +1902,33 @@
       <p class="section-label" style="margin-bottom:14px;">Members</p>
       <p class="muted" id="club-members-empty">Loading…</p>
       <ul class="member-list hidden" id="club-members-list"></ul>
+    </div>
+  </div>
+
+  <!-- Club chat (0132_club_chat.sql, user request 09-08: "can we have a chat per club? where
+       people in the same club can chat and share screenshot. the closest to whatsapp
+       functionality") — opened via the header icon on screen-club-detail above. Same
+       modal-backdrop bottom-sheet shape as clubmate-workouts-backdrop, just its own taller card
+       (#club-chat-card, see CSS) since a message list wants more room than a workout list. New
+       messages arrive over Supabase Realtime (openClubChat() below) rather than polling, same
+       delivery mechanism ClubChatScreen.kt uses on Android. -->
+  <div class="modal-backdrop hidden" id="club-chat-backdrop">
+    <div class="modal-card" id="club-chat-card">
+      <div class="sheet-handle"></div>
+      <p class="section-label" id="club-chat-title" style="margin-bottom:10px;">Chat</p>
+      <p class="muted" id="club-chat-empty">Loading…</p>
+      <ul class="club-chat-list hidden" id="club-chat-list"></ul>
+      <div class="club-chat-composer">
+        <button type="button" class="club-chat-icon-btn" id="club-chat-image-btn" aria-label="Share a screenshot">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
+        <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <input type="file" id="club-chat-image-input" accept="image/*" class="hidden" />
+      </div>
+      <button class="btn-text" id="club-chat-close-btn" style="margin-top:6px;">Close</button>
     </div>
   </div>
 
@@ -4311,6 +4383,10 @@ function renderMyClubRow(group) {
 // ---------- Club detail (user request 08-24: "clicking on the club should open the list of club
 // members with the ability to nudge... rename, private vs public, invite user") ----------
 let currentClubDetail = null;
+// Cached alongside currentClubDetail so club chat (below) can resolve a message's sender_id to a
+// display name/avatar without its own round trip — same "join client-side against an
+// already-loaded member list" convention ClubMessage's own doc comment (Models.kt) describes.
+let currentClubMembers = [];
 
 async function openClubDetail(group) {
   currentClubDetail = group;
@@ -4358,7 +4434,8 @@ async function openClubDetail(group) {
   } catch (e) {
     console.error("Couldn't load pending club invites:", e);
   }
-  renderClubMembers(data || [], pendingInvites);
+  currentClubMembers = data || [];
+  renderClubMembers(currentClubMembers, pendingInvites);
 }
 
 function renderClubMembers(members, pendingInvites = []) {
@@ -4430,6 +4507,182 @@ function renderClubMembers(members, pendingInvites = []) {
   });
   wireHistoryChevrons(list);
 }
+
+// ---------- Club chat (0132_club_chat.sql, user request 09-08: "can we have a chat per club?
+// where people in the same club can chat and share screenshot. the closest to whatsapp
+// functionality") — opened via the header icon on screen-club-detail. History loads once (RLS
+// already scopes club_messages to fn_my_group_ids(), same as every other club-scoped read here);
+// new messages arrive over Supabase Realtime's postgres_changes instead of polling, filtered
+// server-side to this one group so a busy club's chat doesn't wake up every other open tab's
+// subscription. clubChatChannel is torn down in closeClubChat() — leaving it subscribed after the
+// sheet closes would keep the socket open for a chat nobody's looking at anymore. ----------
+let clubChatChannel = null;
+
+async function openClubChat() {
+  if (!currentClubDetail) return;
+  const group = currentClubDetail;
+  el("club-chat-title").textContent = group.name;
+  el("club-chat-empty").textContent = "Loading…";
+  show("club-chat-empty");
+  hide("club-chat-list");
+  el("club-chat-input").value = "";
+  show("club-chat-backdrop");
+  const card = el("club-chat-card");
+  card.style.transform = "translateY(100%)";
+  void card.offsetHeight;
+  requestAnimationFrame(() => { card.style.transform = "translateY(0)"; });
+
+  const { data, error } = await supabase
+    .from("club_messages")
+    .select("*")
+    .eq("group_id", group.id)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) {
+    console.error("Couldn't load club chat:", error);
+    el("club-chat-empty").textContent = "Couldn't load chat right now.";
+    return;
+  }
+  renderClubChatMessages(data || []);
+
+  // Realtime — set up the listener, then subscribe (same order Supabase's own docs require:
+  // handlers registered before the channel joins won't be missed, ones added after can be).
+  if (clubChatChannel) {
+    supabase.removeChannel(clubChatChannel);
+    clubChatChannel = null;
+  }
+  clubChatChannel = supabase
+    .channel(`club_chat_${group.id}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "club_messages", filter: `group_id=eq.${group.id}` },
+      (payload) => appendClubChatMessage(payload.new)
+    )
+    .subscribe();
+}
+
+function closeClubChat() {
+  const card = el("club-chat-card");
+  card.style.transform = "translateY(100%)";
+  setTimeout(() => hide("club-chat-backdrop"), 280);
+  if (clubChatChannel) {
+    supabase.removeChannel(clubChatChannel);
+    clubChatChannel = null;
+  }
+}
+
+function clubChatSenderLabel(senderId) {
+  if (senderId === currentSession.user.id) return "You";
+  const member = currentClubMembers.find((m) => m.user_id === senderId);
+  return member?.display_name || "Member";
+}
+
+function clubChatBubbleHtml(message) {
+  const isMine = message.sender_id === currentSession.user.id;
+  const inner = message.image_url
+    ? `<img src="${message.image_url}" alt="Shared screenshot" />`
+    : escapeHtml(message.body || "");
+  return `
+    <li class="club-chat-row ${isMine ? "mine" : ""}" data-id="${message.id}">
+      <div class="club-chat-bubble-wrap">
+        ${isMine ? "" : `<p class="club-chat-sender">${escapeHtml(clubChatSenderLabel(message.sender_id))}</p>`}
+        <div class="club-chat-bubble${message.image_url ? " has-image" : ""}">${inner}</div>
+      </div>
+    </li>
+  `;
+}
+
+function renderClubChatMessages(rows) {
+  const list = el("club-chat-list");
+  if (rows.length === 0) {
+    el("club-chat-empty").textContent = "No messages yet — say hi to your club.";
+    show("club-chat-empty");
+    hide("club-chat-list");
+    return;
+  }
+  hide("club-chat-empty");
+  show("club-chat-list");
+  list.innerHTML = rows.map(clubChatBubbleHtml).join("");
+  list.scrollTop = list.scrollHeight;
+}
+
+/** Appends one incoming message — used both by the Realtime INSERT handler (every device,
+ *  including the sender's own once its optimistic copy below is de-duped by id) and nowhere
+ *  else, so the message list only ever grows here, never re-renders wholesale after the initial
+ *  load. */
+function appendClubChatMessage(message) {
+  const list = el("club-chat-list");
+  if (list.querySelector(`[data-id="${message.id}"]`)) return; // this device's own optimistic send
+  hide("club-chat-empty");
+  show("club-chat-list");
+  list.insertAdjacentHTML("beforeend", clubChatBubbleHtml(message));
+  list.scrollTop = list.scrollHeight;
+}
+
+async function sendClubChatText() {
+  if (!currentClubDetail) return;
+  const input = el("club-chat-input");
+  const body = input.value.trim();
+  if (!body) return;
+  input.value = "";
+  const localId = safeRandomUUID();
+  appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body, image_url: null });
+  const { error } = await supabase
+    .from("club_messages")
+    .insert({ group_id: currentClubDetail.id, sender_id: currentSession.user.id, body });
+  if (error) {
+    console.error("Club chat send error:", error);
+    el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
+    alert("Couldn't send that message.");
+  }
+}
+
+/** Reuses the "avatars" bucket, same as club-photo-btn above — its write policy only checks the
+ *  FIRST path segment against auth.uid(), so "{userId}/chat/{groupId}/{uuid}.jpg" needs no new
+ *  bucket or storage.objects policy (see 0132_club_chat.sql's header for why). */
+async function sendClubChatImage(file) {
+  if (!currentClubDetail || !file) return;
+  const group = currentClubDetail;
+  try {
+    const path = `${currentSession.user.id}/chat/${group.id}/${safeRandomUUID()}.jpg`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      contentType: file.type || "image/jpeg",
+    });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const imageUrl = data.publicUrl;
+    const localId = safeRandomUUID();
+    appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body: null, image_url: imageUrl });
+    const { error: insErr } = await supabase
+      .from("club_messages")
+      .insert({ group_id: group.id, sender_id: currentSession.user.id, image_url: imageUrl });
+    if (insErr) {
+      console.error("Club chat image send error:", insErr);
+      el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
+      alert("Couldn't send that image.");
+    }
+  } catch (err) {
+    console.error("Club chat image upload error:", err);
+    alert(err.message || "Couldn't upload that image");
+  }
+}
+
+el("club-chat-open-btn").addEventListener("click", openClubChat);
+el("club-chat-close-btn").addEventListener("click", closeClubChat);
+el("club-chat-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "club-chat-backdrop") closeClubChat();
+});
+attachSwipeDownToClose(el("club-chat-card"), closeClubChat);
+el("club-chat-send-btn").addEventListener("click", sendClubChatText);
+el("club-chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendClubChatText();
+});
+el("club-chat-image-btn").addEventListener("click", () => el("club-chat-image-input").click());
+el("club-chat-image-input").addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (file) sendClubChatImage(file);
+});
 
 // Rename/Invite icon buttons (user request 08-26) — reveal their own field, hide the other one
 // (only one editing task at a time, same as most single-purpose reveal-on-tap patterns) and focus
