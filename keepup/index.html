@@ -446,6 +446,11 @@
     background: var(--accent-soft); display: flex; align-items: center; justify-content: center;
   }
   .club-thumb-letter { font-size: 18px; font-weight: 900; color: var(--accent); }
+  /* Chat header's smaller club thumbnail (user request 09-10) — reuses .club-thumb/.club-thumb-
+     letter's own colors/fallback, just sized to sit in a .screen-header row next to the back
+     button instead of a full club-card. */
+  .club-chat-header-thumb .club-thumb { width: 32px; height: 32px; border-radius: 9px; }
+  .club-chat-header-thumb .club-thumb-letter { font-size: 14px; }
   .club-thumb-badge {
     position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%;
     background: var(--bg); border: 1.5px solid var(--card); display: flex; align-items: center; justify-content: center;
@@ -595,7 +600,7 @@
   .club-chat-icon-btn {
     width: 40px; height: 40px; border-radius: 50%; background: var(--card-raised); border: none;
     padding: 0; margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted);
+    color: var(--text-muted); font-size: 18px; line-height: 1;
   }
   .club-chat-icon-btn svg { width: 20px; height: 20px; }
   /* FIX (user request 09-09 — sporty send button, not a plain ghost icon): filled gradient circle,
@@ -622,6 +627,25 @@
   }
   .club-chat-attach-menu button:active { background: rgba(255,255,255,0.06); }
   .club-chat-attach-menu svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+  /* Emoji picker (user report 09-10) — same anchored-popover shape as the attach menu above, a
+     grid instead of a list since these are single-tap glyphs, not labeled actions. */
+  .club-chat-emoji-menu {
+    position: absolute; bottom: 48px; left: 0; background: var(--card-raised);
+    border: 1px solid var(--hairline); border-radius: 14px; padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 10;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 240px;
+  }
+  .club-chat-emoji-menu button {
+    background: none; border: none; font-size: 22px; line-height: 1; padding: 6px;
+    border-radius: 8px; cursor: pointer;
+    /* FIX (found 09-10 while verifying this menu): a grid track's implicit min-width:auto keeps
+       it from shrinking below its content's natural size — a couple of these emoji (the ones with
+       a variation-selector, e.g. the stopwatch) are wider than an even 1fr share, which was
+       stretching every column to match and pushing the last one outside the popover's own
+       rounded border. min-width:0 lets the grid actually enforce equal 1fr columns. */
+    min-width: 0;
+  }
+  .club-chat-emoji-menu button:active { background: rgba(255,255,255,0.08); }
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
@@ -2015,6 +2039,10 @@
       <button class="screen-back-btn" id="club-chat-back-btn" aria-label="Back">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
+      <!-- Club photo (user request 09-10: "we should show the club photo") — same
+           groupThumbnailHtml() every other club-photo spot on this page already uses (letter
+           fallback when the club has none), just sized down to fit the header row. -->
+      <div id="club-chat-thumb" class="club-chat-header-thumb"></div>
       <p class="screen-title" id="club-chat-title" style="flex:1;">Chat</p>
     </div>
     <p class="muted" id="club-chat-empty">Loading…</p>
@@ -2041,6 +2069,14 @@
             Gallery
           </button>
         </div>
+      </div>
+      <!-- Emoji picker (user report 09-10: "i dont see where to choose gif or emoji") — a small
+           curated grid rather than a full emoji library/keyboard reimplementation; every OS/browser
+           already has its own emoji keyboard reachable from a plain text input, this is just a
+           quicker one-tap set of the ones people actually reach for in a workout-club chat. -->
+      <div class="club-chat-attach-wrap">
+        <button type="button" class="club-chat-icon-btn" id="club-chat-emoji-btn" aria-label="Add an emoji">😊</button>
+        <div class="club-chat-emoji-menu hidden" id="club-chat-emoji-menu"></div>
       </div>
       <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
       <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
@@ -4721,6 +4757,7 @@ async function openClubChat() {
   if (!currentClubDetail) return;
   const group = currentClubDetail;
   el("club-chat-title").textContent = group.name;
+  el("club-chat-thumb").innerHTML = groupThumbnailHtml(group.name, group.photo_url);
   el("club-chat-empty").textContent = "Loading…";
   show("club-chat-empty");
   hide("club-chat-list");
@@ -4916,10 +4953,40 @@ el("club-chat-input").addEventListener("keydown", (e) => {
 // a photo") — replaces the old single button that jumped straight to the gallery picker.
 el("club-chat-attach-btn").addEventListener("click", (e) => {
   e.stopPropagation();
+  hide("club-chat-emoji-menu"); // mutually exclusive with the emoji popover below
   el("club-chat-attach-menu").classList.toggle("hidden");
 });
+// Emoji picker (user report 09-10: "i dont see where to choose gif or emoji") — a curated grid,
+// not a full emoji-keyboard reimplementation (every OS/browser already has its own reachable
+// straight from the text input); this is a quicker one-tap set of what a workout-club chat
+// actually reaches for. Rendered once here rather than server/DB-driven — it's a fixed, small,
+// client-only list with no reason to change per user or club.
+const CLUB_CHAT_EMOJI = [
+  "💪","🔥","🏋️","🏃","🚴","🥇","🏆","👏","🙌","💯",
+  "😂","😅","😍","😎","🤩","😴","🤕","🥵","🥶","😤",
+  "👍","👎","🙏","❤️","💚","🎉","✅","⏱️","🚀","☕",
+];
+el("club-chat-emoji-menu").innerHTML = CLUB_CHAT_EMOJI
+  .map((e) => `<button type="button">${e}</button>`)
+  .join("");
+el("club-chat-emoji-menu").querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = el("club-chat-input");
+    input.value += btn.textContent;
+    input.focus();
+    hide("club-chat-emoji-menu");
+  });
+});
+el("club-chat-emoji-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  hide("club-chat-attach-menu"); // mutually exclusive with the attach popover above
+  el("club-chat-emoji-menu").classList.toggle("hidden");
+});
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".club-chat-attach-wrap")) hide("club-chat-attach-menu");
+  if (!e.target.closest(".club-chat-attach-wrap")) {
+    hide("club-chat-attach-menu");
+    hide("club-chat-emoji-menu");
+  }
 });
 el("club-chat-camera-btn").addEventListener("click", () => {
   hide("club-chat-attach-menu");
