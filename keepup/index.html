@@ -800,6 +800,29 @@
     font-size: 17px; line-height: 1; cursor: pointer; color: var(--text-muted);
   }
   .club-chat-emoji-tabs button.active { background: var(--accent-soft); color: var(--accent); }
+  /* GIF picker (user question 09-10/09-20). Text badge, not an icon — no single universal glyph
+     for "GIF" the way a camera/paperclip has one; same treatment .club-chat-pill-icon's emoji
+     button already gives a text glyph. Explicit padding:0/min-width/min-height:0 for the same
+     "the page's global button reset otherwise wins" reason .club-chat-pill-icon's own comment
+     already documents — this button just adds its own font-size/font-weight on top of that base. */
+  .club-chat-gif-btn { font-size: 9px; font-weight: 800; letter-spacing: 0.02em; }
+  .club-chat-gif-panel { padding-bottom: 0; }
+  .club-chat-gif-body {
+    flex: 1; overflow-y: auto; padding: 10px 12px; min-height: 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start;
+  }
+  .club-chat-gif-hint { grid-column: 1 / -1; text-align: center; padding: 24px 0; font-size: 13px; }
+  .club-chat-gif-tile {
+    width: 100%; aspect-ratio: 1.4; border-radius: 10px; overflow: hidden; cursor: pointer;
+    background: var(--card); border: none; padding: 0; min-width: 0; min-height: 0;
+  }
+  .club-chat-gif-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* GIPHY's API terms require attributing them somewhere in results UI — small, unobtrusive,
+     same spirit as any other required third-party attribution line. */
+  .club-chat-gif-attribution {
+    flex-shrink: 0; text-align: center; font-size: 10px; color: var(--text-muted);
+    padding: 4px 0 6px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
@@ -2243,6 +2266,11 @@
         <button type="button" class="club-chat-pill-icon" id="club-chat-camera-btn" aria-label="Take a photo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </button>
+        <!-- GIF picker (user question 09-10: "are we able to send Gif?" — deferred pending a
+             provider API key, resumed 09-20: "can we work on gif?"). GIPHY, not the originally
+             chosen Tenor — Google discontinued Tenor to new API clients in Jan 2026 and existing
+             keys stopped working after Jun 30 2026, already passed by the time this was built. -->
+        <button type="button" class="club-chat-pill-icon club-chat-gif-btn" id="club-chat-gif-btn" aria-label="Send a GIF">GIF</button>
       </div>
       <button type="button" class="club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -2260,6 +2288,20 @@
       </div>
       <div class="club-chat-emoji-body" id="club-chat-emoji-body"></div>
       <div class="club-chat-emoji-tabs" id="club-chat-emoji-tabs"></div>
+    </div>
+    <!-- GIF picker (user question 09-10: "are we able to send Gif?", resumed 09-20) — same
+         full-width-panel-below-the-composer shape as the emoji panel above, minus the
+         categories/tabs (GIPHY's search endpoint is the only way results are ever shown here,
+         there's no category browse). GIPHY_ATTRIBUTION note: their API terms require showing the
+         GIPHY logo somewhere in the results UI, hence #club-chat-gif-attribution below. -->
+    <div class="club-chat-emoji-panel club-chat-gif-panel hidden" id="club-chat-gif-panel">
+      <div class="club-chat-emoji-search-wrap">
+        <input type="text" id="club-chat-gif-search" placeholder="Search GIFs" />
+      </div>
+      <div class="club-chat-gif-body" id="club-chat-gif-body">
+        <p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>
+      </div>
+      <p class="club-chat-gif-attribution" id="club-chat-gif-attribution">Powered by GIPHY</p>
     </div>
     <!-- Reaction picker (user request 09-12/09-13: "long press and react" / "i should be able to
          click many emoji, it should not close on the first emoji") — a small floating strip
@@ -2658,6 +2700,16 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // is on-device now (extractWorkoutFieldsFromOcr below), no Edge Function call for it anymore.
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// GIF picker (user question 09-10: "are we able to send Gif?", resumed 09-20) — GIPHY, not the
+// originally chosen Tenor: Google discontinued Tenor to new API clients in Jan 2026, existing
+// keys stopped working after Jun 30 2026 (already passed by the time this was built). Placeholder
+// below — get a free key at developers.giphy.com ("Create an API Key") and paste it in; until
+// then searchGiphyGifs (JS, further down) short-circuits to an empty result rather than firing
+// requests that would just fail. This key is meant to be public the same way SUPABASE_ANON_KEY
+// above is (GIPHY's own client-side/browser embed use case is exactly this), so no different
+// handling needed than any other constant in this file.
+const GIPHY_API_KEY = "YOUR_GIPHY_API_KEY_HERE";
 
 const el = (id) => document.getElementById(id);
 const show = (id) => el(id).classList.remove("hidden");
@@ -5456,6 +5508,27 @@ async function sendClubChatImage(file) {
   }
 }
 
+/** Sends a GIF picked from the search panel below — no upload step needed unlike
+ *  sendClubChatImage above, since the url is already hosted on GIPHY's own CDN. Same
+ *  optimistic-append/explicit-shared-id/revert-on-failure shape either way. */
+async function sendClubChatGif(url) {
+  if (!currentClubDetail || !url) return;
+  const group = currentClubDetail;
+  const replyToId = clubChatReplyTarget?.id ?? null;
+  cancelClubChatReply();
+  hide("club-chat-gif-panel");
+  const localId = safeRandomUUID();
+  appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body: null, image_url: url, reply_to_id: replyToId });
+  const { error } = await supabase
+    .from("club_messages")
+    .insert({ id: localId, group_id: group.id, sender_id: currentSession.user.id, image_url: url, reply_to_id: replyToId });
+  if (error) {
+    console.error("Club chat GIF send error:", error);
+    el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
+    alert("Couldn't send that GIF.");
+  }
+}
+
 el("club-chat-open-btn").addEventListener("click", openClubChat);
 // Deliberately NOT the generic [data-close-screen] auto-wiring (openScreen()'s own pattern) —
 // this needs to run closeClubChatCleanup specifically (the realtime teardown), not just hide the
@@ -5805,6 +5878,7 @@ el("club-chat-emoji-btn").addEventListener("click", (e) => {
   if (opening) {
     el("club-chat-emoji-search").value = ""; // start each open on the full picker, not a stale search
     renderEmojiPanel(); // picks up anything added to Recents since last render
+    hide("club-chat-gif-panel"); // only one panel open at a time (user request 09-20's own GIF panel)
   }
   panel.classList.toggle("hidden");
   setClubChatEmojiToggleIcon(opening);
@@ -5817,10 +5891,11 @@ el("club-chat-emoji-btn").addEventListener("click", (e) => {
 });
 // Switching back to typing = switching back to the keyboard, same as WhatsApp's own picker —
 // tapping the message field closes the emoji panel instead of it just sitting there stacked
-// under a now-focused keyboard.
+// under a now-focused keyboard. Closes the GIF panel too (user request 09-20) for the same reason.
 el("club-chat-input").addEventListener("focus", () => {
   hide("club-chat-emoji-panel");
   setClubChatEmojiToggleIcon(false);
+  hide("club-chat-gif-panel");
 });
 el("club-chat-image-input").addEventListener("change", (e) => {
   const file = e.target.files?.[0];
@@ -5831,6 +5906,70 @@ el("club-chat-camera-input").addEventListener("change", (e) => {
   const file = e.target.files?.[0];
   e.target.value = "";
   if (file) sendClubChatImage(file);
+});
+
+// ---------- GIF picker (user question 09-10: "are we able to send Gif?", resumed 09-20) ----------
+// GIPHY's real search endpoint/response shape, confirmed against their own docs before writing
+// this — fixed_width for the picker's own small grid tiles, fixed_height (a real-sized-but-not-
+// huge rendition, not the giant "original") for what actually gets sent as the message, same
+// "don't send the biggest possible file" restraint most chat apps apply to GIFs.
+async function searchGiphyGifs(query) {
+  if (!query.trim() || GIPHY_API_KEY === "YOUR_GIPHY_API_KEY_HERE") return [];
+  try {
+    const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`GIPHY search failed: ${res.status}`);
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error("GIF search error:", err);
+    return [];
+  }
+}
+function clubChatGifGridHtml(gifs) {
+  return gifs.map((g) => `
+    <button type="button" class="club-chat-gif-tile" data-send-url="${g.images.fixed_height.url}">
+      <img src="${g.images.fixed_width.url}" alt="" loading="lazy" />
+    </button>
+  `).join("");
+}
+// Debounced (400ms) — each keystroke cancels the previous pending search rather than firing one
+// request per character, same restraint any type-ahead search needs.
+let clubChatGifSearchTimer = null;
+el("club-chat-gif-search").addEventListener("input", (e) => {
+  const query = e.target.value;
+  clearTimeout(clubChatGifSearchTimer);
+  const body = el("club-chat-gif-body");
+  if (!query.trim()) {
+    body.innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
+    return;
+  }
+  clubChatGifSearchTimer = setTimeout(async () => {
+    body.innerHTML = `<p class="muted club-chat-gif-hint">Searching…</p>`;
+    const gifs = await searchGiphyGifs(query);
+    body.innerHTML = gifs.length > 0
+      ? clubChatGifGridHtml(gifs)
+      : `<p class="muted club-chat-gif-hint">No GIFs found</p>`;
+  }, 400);
+});
+// Event delegation (not per-tile listeners) — same reasoning the reaction picker/reply-jump
+// delegates elsewhere in this file already use: tiles get replaced wholesale on every search,
+// individual listeners would need re-attaching on every render.
+el("club-chat-gif-body").addEventListener("click", (e) => {
+  const tile = e.target.closest(".club-chat-gif-tile");
+  if (tile) sendClubChatGif(tile.dataset.sendUrl);
+});
+el("club-chat-gif-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const panel = el("club-chat-gif-panel");
+  const opening = panel.classList.contains("hidden");
+  if (opening) {
+    hide("club-chat-emoji-panel"); // only one panel open at a time
+    setClubChatEmojiToggleIcon(false);
+    el("club-chat-gif-search").value = "";
+    el("club-chat-gif-body").innerHTML = `<p class="muted club-chat-gif-hint" id="club-chat-gif-hint">Search for a GIF to send</p>`;
+  }
+  panel.classList.toggle("hidden");
 });
 
 // Rename/Invite icon buttons (user request 08-26) — reveal their own field, hide the other one
