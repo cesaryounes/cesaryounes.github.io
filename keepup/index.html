@@ -545,15 +545,19 @@
      ModalBottomSheet's own open/close motion. Scoped to this one sheet (not the shared .hidden
      helper every other modal/element uses) — see openClubmateWorkouts/closeClubmateWorkouts. */
   #clubmate-workouts-card { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
-  /* ---- Club chat (0132_club_chat.sql, user request 09-08) — same slide-up .modal-card shape as
-     clubmate-workouts-card, just taller (a message list wants more room than a workout list) and
-     laid out as a column so the composer stays pinned under a scrolling message list. Bubble
-     colors mirror ClubChatBubble.kt's isMine ? AccentSoft : DarkBg exactly. ---- */
-  #club-chat-card {
-    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    height: 78vh; display: flex; flex-direction: column;
-  }
-  .club-chat-list { list-style: none; margin: 0; padding: 4px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  /* ---- Club chat (0132_club_chat.sql, user request 09-08) — a full .screen-overlay (see its own
+     HTML comment for why, user report 09-10), laid out as a column so the composer stays pinned
+     under a scrolling message list rather than the generic .screen-overlay's own overflow-y:auto
+     scrolling the whole screen (which would let the composer scroll out of view). Bubble colors
+     mirror ClubChatBubble.kt's isMine ? gradient : translucent-overlay exactly. ---- */
+  /* .screen-overlay's own position:fixed + inset:0 already pins this to exactly the viewport
+     size — just switching its overflow from auto (whole screen scrolls) to a flex column with
+     the message list as the one scrolling child. */
+  /* z-index above the generic .screen-overlay (40) — chat can be opened from ON TOP of
+     screen-club-detail (its header icon) as well as directly from the leaderboard, and needs to
+     stack above the former reliably rather than depending on DOM source order. */
+  #screen-club-chat { display: flex; flex-direction: column; overflow-y: hidden; z-index: 50; }
+  .club-chat-list { list-style: none; margin: 0; padding: 4px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
   .club-chat-row { display: flex; align-items: flex-end; gap: 6px; }
   .club-chat-row.mine { justify-content: flex-end; }
   .club-chat-bubble-wrap { max-width: 75%; display: flex; flex-direction: column; }
@@ -1995,46 +1999,55 @@
 
   <!-- Club chat (0132_club_chat.sql, user request 09-08: "can we have a chat per club? where
        people in the same club can chat and share screenshot. the closest to whatsapp
-       functionality") — opened via the header icon on screen-club-detail above. Same
-       modal-backdrop bottom-sheet shape as clubmate-workouts-backdrop, just its own taller card
-       (#club-chat-card, see CSS) since a message list wants more room than a workout list. New
-       messages arrive over Supabase Realtime (openClubChat() below) rather than polling, same
-       delivery mechanism ClubChatScreen.kt uses on Android. -->
-  <div class="modal-backdrop hidden" id="club-chat-backdrop">
-    <div class="modal-card" id="club-chat-card">
-      <div class="sheet-handle"></div>
-      <p class="section-label" id="club-chat-title" style="margin-bottom:10px;">Chat</p>
-      <p class="muted" id="club-chat-empty">Loading…</p>
-      <ul class="club-chat-list hidden" id="club-chat-list"></ul>
-      <div class="club-chat-composer">
-        <!-- "+" attachment menu (user request 09-09: "replace the camera with a +, either
-             gallery or take a photo") — replaces the old single camera-icon button that only
-             ever opened the gallery picker. club-chat-camera-input's capture="environment" is
-             what routes straight to the device camera on mobile; there's no separate native
-             camera API on the web, a file input with that attribute is the real mechanism. -->
-        <div class="club-chat-attach-wrap">
-          <button type="button" class="club-chat-icon-btn" id="club-chat-attach-btn" aria-label="Attach a photo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <div class="club-chat-attach-menu hidden" id="club-chat-attach-menu">
-            <button type="button" id="club-chat-camera-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              Take Photo
-            </button>
-            <button type="button" id="club-chat-gallery-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-              Choose from Gallery
-            </button>
-          </div>
-        </div>
-        <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
-        <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+       functionality") — opened via the header icon on screen-club-detail above.
+       FIX (user report 09-10 — "scrolling in the chat lags, and makes the conversation close,
+       maybe it should on a separate screen?"): was a modal-backdrop bottom sheet with a hand-rolled
+       swipe-down-to-close gesture (attachSwipeDownToClose) that tracked scrollTop on the OUTER
+       card — but the actual scrollable element was always the INNER #club-chat-list (its own
+       overflow-y:auto), so the outer card's scrollTop stayed 0 regardless of how far into the
+       conversation you'd scrolled, misreading an ordinary downward scroll as a dismiss swipe. A
+       full .screen-overlay (same shape screen-club-detail/screen-club-audit already use) has no
+       swipe-to-dismiss gesture at all — only the explicit back arrow — which removes this entire
+       class of bug rather than patching the scrollTop target, and matches the user's own
+       suggestion directly. -->
+  <div class="screen-overlay hidden" id="screen-club-chat">
+    <div class="screen-header">
+      <button class="screen-back-btn" id="club-chat-back-btn" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title" id="club-chat-title" style="flex:1;">Chat</p>
+    </div>
+    <p class="muted" id="club-chat-empty">Loading…</p>
+    <ul class="club-chat-list hidden" id="club-chat-list"></ul>
+    <div class="club-chat-composer">
+      <!-- "+" attachment menu (user request 09-09: "replace the camera with a +, either
+           gallery or take a photo") — replaces the old single camera-icon button that only
+           ever opened the gallery picker. club-chat-camera-input's capture="environment" is
+           what routes straight to the device camera on mobile; there's no separate native
+           camera API on the web, a file input with that attribute is the real mechanism. -->
+      <div class="club-chat-attach-wrap">
+        <button type="button" class="club-chat-icon-btn" id="club-chat-attach-btn" aria-label="Attach a photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
-        <input type="file" id="club-chat-image-input" accept="image/*" class="hidden" />
-        <input type="file" id="club-chat-camera-input" accept="image/*" capture="environment" class="hidden" />
+        <div class="club-chat-attach-menu hidden" id="club-chat-attach-menu">
+          <button type="button" id="club-chat-camera-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take Photo
+          </button>
+          <!-- FIX (user report 09-10 — "Choose from library is too long"): "Choose from Gallery"
+               was wrapping onto two lines in the popover at typical phone widths. -->
+          <button type="button" id="club-chat-gallery-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            Gallery
+          </button>
+        </div>
       </div>
-      <button class="btn-text" id="club-chat-close-btn" style="margin-top:6px;">Close</button>
+      <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
+      <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+      <input type="file" id="club-chat-image-input" accept="image/*" class="hidden" />
+      <input type="file" id="club-chat-camera-input" accept="image/*" capture="environment" class="hidden" />
     </div>
   </div>
 
@@ -4712,11 +4725,11 @@ async function openClubChat() {
   show("club-chat-empty");
   hide("club-chat-list");
   el("club-chat-input").value = "";
-  show("club-chat-backdrop");
-  const card = el("club-chat-card");
-  card.style.transform = "translateY(100%)";
-  void card.offsetHeight;
-  requestAnimationFrame(() => { card.style.transform = "translateY(0)"; });
+  show("screen-club-chat");
+  // openOverlay/closeClubChatCleanup (not the generic data-close-screen wiring) so the browser
+  // back button/gesture runs the SAME realtime teardown the explicit back arrow does — see
+  // closeClubChatCleanup's own comment for why that matters.
+  openOverlay(closeClubChatCleanup);
 
   const { data, error } = await supabase
     .from("club_messages")
@@ -4748,9 +4761,15 @@ async function openClubChat() {
 }
 
 function closeClubChat() {
-  const card = el("club-chat-card");
-  card.style.transform = "translateY(100%)";
-  setTimeout(() => hide("club-chat-backdrop"), 280);
+  closeOverlay(closeClubChatCleanup);
+}
+
+// The actual close work — called either from closeClubChat() (explicit back-arrow tap) or
+// directly by the popstate handler (browser back button/gesture, openOverlay's own mechanism).
+// Both paths MUST run this, not just hide the screen — an unsubscribed channel left running is
+// exactly the cross-club message leak AppViewModel.kt's own 09-09 fix addressed on Android.
+function closeClubChatCleanup() {
+  hide("screen-club-chat");
   if (clubChatChannel) {
     supabase.removeChannel(clubChatChannel);
     clubChatChannel = null;
@@ -4820,6 +4839,16 @@ function appendClubChatMessage(message) {
   list.scrollTop = list.scrollHeight;
 }
 
+// FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
+// disappears"): the optimistic bubble used a client-generated id, but the INSERT below never
+// passed that id along — Postgres assigned its own via club_messages.id's gen_random_uuid()
+// default, so the Realtime echo of this exact insert arrived with a DIFFERENT id than the
+// optimistic copy's. appendClubChatMessage's dedup check (by id) couldn't recognize them as the
+// same message, so both stayed on screen as two separate bubbles — until the next full reload
+// (openClubChat's history select), which only ever returns the one real row, making the
+// optimistic "ghost" disappear. Passing the same client-generated id straight into the insert
+// makes the echo match and get skipped, same as it already does for a genuinely different
+// message.
 async function sendClubChatText() {
   if (!currentClubDetail) return;
   const input = el("club-chat-input");
@@ -4830,7 +4859,7 @@ async function sendClubChatText() {
   appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body, image_url: null });
   const { error } = await supabase
     .from("club_messages")
-    .insert({ group_id: currentClubDetail.id, sender_id: currentSession.user.id, body });
+    .insert({ id: localId, group_id: currentClubDetail.id, sender_id: currentSession.user.id, body });
   if (error) {
     console.error("Club chat send error:", error);
     el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
@@ -4839,24 +4868,30 @@ async function sendClubChatText() {
 }
 
 /** Reuses the "avatars" bucket, same as club-photo-btn above — its write policy only checks the
- *  FIRST path segment against auth.uid(), so "{userId}/chat/{groupId}/{uuid}.jpg" needs no new
- *  bucket or storage.objects policy (see 0132_club_chat.sql's header for why). */
+ *  FIRST path segment against auth.uid(), so "{userId}/chat/{groupId}/{uuid}.<ext>" needs no new
+ *  bucket or storage.objects policy (see 0132_club_chat.sql's header for why). contentType already
+ *  used the File object's own real .type (so a GIF, user question 09-10, already animated
+ *  correctly here) — the extension itself was hardcoded to .jpg regardless, which this now
+ *  matches to the real type too, purely for a filename that isn't misleading. */
 async function sendClubChatImage(file) {
   if (!currentClubDetail || !file) return;
   const group = currentClubDetail;
   try {
-    const path = `${currentSession.user.id}/chat/${group.id}/${safeRandomUUID()}.jpg`;
+    const contentType = file.type || "image/jpeg";
+    const extension = contentType.split("/")[1] || "jpg";
+    const path = `${currentSession.user.id}/chat/${group.id}/${safeRandomUUID()}.${extension}`;
     const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
-      contentType: file.type || "image/jpeg",
+      contentType,
     });
     if (upErr) throw upErr;
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     const imageUrl = data.publicUrl;
+    // Same explicit-shared-id fix as sendClubChatText above.
     const localId = safeRandomUUID();
     appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body: null, image_url: imageUrl });
     const { error: insErr } = await supabase
       .from("club_messages")
-      .insert({ group_id: group.id, sender_id: currentSession.user.id, image_url: imageUrl });
+      .insert({ id: localId, group_id: group.id, sender_id: currentSession.user.id, image_url: imageUrl });
     if (insErr) {
       console.error("Club chat image send error:", insErr);
       el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
@@ -4869,11 +4904,10 @@ async function sendClubChatImage(file) {
 }
 
 el("club-chat-open-btn").addEventListener("click", openClubChat);
-el("club-chat-close-btn").addEventListener("click", closeClubChat);
-el("club-chat-backdrop").addEventListener("click", (e) => {
-  if (e.target.id === "club-chat-backdrop") closeClubChat();
-});
-attachSwipeDownToClose(el("club-chat-card"), closeClubChat);
+// Deliberately NOT the generic [data-close-screen] auto-wiring (openScreen()'s own pattern) —
+// this needs to run closeClubChatCleanup specifically (the realtime teardown), not just hide the
+// screen, and openClubChat() already calls openOverlay(closeClubChatCleanup) itself directly.
+el("club-chat-back-btn").addEventListener("click", closeClubChat);
 el("club-chat-send-btn").addEventListener("click", sendClubChatText);
 el("club-chat-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendClubChatText();
