@@ -5613,19 +5613,18 @@ function addRecentEmoji(emoji) {
     // "one nicety doesn't work" fallback other localStorage uses on this page already accept.
   }
 }
-// FIX (user report 09-16 — "still cant choose many emojis...why?"): insertEmoji re-focuses the
-// text input after every tap (so the cursor/keyboard stays where you were typing), but the
-// input's own "focus" listener below closes the emoji panel — meant for when you tap the input
-// directly to go back to typing, but it couldn't tell that focus apart from this programmatic
-// one, so it was closing the panel after literally the first emoji every time. This flag lets
-// the focus listener recognize "I caused this" and skip the close just once, the same
-// suppress-next-event pattern used for the reaction picker's phantom-click fix above.
-let clubChatSuppressEmojiPanelCloseOnFocus = false;
+// FIX (user report 09-16 — "still cant choose many emojis...why?" then "when choosing emojis,
+// the keyboard should not go up"): insertEmoji used to re-focus the text input after every tap
+// so the cursor stayed put for continued typing — but on a real phone, focusing a text input
+// pops the on-screen keyboard, which fought with the emoji panel for screen space and wasn't
+// wanted at all (WhatsApp's own picker never brings up the keyboard on an emoji tap either).
+// Dropped the focus() call entirely: the emoji still lands in the field either way since this
+// just appends to input.value directly, and with no focus() call there's no longer a "was this
+// focus programmatic or a real tap" question for the input's own focus listener below to get
+// wrong — that's also what was silently closing the panel after the first emoji before.
 function insertEmoji(emoji) {
   const input = el("club-chat-input");
   input.value += emoji;
-  clubChatSuppressEmojiPanelCloseOnFocus = true;
-  input.focus();
   addRecentEmoji(emoji);
 }
 // emojis: plain glyph strings (Recents/search results) OR [glyph, keywords] tuples (a category) —
@@ -5713,10 +5712,6 @@ el("club-chat-emoji-btn").addEventListener("click", (e) => {
 // tapping the message field closes the emoji panel instead of it just sitting there stacked
 // under a now-focused keyboard.
 el("club-chat-input").addEventListener("focus", () => {
-  if (clubChatSuppressEmojiPanelCloseOnFocus) {
-    clubChatSuppressEmojiPanelCloseOnFocus = false;
-    return;
-  }
   hide("club-chat-emoji-panel");
   setClubChatEmojiToggleIcon(false);
 });
