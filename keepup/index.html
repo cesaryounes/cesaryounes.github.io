@@ -317,6 +317,12 @@
   }
   .club-pill-chat-icon:hover, .club-pill-chat-icon:active { opacity: 1; }
   .club-pill-chat-icon svg { width: 14px; height: 14px; display: block; }
+  /* Unread indicator (user request 09-19: "change color if icon messgage when there are pending
+     messages") — overrides color:inherit above. --danger (coral) rather than --accent (lime):
+     an active pill's own background IS --accent, so an accent-colored icon would nearly vanish
+     against it; coral reads clearly on both the raised-card default and the accent-lime active
+     background. See fn_club_chat_unread_status / refreshClubPillUnreadDots, JS. */
+  .club-pill-chat-icon.unread { color: var(--danger); opacity: 1; }
 
   /* Pending club invites addressed to me (user report 09-09) — same amber-tinted-row treatment
      GroupsScreen.kt's own "CLUB INVITES" card uses. */
@@ -1742,6 +1748,20 @@
               <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-muted); margin-bottom:8px;">Counts toward</label>
               <ul class="club-list" id="saved-clubs-list"></ul>
             </div>
+            <!-- Share this workout's photo to club chat (user request 09-19: "when iphone peole
+                 upload a workout from screen. can send the same picture used to the chat of the
+                 clubs they are in? with a message that challenges the other") — their own
+                 follow-up picked "ask each time" over posting automatically, so this is a real
+                 opt-in choice per workout: pick which clubs (if any), nothing sends unless
+                 workout-share-btn is actually tapped. Only ever shown for a real photo entry
+                 (currentEntryMode === "photo") — see showSavedStep, JS — since a manual entry has
+                 no photo to share. -->
+            <div id="workout-share-wrap" class="hidden" style="text-align:left; margin-bottom:16px;">
+              <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-muted); margin-bottom:8px;">Share to club chat</label>
+              <ul class="club-list" id="workout-share-clubs-list"></ul>
+              <button type="button" class="btn-secondary" id="workout-share-btn" style="margin-top:10px; width:100%;">Share to selected clubs</button>
+              <p class="muted hidden" id="workout-share-status" style="margin-top:8px; margin-bottom:0;"></p>
+            </div>
             <div class="btn-row">
               <button class="btn-secondary" id="log-another-btn">Log another</button>
               <button class="btn-primary" id="done-submit-btn">Done</button>
@@ -2507,6 +2527,22 @@
          see NOTIFICATION_PREF_TOGGLES. No row for the inactivity nudge, matching Android — that
          one's mandatory, no per-type opt-out there either. -->
     <div id="settings-notify-prefs"></div>
+
+    <!-- Auto-shared workout photos in club chat (user request 09-19: "there should be a setting
+         for these auto workout sending in the receiver end. maybe a user wants to only see
+         actual users messages") — a display preference, not a notification: this doesn't stop
+         clubmates from sharing, it only controls whether THIS viewer sees those shares mixed in
+         with real typed messages (clubChatHideAutoShare, JS). -->
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
+        <div class="toggle-label">Workout shares in club chat</div>
+        <div class="toggle-sub">Photos clubmates choose to share after a workout. Turn off to only see real messages.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="settings-auto-share-toggle" checked />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
   </div>
 
   <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
@@ -4017,6 +4053,7 @@ function renderScopePills() {
     const chatBtn = document.createElement("button");
     chatBtn.type = "button";
     chatBtn.className = "club-pill-chat-icon";
+    chatBtn.dataset.chatGroupId = c.id;
     chatBtn.setAttribute("aria-label", `Open ${c.name} chat`);
     chatBtn.innerHTML = CLUB_PILL_CHAT_ICON_SVG;
     chatBtn.addEventListener("click", (e) => {
@@ -4026,6 +4063,27 @@ function renderScopePills() {
     });
     pill.appendChild(chatBtn);
     wrap.appendChild(pill);
+  });
+  refreshClubPillUnreadDots();
+}
+
+// Patches the .unread class onto each club's chat icon after the pills above are already in the
+// DOM — a separate pass (not folded into the loop above) since it's its own round-trip
+// (fn_club_chat_unread_status) that shouldn't block the pills themselves from rendering.
+async function refreshClubPillUnreadDots() {
+  if (myClubs.length === 0) return;
+  const { data, error } = await supabase.rpc("fn_club_chat_unread_status");
+  if (error) {
+    console.error("Couldn't load chat unread status:", error);
+    return;
+  }
+  // Cleared up front, not just added below — renderScopePills' own full rebuild (wrap.innerHTML =
+  // "") already resets this naturally on that path, but closeClubChatCleanup calls this directly
+  // without a rebuild, so without this line a just-read club's icon would never actually clear.
+  el("club-pills").querySelectorAll(".club-pill-chat-icon.unread").forEach((b) => b.classList.remove("unread"));
+  (data || []).forEach((row) => {
+    if (!row.out_has_unread) return;
+    el("club-pills").querySelector(`.club-pill-chat-icon[data-chat-group-id="${row.out_group_id}"]`)?.classList.add("unread");
   });
 }
 
@@ -4977,9 +5035,10 @@ async function openClubChat() {
   // opening the club-detail screen first (openClubDetail's own fn_get_club_members call). Fine
   // while chat was only reachable from there, but the leaderboard's pill chat icon (09-18) opens
   // chat directly and skips that step, so every sender fell back to clubChatSenderLabel's
-  // "Member" default. Run alongside the messages fetch (Promise.all, not sequential) rather than
-  // after it — also one fewer round-trip in the critical path than doing this as a second await.
-  const [{ data, error }, membersRes] = await Promise.all([
+  // "Member" default. Auto-share display preference (09-19, see clubChatHideAutoShare's own
+  // comment) fetched here too. All three run together (Promise.all, not sequential) rather than
+  // one after another — no extra round-trips added to the critical path for either.
+  const [{ data, error }, membersRes, prefRes] = await Promise.all([
     supabase
       .from("club_messages")
       .select("*")
@@ -4987,6 +5046,7 @@ async function openClubChat() {
       .order("created_at", { ascending: true })
       .limit(200),
     supabase.rpc("fn_get_club_members", { p_group_id: group.id }),
+    supabase.from("profiles").select("show_club_auto_share_messages").eq("id", currentSession.user.id).single(),
   ]);
   if (mySeq !== clubChatOpenSeq) return; // a newer openClubChat() call has since taken over
   if (error) {
@@ -4996,6 +5056,17 @@ async function openClubChat() {
   }
   if (membersRes.error) console.error("Couldn't load club members for chat:", membersRes.error);
   else currentClubMembers = membersRes.data || [];
+  // Marks this club's chat read (09-19's unread indicator on the leaderboard pill — see
+  // fn_club_chat_unread_status/renderScopePills) — fire-and-forget, doesn't block the chat from
+  // opening, and non-fatal if it fails (worst case the pill just stays marked unread a bit
+  // longer, not a broken chat).
+  supabase.rpc("fn_mark_club_chat_read", { p_group_id: group.id }).then(({ error: readErr }) => {
+    if (readErr) console.error("Couldn't mark club chat read:", readErr);
+  });
+  // Defaults to showing them (false = don't hide) if the read fails for any reason — same
+  // fail-open choice as every other best-effort preference read on this page; a real column
+  // default of true backs this up server-side regardless.
+  clubChatHideAutoShare = prefRes.error ? false : prefRes.data?.show_club_auto_share_messages === false;
   renderClubChatMessages(data || []);
   refreshClubChatReactions(Array.from(clubChatMessagesById.keys()));
 
@@ -5058,6 +5129,11 @@ function closeClubChatCleanup() {
     supabase.removeChannel(clubChatReactionsChannel);
     clubChatReactionsChannel = null;
   }
+  // Clears that club's own unread dot on the leaderboard pill right away, rather than waiting for
+  // some later unrelated renderScopePills() call to happen to catch it — openClubChat already
+  // marked it read server-side (fn_mark_club_chat_read) the moment the chat opened, this just
+  // syncs the icon to match. No-op harmlessly if the leaderboard pills aren't even on screen.
+  if (el("club-pills")) refreshClubPillUnreadDots();
 }
 
 function clubChatSenderLabel(senderId) {
@@ -5143,10 +5219,21 @@ function clubChatBubbleHtml(message) {
   `;
 }
 
+// Receiver-side preference (user request 09-19: "there should be a setting for these auto
+// workout sending in the receiver end. maybe a user wants to only see actual users messages") —
+// refreshed at the top of openClubChat every time a chat opens (see there), not cached across
+// screens: simpler than keeping a shared value in sync with the Settings toggle, and this is read
+// often enough (once per chat open) that a fresh fetch each time costs nothing noticeable.
+let clubChatHideAutoShare = false;
+
 function renderClubChatMessages(rows) {
   const list = el("club-chat-list");
+  // Kept complete (every row, including hidden auto-share ones) — reply-preview lookups
+  // (clubChatReplyPreviewHtml, jumpToClubChatMessage) still need to resolve a reply pointing at
+  // one even if this viewer has chosen not to see it rendered directly.
   clubChatMessagesById = new Map(rows.map((m) => [m.id, m]));
-  if (rows.length === 0) {
+  const visibleRows = clubChatHideAutoShare ? rows.filter((m) => !m.is_auto_share) : rows;
+  if (visibleRows.length === 0) {
     el("club-chat-empty").textContent = "No messages yet — say hi to your club.";
     show("club-chat-empty");
     hide("club-chat-list");
@@ -5154,18 +5241,21 @@ function renderClubChatMessages(rows) {
   }
   hide("club-chat-empty");
   show("club-chat-list");
-  list.innerHTML = rows.map(clubChatBubbleHtml).join("");
+  list.innerHTML = visibleRows.map(clubChatBubbleHtml).join("");
   list.scrollTop = list.scrollHeight;
 }
 
 /** Appends one incoming message — used both by the Realtime INSERT handler (every device,
  *  including the sender's own once its optimistic copy below is de-duped by id) and nowhere
  *  else, so the message list only ever grows here, never re-renders wholesale after the initial
- *  load. */
+ *  load. Still indexed into clubChatMessagesById even when not rendered (hidden auto-share, this
+ *  viewer's own preference) — same "kept complete for reply lookups" reasoning as
+ *  renderClubChatMessages above. */
 function appendClubChatMessage(message) {
   const list = el("club-chat-list");
   if (list.querySelector(`[data-id="${message.id}"]`)) return; // this device's own optimistic send
   clubChatMessagesById.set(message.id, message);
+  if (clubChatHideAutoShare && message.is_auto_share) return;
   hide("club-chat-empty");
   show("club-chat-list");
   list.insertAdjacentHTML("beforeend", clubChatBubbleHtml(message));
@@ -6898,6 +6988,38 @@ async function refreshNotifyPrefToggles() {
   setNotifyPrefRowsDisabled(!el("settings-push-toggle").checked);
 }
 
+// Auto-shared workout photos in club chat (user request 09-19) — a plain profiles column, not a
+// notification, so a direct .update() rather than fn_set_notification_preference (that RPC is
+// specifically for the 7 notify_* columns above and doesn't know this one exists).
+async function refreshAutoShareToggle() {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("show_club_auto_share_messages")
+    .eq("id", currentSession.user.id)
+    .single();
+  if (error) {
+    console.error("Couldn't load workout-share preference:", error);
+    return;
+  }
+  el("settings-auto-share-toggle").checked = profile?.show_club_auto_share_messages ?? true;
+}
+el("settings-auto-share-toggle").addEventListener("change", async (e) => {
+  const enabled = e.target.checked;
+  e.target.disabled = true;
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_club_auto_share_messages: enabled })
+      .eq("id", currentSession.user.id);
+    if (error) throw error;
+  } catch (err) {
+    console.error("Couldn't update workout-share preference:", err);
+    e.target.checked = !enabled;
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
 // ---------- Create a club (user request 08-21, item 2) ----------
 //
 // p_allow_score_uploads is always true, hardcoded — deliberately not a toggle here, unlike
@@ -8118,7 +8240,102 @@ async function showSavedStep(duration, calories) {
   } catch {
     hide("saved-clubs-wrap");
   }
+
+  renderWorkoutShareClubs();
 }
+
+// ---------- Share this workout's photo to club chat (user request 09-19) ----------
+
+// A random pick from this shows next to the shared photo — friendly and competitive without
+// being aggressive, matching "a message that challenges the other" without needing per-workout
+// context (exercise type, duration) to read naturally on its own; the actual stats line is
+// appended separately below, not baked into these.
+const WORKOUT_SHARE_CAPTIONS = [
+  "Just got this one in 💪 who's next?",
+  "Another one in the books — can you top it?",
+  "Challenge: match this before the week's out 🔥",
+  "Showing up today. Who's joining me?",
+  "That's today handled. Your move.",
+  "Getting after it — care to keep up?",
+  "Logged and feeling good. Beat it if you can 😏",
+  "One more for the club. Who's counting?",
+  "Today's session, done. Next?",
+  "Putting in the work — see you on the leaderboard.",
+  "That felt good. Who wants to race me next time?",
+  "Small step, real progress. Your turn.",
+];
+
+// Populates the checkbox list inside #workout-share-wrap — only shown for a real photo entry
+// (currentEntryMode/currentPhotoDataUrl, set by the photo-input flow above) with at least one
+// club to share to; a manual entry has no photo, so there's nothing to offer sharing here.
+function renderWorkoutShareClubs() {
+  const wrap = el("workout-share-wrap");
+  hide("workout-share-status");
+  if (currentEntryMode !== "photo" || !currentPhotoDataUrl || myClubs.length === 0) {
+    hide(wrap.id);
+    return;
+  }
+  const list = el("workout-share-clubs-list");
+  list.innerHTML = myClubs.map((c) => `
+    <li style="display:flex; align-items:center; justify-content:space-between; padding:8px 0;">
+      <span>${escapeHtml(c.name)}</span>
+      <label class="switch">
+        <input type="checkbox" data-share-club-id="${c.id}" />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </li>
+  `).join("");
+  el("workout-share-btn").disabled = false;
+  el("workout-share-btn").textContent = "Share to selected clubs";
+  show(wrap.id);
+}
+
+el("workout-share-btn").addEventListener("click", async () => {
+  const checked = Array.from(el("workout-share-clubs-list").querySelectorAll("[data-share-club-id]:checked"));
+  if (checked.length === 0) {
+    const status = el("workout-share-status");
+    status.textContent = "Pick at least one club first.";
+    show(status.id);
+    return;
+  }
+  const btn = el("workout-share-btn");
+  btn.disabled = true;
+  btn.textContent = "Sharing…";
+  try {
+    // One upload, reused for every club selected — same photo either way, no reason to re-upload
+    // it once per club. fetch() on a data: URL never hits the network (resolves from the string
+    // already in memory), it's just the standard way to turn one into a Blob.
+    const blob = await (await fetch(currentPhotoDataUrl)).blob();
+    const contentType = blob.type || "image/jpeg";
+    const extension = contentType.split("/")[1] || "jpg";
+    // Reuses the same "avatars" bucket / path convention club chat images already use (see
+    // sendClubChatImage) — the bucket's write policy only checks the first path segment against
+    // auth.uid(), so this needs no new bucket or storage policy either.
+    const path = `${currentSession.user.id}/chat/shared/${safeRandomUUID()}.${extension}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, blob, { contentType });
+    if (upErr) throw upErr;
+    const imageUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const caption = WORKOUT_SHARE_CAPTIONS[Math.floor(Math.random() * WORKOUT_SHARE_CAPTIONS.length)];
+    const clubIds = checked.map((cb) => cb.dataset.shareClubId);
+    const rows = clubIds.map((groupId) => ({
+      id: safeRandomUUID(), group_id: groupId, sender_id: currentSession.user.id,
+      body: caption, image_url: imageUrl, is_auto_share: true,
+    }));
+    const { error: insErr } = await supabase.from("club_messages").insert(rows);
+    if (insErr) throw insErr;
+    const status = el("workout-share-status");
+    status.textContent = `Shared to ${clubIds.length} club${clubIds.length === 1 ? "" : "s"}.`;
+    show(status.id);
+    btn.textContent = "Shared";
+  } catch (e) {
+    console.error("Couldn't share workout to club chat:", e);
+    const status = el("workout-share-status");
+    status.textContent = "Couldn't share that right now — try again.";
+    show(status.id);
+    btn.disabled = false;
+    btn.textContent = "Share to selected clubs";
+  }
+});
 
 // ---------- Workout list (view all sources; edit / delete own web uploads only) ----------
 
@@ -8400,6 +8617,7 @@ el("more-menu-settings").addEventListener("click", () => {
     await refreshPushToggleState();
     await refreshNotifyPrefToggles();
   })();
+  refreshAutoShareToggle(); // not part of the push-toggle sequence above — unrelated preference
 });
 // Profile is a real tab (#tab-profile, part of TAB_ORDER), not an overlay like Membership/Shop/
 // Settings — so this closes the popover and switches to it directly, rather than going through
