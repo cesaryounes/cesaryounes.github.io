@@ -5623,6 +5623,20 @@ async function refreshPushToggleState() {
 async function subscribeToPush() {
   const reg = await registerServiceWorker();
   if (!reg) throw new Error("This browser doesn't support push notifications.");
+  // FIX (user report 09-08 — "I think the user have the permission for notifications denied, and
+  // hence why he can't turn these on"): once denied, every browser (see maybeShowPushPrompt's own
+  // comment above) silently re-resolves requestPermission() to "denied" with NO dialog shown at
+  // all — so tapping the toggle again just re-throws the same generic message forever, with no
+  // hint that the toggle itself can no longer fix it. Checking permission BEFORE calling
+  // requestPermission() lets this branch give the one message that's actually still true: go
+  // change it in the OS settings, not "try again."
+  if (Notification.permission === "denied") {
+    throw new Error(
+      isIOS()
+        ? "Notifications are blocked for KeepUp. Open the iPhone Settings app → Notifications → KeepUp, and turn on Allow Notifications, then come back here."
+        : "Notifications are blocked for KeepUp in this browser. Check your browser or system notification settings for this site to turn them back on."
+    );
+  }
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("Notification permission was not granted.");
   const sub = await reg.pushManager.subscribe({
