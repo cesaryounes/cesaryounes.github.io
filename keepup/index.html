@@ -5233,8 +5233,18 @@ async function toggleClubChatReaction(messageId, emoji) {
   refreshClubChatReactions([messageId]);
 }
 let clubChatReactionPickerTargetId = null;
+// Set true for exactly one click right as the picker opens, and consumed by the very next
+// document click listener below (user report 09-16: "if i long press and change my mind,
+// clicking anywhere should close the emojis") — a long-press-then-release with no movement
+// still fires a trailing native "click" on the row it opened from, which would otherwise reach
+// that same listener and close the picker the instant it opened. Suppressing only that one
+// phantom click (rather than excluding all .club-chat-row clicks, the old fix) is what lets a
+// REAL later tap on any row — including the very same one — close the picker like everywhere
+// else does.
+let clubChatReactionPickerSuppressNextClick = false;
 function showClubChatReactionPicker(messageId, rowEl) {
   clubChatReactionPickerTargetId = messageId;
+  clubChatReactionPickerSuppressNextClick = true;
   const picker = el("club-chat-reaction-picker");
   const rect = rowEl.getBoundingClientRect();
   picker.style.top = `${Math.max(8, rect.top - 54)}px`;
@@ -5448,7 +5458,11 @@ el("club-chat-delete-btn").addEventListener("click", () => {
   if (messageId) deleteClubChatMessage(messageId);
 });
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#club-chat-reaction-picker") && !e.target.closest(".club-chat-row")) hideClubChatReactionPicker();
+  if (clubChatReactionPickerSuppressNextClick) {
+    clubChatReactionPickerSuppressNextClick = false;
+    return;
+  }
+  if (!e.target.closest("#club-chat-reaction-picker")) hideClubChatReactionPicker();
 });
 // Attach (paperclip) / Camera icons (user request 09-11, with a WhatsApp screenshot: "can you
 // make this?") — each is now its own direct one-tap trigger inside the input pill, same split
