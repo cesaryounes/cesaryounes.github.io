@@ -299,9 +299,24 @@
   .club-pill {
     flex-shrink: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
     background: var(--card-raised); border: 1px solid var(--hairline); color: var(--text-muted);
-    cursor: pointer; white-space: nowrap;
+    cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;
   }
   .club-pill.active { background: var(--accent); color: #0B0E14; border-color: var(--accent); }
+  /* Chat access from the leaderboard's own club pill (user request 09-18: "are we able to have
+     the chat access from the Group name?") — sits inside the pill next to the name so opening a
+     club's chat no longer needs selecting its scope first and then finding the separate button
+     that used to appear below the pills row (removed, this replaces it). stopPropagation on click
+     is what keeps a tap here from also re-triggering the pill's own setScope. Explicit padding/
+     min-width/min-height:0 because the page's global `button{...}` reset (padding, min-height)
+     otherwise wins over a plain width/height here — bitten by this exact class of bug more than
+     once already on this same chat feature. */
+  .club-pill-chat-icon {
+    display: flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+    padding: 0; min-width: 0; min-height: 0; margin: 0; background: none; border: none;
+    color: inherit; opacity: 0.6; cursor: pointer; flex-shrink: 0;
+  }
+  .club-pill-chat-icon:hover, .club-pill-chat-icon:active { opacity: 1; }
+  .club-pill-chat-icon svg { width: 14px; height: 14px; display: block; }
 
   /* Pending club invites addressed to me (user report 09-09) — same amber-tinted-row treatment
      GroupsScreen.kt's own "CLUB INVITES" card uses. */
@@ -311,15 +326,6 @@
   .club-invite-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .club-invite-by { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.02em; margin-top: 1px; }
 
-  /* Club chat entry point on the leaderboard (user request 09-09) — same accent-soft clickable
-     row shape used elsewhere on this page for a secondary-but-findable action. */
-  .lb-chat-entry { margin-bottom: 14px; }
-  .lb-chat-entry-btn {
-    display: flex; align-items: center; gap: 8px; width: 100%;
-    background: var(--accent-soft); border: none; border-radius: 12px;
-    padding: 10px 14px; color: var(--accent); font-size: 13px; font-weight: 700; cursor: pointer;
-  }
-  .lb-chat-entry-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
   .period-pills { display: flex; gap: 6px; margin-bottom: 16px; }
   .period-pill {
@@ -1891,11 +1897,6 @@
         <div class="leaderboard-flat">
           <p class="section-label" style="margin-bottom:12px;">Leaderboard</p>
           <div class="club-pills" id="club-pills"></div>
-          <!-- Club chat entry point (user request 09-09: "chat to be accessible from the club
-               leaderboard") — only shown when a specific club's scope is selected (Global/Region
-               and no scope at all have no single club to chat with). Same openClubChat() the
-               club-detail screen's header icon already calls, just reached from here too. -->
-          <div class="lb-chat-entry hidden" id="lb-chat-entry"></div>
           <p class="muted hidden" id="no-clubs-hint" style="margin-bottom:14px;">Join a club from the Club tab to see its own leaderboard too.</p>
           <div class="period-pills" id="period-pills">
             <div class="period-pill" data-period="weekly">Week</div>
@@ -3992,34 +3993,10 @@ function scopeKey(scope) {
 function setScope(scope) {
   currentScope = scope;
   renderScopePills();
-  renderLbChatEntry();
   loadClubLeaderboard();
 }
 
-// Club chat entry point (user request 09-09) — only rendered for a specific club's scope. Looks
-// the full club record up in myClubs (currentScope only carries id/name) so this reaches the same
-// openClubChat() flow the club-detail screen's header icon uses, not a second copy of it.
-function renderLbChatEntry() {
-  const wrap = el("lb-chat-entry");
-  const club = currentScope.type === "club" ? myClubs.find((c) => c.id === currentScope.id) : null;
-  if (!club) {
-    hide("lb-chat-entry");
-    wrap.innerHTML = "";
-    return;
-  }
-  wrap.innerHTML = `
-    <button type="button" class="lb-chat-entry-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-      Open ${escapeHtml(club.name)} chat
-    </button>
-  `;
-  show("lb-chat-entry");
-  wrap.querySelector(".lb-chat-entry-btn").addEventListener("click", () => {
-    currentClubDetail = club;
-    openClubChat();
-  });
-}
-
+const CLUB_PILL_CHAT_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
 function renderScopePills() {
   const wrap = el("club-pills");
   wrap.innerHTML = "";
@@ -4037,8 +4014,31 @@ function renderScopePills() {
   if (myRegionCode) {
     addPill(myRegionCode, currentScope.type === "region", () => setScope({ type: "region", code: myRegionCode }));
   }
+  // Chat access straight from the club's own pill (user request 09-18: "are we able to have the
+  // chat access from the Group name?") — replaces the old separate "Open X chat" row that used to
+  // appear below the pills only once that club's scope was already selected (09-09). A small icon
+  // inside the pill itself, next to the name, opens that club's chat directly from any pill,
+  // selected or not — one tap instead of select-then-find-the-button.
   myClubs.forEach((c) => {
-    addPill(c.name, currentScope.type === "club" && currentScope.id === c.id, () => setScope({ type: "club", id: c.id, name: c.name }));
+    const pill = document.createElement("div");
+    pill.className = "club-pill" + (currentScope.type === "club" && currentScope.id === c.id ? " active" : "");
+    const label = document.createElement("span");
+    label.textContent = c.name;
+    pill.appendChild(label);
+    pill.addEventListener("click", () => setScope({ type: "club", id: c.id, name: c.name }));
+
+    const chatBtn = document.createElement("button");
+    chatBtn.type = "button";
+    chatBtn.className = "club-pill-chat-icon";
+    chatBtn.setAttribute("aria-label", `Open ${c.name} chat`);
+    chatBtn.innerHTML = CLUB_PILL_CHAT_ICON_SVG;
+    chatBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // don't also fire the pill's own setScope
+      currentClubDetail = c;
+      openClubChat();
+    });
+    pill.appendChild(chatBtn);
+    wrap.appendChild(pill);
   });
 }
 
