@@ -4944,10 +4944,21 @@ let clubChatReplyTarget = null;
 // reactions are low-frequency enough that a full refetch per change is simple and safe rather
 // than juggling INSERT/UPDATE/DELETE payloads by hand.
 let clubChatReactionsByMessageId = new Map();
+// FIX (user report 09-19 — "when i openned the chat, from a new club, i can see messages from
+// other club! that is very dangerous!!"): openClubChat is async but had no guard against being
+// called again before its own fetch resolved — open club A, then quickly open club B before A's
+// query returns, and A's response would land LAST and overwrite B's correctly-loaded messages
+// with A's, while the header still said B. Matches exactly what was reported ("if I close and
+// open it again, seems clean" — a third call's response then legitimately lands last). Same
+// stale-response guard already used for the streak celebration sequence (celebSeq, above): bump
+// this on every call, stamp the call that owns it, and bail out after the await if a newer call
+// has since taken over.
+let clubChatOpenSeq = 0;
 
 async function openClubChat() {
   if (!currentClubDetail) return;
   const group = currentClubDetail;
+  const mySeq = ++clubChatOpenSeq;
   el("club-chat-title").textContent = group.name;
   el("club-chat-thumb").innerHTML = groupThumbnailHtml(group.name, group.photo_url);
   el("club-chat-empty").textContent = "Loading…";
@@ -4961,17 +4972,30 @@ async function openClubChat() {
   // closeClubChatCleanup's own comment for why that matters.
   openOverlay(closeClubChatCleanup);
 
-  const { data, error } = await supabase
-    .from("club_messages")
-    .select("*")
-    .eq("group_id", group.id)
-    .order("created_at", { ascending: true })
-    .limit(200);
+  // Members fetched here too now (user report 09-19: sender name "reverted back to member") —
+  // clubChatSenderLabel reads from currentClubMembers, which used to only get populated by
+  // opening the club-detail screen first (openClubDetail's own fn_get_club_members call). Fine
+  // while chat was only reachable from there, but the leaderboard's pill chat icon (09-18) opens
+  // chat directly and skips that step, so every sender fell back to clubChatSenderLabel's
+  // "Member" default. Run alongside the messages fetch (Promise.all, not sequential) rather than
+  // after it — also one fewer round-trip in the critical path than doing this as a second await.
+  const [{ data, error }, membersRes] = await Promise.all([
+    supabase
+      .from("club_messages")
+      .select("*")
+      .eq("group_id", group.id)
+      .order("created_at", { ascending: true })
+      .limit(200),
+    supabase.rpc("fn_get_club_members", { p_group_id: group.id }),
+  ]);
+  if (mySeq !== clubChatOpenSeq) return; // a newer openClubChat() call has since taken over
   if (error) {
     console.error("Couldn't load club chat:", error);
     el("club-chat-empty").textContent = "Couldn't load chat right now.";
     return;
   }
+  if (membersRes.error) console.error("Couldn't load club members for chat:", membersRes.error);
+  else currentClubMembers = membersRes.data || [];
   renderClubChatMessages(data || []);
   refreshClubChatReactions(Array.from(clubChatMessagesById.keys()));
 
