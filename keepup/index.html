@@ -561,9 +561,30 @@
   /* z-index above the generic .screen-overlay (40) — chat can be opened from ON TOP of
      screen-club-detail (its header icon) as well as directly from the leaderboard, and needs to
      stack above the former reliably rather than depending on DOM source order. */
-  #screen-club-chat { display: flex; flex-direction: column; overflow-y: hidden; z-index: 50; }
-  .club-chat-list { list-style: none; margin: 0; padding: 4px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; }
+  /* FIX (user report 09-11 — "the chat screen is not fitting on the web... scroll left and
+     right, everything should fit"): overflow-y:hidden alone leaves overflow-x at its default
+     (visible), and per the CSS spec, a "visible" axis paired with a non-visible one on the same
+     box actually COMPUTES as auto instead — so any child that overflowed horizontally (see the
+     composer input's own min-width fix above for what was actually doing that) turned into a real
+     horizontal scrollbar on the whole screen rather than just being clipped. Setting overflow-x
+     explicitly closes that off for good, regardless of whatever content ends up inside later. */
+  #screen-club-chat { display: flex; flex-direction: column; overflow-y: hidden; overflow-x: hidden; z-index: 50; }
+  /* scroll-behavior:smooth is what makes appendClubChatMessage's scrollTo (JS) actually ease
+     down to a new message instead of snapping — the initial history load still jumps instantly
+     since that one sets scrollTop directly, not scrollTo(). */
+  .club-chat-list {
+    list-style: none; margin: 0; padding: 4px 0 2px; flex: 1; overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column; gap: 12px; min-height: 0; scroll-behavior: smooth;
+  }
+  /* Fade/slide-in for every new row (user request 09-11 — "flowy feel") — runs once on insert,
+     including the initial history load (a light staggered-feeling settle-in is a nicer first
+     impression than every row just being instantly "there"), harmless to replay since it's a
+     one-shot forwards-filling animation, not a loop. */
+  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; animation: clubChatRowIn 0.22s ease-out; }
+  @keyframes clubChatRowIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   .club-chat-row.mine { justify-content: flex-end; }
   .club-chat-bubble-wrap { max-width: 75%; display: flex; flex-direction: column; }
   .club-chat-row.mine .club-chat-bubble-wrap { align-items: flex-end; }
@@ -588,8 +609,16 @@
   }
   .club-chat-composer { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-shrink: 0; }
   .club-chat-composer input[type="text"] {
-    flex: 1; background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 20px;
-    padding: 11px 16px; color: var(--text-main); font-size: 14px;
+    /* FIX (user report 09-11 — "the chat screen is not fitting on the web... scroll left and
+       right"): flex:1 alone doesn't let a text input shrink below its own default minimum content
+       width (a plain UA-stylesheet floor, well over 100px on most browsers) — with the attach,
+       emoji and send buttons (40px each) plus their gaps already claiming ~150px, that floor could
+       push the composer row past the viewport on a narrow phone, which is exactly what
+       #screen-club-chat's own overflow-x fix below was turning into an actual horizontal scrollbar
+       rather than just clipping. min-width:0 is what actually lets flex:1 shrink this all the way
+       down to fit. */
+    flex: 1; min-width: 0; background: var(--card-raised); border: 1px solid var(--hairline);
+    border-radius: 20px; padding: 11px 16px; color: var(--text-main); font-size: 14px;
   }
   /* FIX (user report 09-08, with a screenshot — "buttons are missing"): the generic `button`
      rule's padding: 14px 20px (40px horizontal alone) left ZERO interior room in a 40px circle,
@@ -4873,7 +4902,12 @@ function appendClubChatMessage(message) {
   hide("club-chat-empty");
   show("club-chat-list");
   list.insertAdjacentHTML("beforeend", clubChatBubbleHtml(message));
-  list.scrollTop = list.scrollHeight;
+  // FIX (user request 09-11 — "make everything... smooth... flowy feel"): a new message now
+  // fades/slides in (see .club-chat-row's own animation, CSS) and the list eases down to it
+  // instead of both snapping instantly. The initial history load (renderClubChatMessages) stays a
+  // hard jump on purpose — nobody wants to watch a whole conversation's worth of messages
+  // scroll past just to open the chat.
+  list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
 }
 
 // FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
