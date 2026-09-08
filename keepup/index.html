@@ -580,7 +580,11 @@
      including the initial history load (a light staggered-feeling settle-in is a nicer first
      impression than every row just being instantly "there"), harmless to replay since it's a
      one-shot forwards-filling animation, not a loop. */
-  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; animation: clubChatRowIn 0.22s ease-out; }
+  /* touch-action:pan-y (user request 09-12: "swipe right to reply") — tells the browser to keep
+     handling vertical scrolling natively while leaving horizontal movement to JS (see the
+     pointerdown/move/up handlers on #club-chat-list) instead of the two fighting over the same
+     gesture. */
+  .club-chat-row { display: flex; align-items: flex-end; gap: 6px; animation: clubChatRowIn 0.22s ease-out; touch-action: pan-y; }
   @keyframes clubChatRowIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -623,12 +627,60 @@
     clip-path: polygon(0 0, 0 100%, 80% 100%);
   }
   .club-chat-bubble img { display: block; max-width: 220px; border-radius: 12px; }
+  /* Auto-linked URL (user question 09-12: "how do links work?") — inherits the bubble's own text
+     color (readable on both the dark "theirs" fill and the light "mine" gradient) rather than a
+     fixed blue, underlined so it still reads as a link without changing color. */
+  .club-chat-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .club-chat-bubble.has-image { padding: 4px; }
   .club-chat-avatar {
     width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 800; color: #000;
   }
+  /* Quoted reply preview, INSIDE a bubble (user request 09-12: "swipe right to reply") — a small
+     left-accented strip above the actual message text, same "who + a trimmed snippet" shape
+     WhatsApp's own quoted-reply block uses. Sits inside .club-chat-bubble so it inherits that
+     bubble's own background/gradient — a slightly darker/lighter overlay reads as "quoted" without
+     needing its own separate color. */
+  .club-chat-reply-preview {
+    display: block; border-left: 3px solid currentColor; opacity: 0.75;
+    padding: 3px 0 3px 8px; margin-bottom: 5px; font-size: 12px; line-height: 1.3;
+  }
+  .club-chat-reply-preview .club-chat-reply-sender { display: block; font-weight: 700; }
+  .club-chat-reply-preview .club-chat-reply-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Reply bar above the composer (user request 09-12) — same "quoted preview + X to cancel" shape
+     WhatsApp's own reply bar uses, shown only while actively composing a reply
+     (startClubChatReply/cancelClubChatReply, JS). */
+  .club-chat-reply-bar {
+    display: flex; align-items: center; gap: 10px; background: var(--card-raised);
+    border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; border-left: 3px solid var(--accent);
+  }
+  .club-chat-reply-bar-text { flex: 1; min-width: 0; }
+  .club-chat-reply-bar-sender { margin: 0; font-size: 12px; font-weight: 700; color: var(--accent); }
+  .club-chat-reply-bar-preview { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #club-chat-reply-cancel-btn {
+    background: none; border: none; padding: 4px; margin: 0; color: var(--text-muted); cursor: pointer;
+    flex-shrink: 0; display: flex;
+  }
+  #club-chat-reply-cancel-btn svg { width: 18px; height: 18px; }
+  /* Reaction badge, below a bubble (user request 09-12: "long press and react") */
+  .club-chat-reaction-badge-slot:empty { display: none; }
+  .club-chat-reaction-badge {
+    display: inline-block; background: var(--card-raised); border: 1px solid var(--hairline);
+    border-radius: 999px; padding: 1px 7px; font-size: 12px; margin-top: 3px;
+  }
+  /* Floating reaction picker (user request 09-12) — position:fixed so showClubChatReactionPicker
+     (JS) can place it next to whichever bubble was long-pressed, anywhere in the viewport. */
+  .club-chat-reaction-picker {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 60;
+    display: flex; gap: 2px; background: var(--card-raised); border: 1px solid var(--hairline);
+    border-radius: 999px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .club-chat-reaction-picker button {
+    background: none; border: none; font-size: 24px; line-height: 1; padding: 4px;
+    border-radius: 50%; cursor: pointer; min-width: 0;
+  }
+  .club-chat-reaction-picker button:active { background: rgba(255,255,255,0.12); transform: scale(1.15); }
   /* Composer (user request 09-11, with a WhatsApp screenshot — "can you make this? i dont like
      the current we have"): one rounded field/pill holds the emoji toggle, text input, attach and
      camera icons; Send is the only element outside it. Replaces the earlier version's 4 separate
@@ -2107,6 +2159,18 @@
          around the field. The attach-menu popover (Take Photo vs Gallery, behind one "+") is gone
          entirely — camera and gallery are now their own direct one-tap icons inside the pill, same
          as WhatsApp's own paperclip/camera split, so there's no submenu to open first. -->
+    <!-- Reply bar (user request 09-12: "i should be able to swipe right to reply to that
+         message") — shown above the composer while replying, same "quoted preview + X to
+         cancel" shape WhatsApp's own reply bar uses. Populated by startClubChatReply() (JS). -->
+    <div class="club-chat-reply-bar hidden" id="club-chat-reply-bar">
+      <div class="club-chat-reply-bar-text">
+        <p class="club-chat-reply-bar-sender" id="club-chat-reply-bar-sender"></p>
+        <p class="club-chat-reply-bar-preview" id="club-chat-reply-bar-preview"></p>
+      </div>
+      <button type="button" id="club-chat-reply-cancel-btn" aria-label="Cancel reply">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
     <div class="club-chat-composer">
       <div class="club-chat-input-pill">
         <!-- Toggles between this smiley icon and a keyboard icon depending on whether the emoji
@@ -2131,6 +2195,18 @@
     <div class="club-chat-emoji-panel hidden" id="club-chat-emoji-panel">
       <div class="club-chat-emoji-body" id="club-chat-emoji-body"></div>
       <div class="club-chat-emoji-tabs" id="club-chat-emoji-tabs"></div>
+    </div>
+    <!-- Reaction picker (user request 09-12: "i should be able to long press and react to a
+         message") — a small floating strip positioned next to whichever bubble was long-pressed
+         (see showClubChatReactionPicker, JS). Fixed position so it can sit anywhere in the
+         viewport regardless of which bubble triggered it. -->
+    <div class="club-chat-reaction-picker hidden" id="club-chat-reaction-picker">
+      <button type="button" data-emoji="👍">👍</button>
+      <button type="button" data-emoji="❤️">❤️</button>
+      <button type="button" data-emoji="😂">😂</button>
+      <button type="button" data-emoji="😮">😮</button>
+      <button type="button" data-emoji="😢">😢</button>
+      <button type="button" data-emoji="🙏">🙏</button>
     </div>
   </div>
 
@@ -4799,6 +4875,23 @@ function renderClubMembers(members, pendingInvites = []) {
 // subscription. clubChatChannel is torn down in closeClubChat() — leaving it subscribed after the
 // sheet closes would keep the socket open for a chat nobody's looking at anymore. ----------
 let clubChatChannel = null;
+// Reactions ride a SEPARATE realtime channel/table (0135_club_chat_replies_and_reactions.sql) —
+// its own postgres_changes subscription, torn down the same way clubChatChannel is.
+let clubChatReactionsChannel = null;
+// In-memory index of every currently-loaded message, by id (user request 09-12: "swipe right to
+// reply") — resolving a reply_to_id to what it's quoting, or looking up a long-pressed message to
+// react to, both need the ORIGINAL message's content, not just its id. Populated by
+// renderClubChatMessages (history) and appendClubChatMessage (live) — never queried fresh from
+// Supabase for this, since everything visible on screen is already sitting right here.
+let clubChatMessagesById = new Map();
+// The message currently being replied to (or null) — set by startClubChatReply, read by
+// sendClubChatText/sendClubChatImage, cleared by cancelClubChatReply.
+let clubChatReplyTarget = null;
+// message_id -> array of {message_id, user_id, emoji} — refreshed wholesale on open and on any
+// realtime change (see refreshClubChatReactions) rather than patched incrementally per event;
+// reactions are low-frequency enough that a full refetch per change is simple and safe rather
+// than juggling INSERT/UPDATE/DELETE payloads by hand.
+let clubChatReactionsByMessageId = new Map();
 
 async function openClubChat() {
   if (!currentClubDetail) return;
@@ -4809,6 +4902,7 @@ async function openClubChat() {
   show("club-chat-empty");
   hide("club-chat-list");
   el("club-chat-input").value = "";
+  cancelClubChatReply();
   show("screen-club-chat");
   // openOverlay/closeClubChatCleanup (not the generic data-close-screen wiring) so the browser
   // back button/gesture runs the SAME realtime teardown the explicit back arrow does — see
@@ -4827,6 +4921,7 @@ async function openClubChat() {
     return;
   }
   renderClubChatMessages(data || []);
+  refreshClubChatReactions(Array.from(clubChatMessagesById.keys()));
 
   // Realtime — set up the listener, then subscribe (same order Supabase's own docs require:
   // handlers registered before the channel joins won't be missed, ones added after can be).
@@ -4842,6 +4937,19 @@ async function openClubChat() {
       (payload) => appendClubChatMessage(payload.new)
     )
     .subscribe();
+
+  if (clubChatReactionsChannel) {
+    supabase.removeChannel(clubChatReactionsChannel);
+    clubChatReactionsChannel = null;
+  }
+  clubChatReactionsChannel = supabase
+    .channel(`club_chat_reactions_${group.id}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "club_message_reactions", filter: `group_id=eq.${group.id}` },
+      () => refreshClubChatReactions(Array.from(clubChatMessagesById.keys()))
+    )
+    .subscribe();
 }
 
 function closeClubChat() {
@@ -4854,9 +4962,17 @@ function closeClubChat() {
 // exactly the cross-club message leak AppViewModel.kt's own 09-09 fix addressed on Android.
 function closeClubChatCleanup() {
   hide("screen-club-chat");
+  hide("club-chat-reaction-picker");
+  cancelClubChatReply();
+  clubChatMessagesById = new Map();
+  clubChatReactionsByMessageId = new Map();
   if (clubChatChannel) {
     supabase.removeChannel(clubChatChannel);
     clubChatChannel = null;
+  }
+  if (clubChatReactionsChannel) {
+    supabase.removeChannel(clubChatReactionsChannel);
+    clubChatReactionsChannel = null;
   }
 }
 
@@ -4876,21 +4992,53 @@ function clubChatAvatarColorFor(senderId) {
   return CLUB_CHAT_AVATAR_COLORS[Math.abs(hash) % CLUB_CHAT_AVATAR_COLORS.length];
 }
 
+// Auto-links a plain URL in message text (user question 09-12: "how do links work? can you make
+// if a link is shared, it will work?") — escapeHtml runs FIRST so the regex only ever matches
+// inside already-safe text (an attacker can't smuggle a real <a> tag through message content this
+// way); the http(s):// prefix is added for a bare "www.x.com" so the browser doesn't try to
+// resolve it as a relative path.
+function linkifyText(text) {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/(https?:\/\/[^\s<]+|www\.[^\s<]+)/g, (match) => {
+    const href = match.startsWith("http") ? match : `https://${match}`;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="club-chat-link">${match}</a>`;
+  });
+}
+
+/** Quoted-reply preview inside a bubble (user request 09-12: "swipe right to reply") — looks the
+ *  original message up in clubChatMessagesById rather than a fresh query; if it's not there (a
+ *  reply to something outside the currently-loaded 200-message window, or genuinely deleted),
+ *  this quietly renders nothing rather than a broken "message not found" block. */
+function clubChatReplyPreviewHtml(replyToId) {
+  const original = clubChatMessagesById.get(replyToId);
+  if (!original) return "";
+  const label = clubChatSenderLabel(original.sender_id);
+  const preview = original.image_url ? "📷 Photo" : (original.body || "");
+  return `
+    <span class="club-chat-reply-preview">
+      <span class="club-chat-reply-sender">${escapeHtml(label)}</span>
+      <span class="club-chat-reply-text">${escapeHtml(preview)}</span>
+    </span>
+  `;
+}
+
 function clubChatBubbleHtml(message) {
   const isMine = message.sender_id === currentSession.user.id;
   const inner = message.image_url
     ? `<img src="${message.image_url}" alt="Shared screenshot" />`
-    : escapeHtml(message.body || "");
+    : linkifyText(message.body || "");
   const senderLabel = clubChatSenderLabel(message.sender_id);
   const avatarHtml = isMine
     ? ""
     : `<div class="club-chat-avatar" style="background:${clubChatAvatarColorFor(message.sender_id)};">${escapeHtml(senderLabel.slice(0, 1).toUpperCase())}</div>`;
+  const replyHtml = message.reply_to_id ? clubChatReplyPreviewHtml(message.reply_to_id) : "";
   return `
     <li class="club-chat-row ${isMine ? "mine" : ""}" data-id="${message.id}">
       ${avatarHtml}
       <div class="club-chat-bubble-wrap">
         ${isMine ? "" : `<p class="club-chat-sender">${escapeHtml(senderLabel)}</p>`}
-        <div class="club-chat-bubble${message.image_url ? " has-image" : ""}">${inner}</div>
+        <div class="club-chat-bubble${message.image_url ? " has-image" : ""}">${replyHtml}${inner}</div>
+        <div class="club-chat-reaction-badge-slot">${reactionBadgeHtml(message.id)}</div>
       </div>
     </li>
   `;
@@ -4898,6 +5046,7 @@ function clubChatBubbleHtml(message) {
 
 function renderClubChatMessages(rows) {
   const list = el("club-chat-list");
+  clubChatMessagesById = new Map(rows.map((m) => [m.id, m]));
   if (rows.length === 0) {
     el("club-chat-empty").textContent = "No messages yet — say hi to your club.";
     show("club-chat-empty");
@@ -4917,6 +5066,7 @@ function renderClubChatMessages(rows) {
 function appendClubChatMessage(message) {
   const list = el("club-chat-list");
   if (list.querySelector(`[data-id="${message.id}"]`)) return; // this device's own optimistic send
+  clubChatMessagesById.set(message.id, message);
   hide("club-chat-empty");
   show("club-chat-list");
   list.insertAdjacentHTML("beforeend", clubChatBubbleHtml(message));
@@ -4926,6 +5076,85 @@ function appendClubChatMessage(message) {
   // hard jump on purpose — nobody wants to watch a whole conversation's worth of messages
   // scroll past just to open the chat.
   list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+}
+
+// ---------- Reply-to (user request 09-12: "swipe right to reply") ----------
+function startClubChatReply(messageId) {
+  const original = clubChatMessagesById.get(messageId);
+  if (!original) return;
+  clubChatReplyTarget = original;
+  el("club-chat-reply-bar-sender").textContent = clubChatSenderLabel(original.sender_id);
+  el("club-chat-reply-bar-preview").textContent = original.image_url ? "📷 Photo" : (original.body || "");
+  show("club-chat-reply-bar");
+  el("club-chat-input").focus();
+}
+function cancelClubChatReply() {
+  clubChatReplyTarget = null;
+  hide("club-chat-reply-bar");
+}
+
+// ---------- Reactions (user request 09-12: "long press and react to a message") ----------
+function reactionBadgeHtml(messageId) {
+  const reactions = clubChatReactionsByMessageId.get(messageId) || [];
+  if (reactions.length === 0) return "";
+  const counts = new Map();
+  reactions.forEach((r) => counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1));
+  const parts = Array.from(counts.entries()).map(([emoji, count]) => (count > 1 ? `${emoji} ${count}` : emoji));
+  return `<span class="club-chat-reaction-badge">${parts.join("  ")}</span>`;
+}
+function renderClubChatReactionBadge(messageId) {
+  const row = el("club-chat-list").querySelector(`.club-chat-row[data-id="${messageId}"]`);
+  const slot = row?.querySelector(".club-chat-reaction-badge-slot");
+  if (slot) slot.innerHTML = reactionBadgeHtml(messageId);
+}
+async function refreshClubChatReactions(messageIds) {
+  if (!messageIds || messageIds.length === 0) return;
+  const { data, error } = await supabase
+    .from("club_message_reactions")
+    .select("message_id, user_id, emoji")
+    .in("message_id", messageIds);
+  if (error) {
+    console.error("Couldn't load reactions:", error);
+    return;
+  }
+  const byMessage = new Map();
+  (data || []).forEach((r) => {
+    if (!byMessage.has(r.message_id)) byMessage.set(r.message_id, []);
+    byMessage.get(r.message_id).push(r);
+  });
+  messageIds.forEach((id) => {
+    clubChatReactionsByMessageId.set(id, byMessage.get(id) || []);
+    renderClubChatReactionBadge(id);
+  });
+}
+/** Tapping the SAME reaction you already left removes it (matches WhatsApp); tapping a different
+ *  one replaces it — enforced naturally by the (message_id, user_id) primary key, one row per
+ *  person per message. Re-fetches this one message's reactions immediately after, rather than
+ *  waiting for the realtime echo, so the tapper sees their own change instantly. */
+async function toggleClubChatReaction(messageId, emoji) {
+  const mine = (clubChatReactionsByMessageId.get(messageId) || []).find((r) => r.user_id === currentSession.user.id);
+  if (mine && mine.emoji === emoji) {
+    await supabase.from("club_message_reactions").delete().eq("message_id", messageId).eq("user_id", currentSession.user.id);
+  } else {
+    // group_id deliberately omitted — the BEFORE trigger (0135) derives it server-side from
+    // message_id regardless of what's sent, so there's nothing correct to put here anyway.
+    await supabase
+      .from("club_message_reactions")
+      .upsert({ message_id: messageId, user_id: currentSession.user.id, emoji }, { onConflict: "message_id,user_id" });
+  }
+  refreshClubChatReactions([messageId]);
+}
+let clubChatReactionPickerTargetId = null;
+function showClubChatReactionPicker(messageId, rowEl) {
+  clubChatReactionPickerTargetId = messageId;
+  const picker = el("club-chat-reaction-picker");
+  const rect = rowEl.getBoundingClientRect();
+  picker.style.top = `${Math.max(8, rect.top - 54)}px`;
+  picker.classList.remove("hidden");
+}
+function hideClubChatReactionPicker() {
+  clubChatReactionPickerTargetId = null;
+  hide("club-chat-reaction-picker");
 }
 
 // FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
@@ -4944,11 +5173,15 @@ async function sendClubChatText() {
   const body = input.value.trim();
   if (!body) return;
   input.value = "";
+  // Reply target (user request 09-12) — read and cleared BEFORE the round trip so the reply bar
+  // closes immediately, same "update local state first" shape the rest of this send flow uses.
+  const replyToId = clubChatReplyTarget?.id ?? null;
+  cancelClubChatReply();
   const localId = safeRandomUUID();
-  appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body, image_url: null });
+  appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body, image_url: null, reply_to_id: replyToId });
   const { error } = await supabase
     .from("club_messages")
-    .insert({ id: localId, group_id: currentClubDetail.id, sender_id: currentSession.user.id, body });
+    .insert({ id: localId, group_id: currentClubDetail.id, sender_id: currentSession.user.id, body, reply_to_id: replyToId });
   if (error) {
     console.error("Club chat send error:", error);
     el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
@@ -4965,6 +5198,9 @@ async function sendClubChatText() {
 async function sendClubChatImage(file) {
   if (!currentClubDetail || !file) return;
   const group = currentClubDetail;
+  // Same "read and clear the reply target before the round trip" shape sendClubChatText uses.
+  const replyToId = clubChatReplyTarget?.id ?? null;
+  cancelClubChatReply();
   try {
     const contentType = file.type || "image/jpeg";
     const extension = contentType.split("/")[1] || "jpg";
@@ -4977,10 +5213,10 @@ async function sendClubChatImage(file) {
     const imageUrl = data.publicUrl;
     // Same explicit-shared-id fix as sendClubChatText above.
     const localId = safeRandomUUID();
-    appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body: null, image_url: imageUrl });
+    appendClubChatMessage({ id: localId, sender_id: currentSession.user.id, body: null, image_url: imageUrl, reply_to_id: replyToId });
     const { error: insErr } = await supabase
       .from("club_messages")
-      .insert({ id: localId, group_id: group.id, sender_id: currentSession.user.id, image_url: imageUrl });
+      .insert({ id: localId, group_id: group.id, sender_id: currentSession.user.id, image_url: imageUrl, reply_to_id: replyToId });
     if (insErr) {
       console.error("Club chat image send error:", insErr);
       el("club-chat-list").querySelector(`[data-id="${localId}"]`)?.remove();
@@ -5000,6 +5236,76 @@ el("club-chat-back-btn").addEventListener("click", closeClubChat);
 el("club-chat-send-btn").addEventListener("click", sendClubChatText);
 el("club-chat-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendClubChatText();
+});
+el("club-chat-reply-cancel-btn").addEventListener("click", cancelClubChatReply);
+
+// Swipe-right-to-reply + long-press-to-react (user request 09-12) — one shared pointerdown/move/up
+// sequence on the list (event delegation, so this keeps working for every row appendClubChatMessage
+// adds later, not just the ones present when this listener was attached). A vertical or leftward
+// drag is left alone entirely (touch-action:pan-y on .club-chat-row, CSS, hands vertical scrolling
+// back to the browser natively) — only a clear rightward drag past the threshold counts as a swipe,
+// and ANY movement at all cancels a long-press in progress, so scrolling the list never
+// accidentally opens the reaction picker.
+const CLUB_CHAT_SWIPE_REPLY_PX = 50;
+const CLUB_CHAT_LONG_PRESS_MS = 450;
+let clubChatGesture = null; // { row, messageId, startX, startY, dragging }
+let clubChatLongPressTimer = null;
+function cancelClubChatLongPress() {
+  if (clubChatLongPressTimer) {
+    clearTimeout(clubChatLongPressTimer);
+    clubChatLongPressTimer = null;
+  }
+}
+el("club-chat-list").addEventListener("pointerdown", (e) => {
+  const row = e.target.closest(".club-chat-row");
+  if (!row) return;
+  clubChatGesture = { row, messageId: row.dataset.id, startX: e.clientX, startY: e.clientY, dragging: false };
+  clubChatLongPressTimer = setTimeout(() => {
+    clubChatLongPressTimer = null;
+    if (!clubChatGesture) return;
+    clubChatGesture.row.style.transform = "";
+    showClubChatReactionPicker(clubChatGesture.messageId, clubChatGesture.row);
+    clubChatGesture = null;
+  }, CLUB_CHAT_LONG_PRESS_MS);
+});
+el("club-chat-list").addEventListener("pointermove", (e) => {
+  if (!clubChatGesture) return;
+  const dx = e.clientX - clubChatGesture.startX;
+  const dy = e.clientY - clubChatGesture.startY;
+  if (Math.abs(dx) > 8 || Math.abs(dy) > 8) cancelClubChatLongPress();
+  if (!clubChatGesture.dragging && dx > 10 && Math.abs(dx) > Math.abs(dy)) {
+    clubChatGesture.dragging = true;
+  }
+  if (clubChatGesture.dragging && dx > 0) {
+    clubChatGesture.row.style.transform = `translateX(${Math.min(dx, 60)}px)`;
+  }
+});
+function clubChatGestureEnd(e) {
+  cancelClubChatLongPress();
+  if (!clubChatGesture) return;
+  const dx = e.clientX - clubChatGesture.startX;
+  clubChatGesture.row.style.transition = "transform 0.18s ease";
+  clubChatGesture.row.style.transform = "";
+  if (clubChatGesture.dragging && dx > CLUB_CHAT_SWIPE_REPLY_PX) {
+    startClubChatReply(clubChatGesture.messageId);
+  }
+  const row = clubChatGesture.row;
+  clubChatGesture = null;
+  setTimeout(() => { row.style.transition = ""; }, 200);
+}
+el("club-chat-list").addEventListener("pointerup", clubChatGestureEnd);
+el("club-chat-list").addEventListener("pointercancel", clubChatGestureEnd);
+
+el("club-chat-reaction-picker").querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const emoji = btn.dataset.emoji;
+    const messageId = clubChatReactionPickerTargetId;
+    hideClubChatReactionPicker();
+    if (messageId) toggleClubChatReaction(messageId, emoji);
+  });
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#club-chat-reaction-picker")) hideClubChatReactionPicker();
 });
 // Attach (paperclip) / Camera icons (user request 09-11, with a WhatsApp screenshot: "can you
 // make this?") — each is now its own direct one-tap trigger inside the input pill, same split
