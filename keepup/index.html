@@ -629,55 +629,44 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 800; color: #000;
   }
+  /* Composer (user request 09-11, with a WhatsApp screenshot — "can you make this? i dont like
+     the current we have"): one rounded field/pill holds the emoji toggle, text input, attach and
+     camera icons; Send is the only element outside it. Replaces the earlier version's 4 separate
+     circular buttons floating around the input. */
   .club-chat-composer { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-shrink: 0; }
-  .club-chat-composer input[type="text"] {
+  .club-chat-input-pill {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px;
+    background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 24px;
+    padding: 4px 6px 4px 4px;
+  }
+  .club-chat-input-pill input[type="text"] {
     /* FIX (user report 09-11 — "the chat screen is not fitting on the web... scroll left and
        right"): flex:1 alone doesn't let a text input shrink below its own default minimum content
-       width (a plain UA-stylesheet floor, well over 100px on most browsers) — with the attach,
-       emoji and send buttons (40px each) plus their gaps already claiming ~150px, that floor could
-       push the composer row past the viewport on a narrow phone, which is exactly what
-       #screen-club-chat's own overflow-x fix below was turning into an actual horizontal scrollbar
-       rather than just clipping. min-width:0 is what actually lets flex:1 shrink this all the way
-       down to fit. */
-    flex: 1; min-width: 0; background: var(--card-raised); border: 1px solid var(--hairline);
-    border-radius: 20px; padding: 11px 16px; color: var(--text-main); font-size: 14px;
+       width (a plain UA-stylesheet floor, well over 100px on most browsers) — with the pill's own
+       icon buttons already claiming real width, that floor could push the composer row past a
+       narrow phone's viewport, which is exactly what #screen-club-chat's own overflow-x fix below
+       was turning into an actual horizontal scrollbar rather than just clipping. min-width:0 is
+       what actually lets flex:1 shrink this all the way down to fit. */
+    flex: 1; min-width: 0; background: none; border: none; padding: 8px 4px;
+    color: var(--text-main); font-size: 14px;
   }
-  /* FIX (user report 09-08, with a screenshot — "buttons are missing"): the generic `button`
-     rule's padding: 14px 20px (40px horizontal alone) left ZERO interior room in a 40px circle,
-     squeezing each SVG to 0 width — invisible, not missing. .club-icon-action-circle above (a
-     working icon-only button elsewhere on this page) sidesteps this by putting the circle on an
-     inner <span>, never the <button> itself; padding: 0/margin: 0 here does the same fix more
-     directly, explicitly overriding the generic rule instead of avoiding it. */
-  .club-chat-icon-btn {
-    width: 40px; height: 40px; border-radius: 50%; background: var(--card-raised); border: none;
+  /* Plain icon buttons living INSIDE the pill — no circle/background of their own, matching the
+     reference exactly (only Send gets a filled circle, kept outside the pill below). */
+  .club-chat-pill-icon {
+    width: 32px; height: 32px; border-radius: 50%; background: none; border: none;
     padding: 0; margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     color: var(--text-muted); font-size: 18px; line-height: 1;
   }
-  .club-chat-icon-btn svg { width: 20px; height: 20px; }
+  .club-chat-pill-icon svg { width: 21px; height: 21px; }
   /* FIX (user request 09-09 — sporty send button, not a plain ghost icon): filled gradient circle,
      same accent→amber pair as the "mine" bubble above, so sending itself feels like a real CTA
      instead of a muted icon tap. */
   .club-chat-send-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: none; padding: 0; margin: 0;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--accent), var(--amber)); color: #0B0E14;
   }
-  /* "+" attachment menu (user request 09-09 — "replace the camera with a +, either gallery or
-     take a photo") — a tiny anchored popover, same shape as .more-menu elsewhere on this page,
-     just scoped to this one button. capture="environment" on club-chat-camera-input (see HTML)
-     is what routes that specific file input straight to the device camera on mobile instead of
-     the gallery picker — no separate native camera API exists on the web. */
-  .club-chat-attach-wrap { position: relative; }
-  .club-chat-attach-menu {
-    position: absolute; bottom: 48px; left: 0; background: var(--card-raised);
-    border: 1px solid var(--hairline); border-radius: 14px; padding: 6px; min-width: 180px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 10;
-  }
-  .club-chat-attach-menu button {
-    display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none;
-    padding: 10px 12px; border-radius: 10px; color: var(--text-main); font-size: 13px; font-weight: 600;
-    text-align: left; cursor: pointer;
-  }
-  .club-chat-attach-menu button:active { background: rgba(255,255,255,0.06); }
-  .club-chat-attach-menu svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+  .club-chat-send-btn svg { width: 20px; height: 20px; }
   /* Emoji picker (user report 09-10/09-11 — "make it like whatsapp... for the text, emoji and
      all"): a full-width panel below the composer instead of a small anchored popover, same
      "replaces the keyboard" placement WhatsApp's own uses. #screen-club-chat's flex column gives
@@ -2111,39 +2100,29 @@
     </div>
     <p class="muted" id="club-chat-empty">Loading…</p>
     <ul class="club-chat-list hidden" id="club-chat-list"></ul>
+    <!-- Composer (user request 09-11, with a WhatsApp screenshot: "can you make this? i dont
+         like the current we have") — one pill holding the emoji toggle, the text field, and the
+         attach/camera icons, with only Send as a separate round button outside it, matching the
+         reference exactly. Replaces the earlier version's 4 separate circular buttons scattered
+         around the field. The attach-menu popover (Take Photo vs Gallery, behind one "+") is gone
+         entirely — camera and gallery are now their own direct one-tap icons inside the pill, same
+         as WhatsApp's own paperclip/camera split, so there's no submenu to open first. -->
     <div class="club-chat-composer">
-      <!-- "+" attachment menu (user request 09-09: "replace the camera with a +, either
-           gallery or take a photo") — replaces the old single camera-icon button that only
-           ever opened the gallery picker. club-chat-camera-input's capture="environment" is
-           what routes straight to the device camera on mobile; there's no separate native
-           camera API on the web, a file input with that attribute is the real mechanism. -->
-      <div class="club-chat-attach-wrap">
-        <button type="button" class="club-chat-icon-btn" id="club-chat-attach-btn" aria-label="Attach a photo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <div class="club-chat-input-pill">
+        <!-- Toggles between this smiley icon and a keyboard icon depending on whether the emoji
+             panel is open — same swap WhatsApp's own field does (see setClubChatEmojiToggleIcon,
+             JS), since this button's job switches between "open the emoji panel" and "go back to
+             typing" depending on state. -->
+        <button type="button" class="club-chat-pill-icon" id="club-chat-emoji-btn" aria-label="Add an emoji">😊</button>
+        <input type="text" id="club-chat-input" placeholder="Message" maxlength="1000" />
+        <button type="button" class="club-chat-pill-icon" id="club-chat-attach-btn" aria-label="Attach from gallery">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
-        <div class="club-chat-attach-menu hidden" id="club-chat-attach-menu">
-          <button type="button" id="club-chat-camera-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Take Photo
-          </button>
-          <!-- FIX (user report 09-10 — "Choose from library is too long"): "Choose from Gallery"
-               was wrapping onto two lines in the popover at typical phone widths. -->
-          <button type="button" id="club-chat-gallery-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            Gallery
-          </button>
-        </div>
+        <button type="button" class="club-chat-pill-icon" id="club-chat-camera-btn" aria-label="Take a photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
       </div>
-      <!-- Emoji picker (user report 09-10/09-11: "i dont see where to choose gif or emoji" /
-           "make it like whatsapp... for the text, emoji and all") — a real categorized picker with
-           Recents, not the small 30-emoji anchored popover this started as. Renders as a
-           full-width panel BELOW the composer (see club-chat-emoji-panel, CSS/JS), same
-           "keyboard-replacement" placement WhatsApp's own picker uses — #screen-club-chat's flex
-           column naturally gives the message list less room while this is open, exactly like a
-           real keyboard swap, with no extra layout code needed. -->
-      <button type="button" class="club-chat-icon-btn" id="club-chat-emoji-btn" aria-label="Add an emoji">😊</button>
-      <input type="text" id="club-chat-input" placeholder="Message…" maxlength="1000" />
-      <button type="button" class="club-chat-icon-btn club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
+      <button type="button" class="club-chat-send-btn" id="club-chat-send-btn" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>
       <input type="file" id="club-chat-image-input" accept="image/*" class="hidden" />
@@ -5022,15 +5001,19 @@ el("club-chat-send-btn").addEventListener("click", sendClubChatText);
 el("club-chat-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendClubChatText();
 });
-// "+" attachment menu (user request 09-09: "replace the camera with a +, either gallery or take
-// a photo") — replaces the old single button that jumped straight to the gallery picker.
-el("club-chat-attach-btn").addEventListener("click", (e) => {
-  e.stopPropagation();
-  hide("club-chat-emoji-panel"); // mutually exclusive with the emoji panel below
-  el("club-chat-attach-menu").classList.toggle("hidden");
+// Attach (paperclip) / Camera icons (user request 09-11, with a WhatsApp screenshot: "can you
+// make this?") — each is now its own direct one-tap trigger inside the input pill, same split
+// WhatsApp's own paperclip/camera icons make, replacing the earlier "+" that opened a Take
+// Photo/Gallery menu first. capture="environment" on club-chat-camera-input (see HTML) is what
+// routes that specific file input straight to the device camera on mobile; there's no separate
+// native camera API on the web.
+el("club-chat-attach-btn").addEventListener("click", () => {
+  hide("club-chat-emoji-panel");
+  el("club-chat-image-input").click();
 });
-document.addEventListener("click", (e) => {
-  if (!e.target.closest(".club-chat-attach-wrap")) hide("club-chat-attach-menu");
+el("club-chat-camera-btn").addEventListener("click", () => {
+  hide("club-chat-emoji-panel");
+  el("club-chat-camera-input").click();
 });
 
 // Emoji picker (user report 09-10/09-11: "i dont see where to choose gif or emoji" / "make it
@@ -5142,25 +5125,27 @@ function renderEmojiPanel() {
   });
 }
 renderEmojiPanel();
+// Swaps the emoji button's own glyph between smiley (closed) and a keyboard icon (open) — same
+// toggle WhatsApp's own field does, since the button's job flips between "open the emoji panel"
+// and "go back to typing" depending on state.
+const CLUB_CHAT_KEYBOARD_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="10"/><line x1="10" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="14" y2="10"/><line x1="18" y1="10" x2="18" y2="10"/><line x1="6" y1="14" x2="18" y2="14"/></svg>';
+function setClubChatEmojiToggleIcon(panelOpen) {
+  el("club-chat-emoji-btn").innerHTML = panelOpen ? CLUB_CHAT_KEYBOARD_ICON : "😊";
+}
 el("club-chat-emoji-btn").addEventListener("click", (e) => {
   e.stopPropagation();
-  hide("club-chat-attach-menu"); // mutually exclusive with the attach popover above
   const panel = el("club-chat-emoji-panel");
   const opening = panel.classList.contains("hidden");
   if (opening) renderEmojiPanel(); // picks up anything added to Recents since last render
   panel.classList.toggle("hidden");
+  setClubChatEmojiToggleIcon(opening);
 });
 // Switching back to typing = switching back to the keyboard, same as WhatsApp's own picker —
 // tapping the message field closes the emoji panel instead of it just sitting there stacked
 // under a now-focused keyboard.
-el("club-chat-input").addEventListener("focus", () => hide("club-chat-emoji-panel"));
-el("club-chat-camera-btn").addEventListener("click", () => {
-  hide("club-chat-attach-menu");
-  el("club-chat-camera-input").click();
-});
-el("club-chat-gallery-btn").addEventListener("click", () => {
-  hide("club-chat-attach-menu");
-  el("club-chat-image-input").click();
+el("club-chat-input").addEventListener("focus", () => {
+  hide("club-chat-emoji-panel");
+  setClubChatEmojiToggleIcon(false);
 });
 el("club-chat-image-input").addEventListener("change", (e) => {
   const file = e.target.files?.[0];
