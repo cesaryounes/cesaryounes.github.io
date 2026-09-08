@@ -2703,13 +2703,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // GIF picker (user question 09-10: "are we able to send Gif?", resumed 09-20) — GIPHY, not the
 // originally chosen Tenor: Google discontinued Tenor to new API clients in Jan 2026, existing
-// keys stopped working after Jun 30 2026 (already passed by the time this was built). Placeholder
-// below — get a free key at developers.giphy.com ("Create an API Key") and paste it in; until
-// then searchGiphyGifs (JS, further down) short-circuits to an empty result rather than firing
-// requests that would just fail. This key is meant to be public the same way SUPABASE_ANON_KEY
-// above is (GIPHY's own client-side/browser embed use case is exactly this), so no different
-// handling needed than any other constant in this file.
-const GIPHY_API_KEY = "YOUR_GIPHY_API_KEY_HERE";
+// keys stopped working after Jun 30 2026 (already passed by the time this was built). Real key
+// (09-20) — meant to be public the same way SUPABASE_ANON_KEY above is (GIPHY's own client-side/
+// browser embed use case is exactly this), so no different handling needed than any other
+// constant in this file.
+const GIPHY_API_KEY = "wR2RxzKkzJvYQXLehyO2Qtaqkd7J8ddm";
 
 const el = (id) => document.getElementById(id);
 const show = (id) => el(id).classList.remove("hidden");
