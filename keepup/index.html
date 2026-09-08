@@ -723,6 +723,14 @@
     background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 24px;
     padding: 4px 6px 4px 4px;
   }
+  /* FIX (user report 09-20, with a screenshot — "when typing, can you remove the black
+     rectangle?"): the text input below never set outline:none, so focusing it (i.e. typing) drew
+     the browser's own default focus ring — a sharp rectangle that clashes hard with this pill's
+     rounded shape. Removed entirely rather than left focus unindicated: the pill itself gets an
+     accent-colored border while its input is focused, same "the whole pill lights up" cue a
+     focused search/composer field usually gives, just shaped to match this component instead of
+     a generic rectangle. */
+  .club-chat-input-pill:focus-within { border-color: var(--accent); }
   .club-chat-input-pill input[type="text"] {
     /* FIX (user report 09-11 — "the chat screen is not fitting on the web... scroll left and
        right"): flex:1 alone doesn't let a text input shrink below its own default minimum content
@@ -731,7 +739,7 @@
        narrow phone's viewport, which is exactly what #screen-club-chat's own overflow-x fix below
        was turning into an actual horizontal scrollbar rather than just clipping. min-width:0 is
        what actually lets flex:1 shrink this all the way down to fit. */
-    flex: 1; min-width: 0; background: none; border: none; padding: 8px 4px;
+    flex: 1; min-width: 0; background: none; border: none; outline: none; padding: 8px 4px;
     color: var(--text-main); font-size: 14px;
   }
   /* Plain icon buttons living INSIDE the pill — no circle/background of their own, matching the
