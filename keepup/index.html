@@ -227,6 +227,13 @@
   }
   .row { display: flex; gap: 12px; }
   .row .field { flex: 1; }
+  /* FIX (user report 09-21: Sex + "Exercise days per week" "should be at the same level") — a
+     .row's fields align by flex default (align-items: stretch stretches each .field COLUMN to
+     match, but not the label INSIDE it), so a label that happens to wrap to 2 lines on this
+     screen's width pushes only its own select down relative to a sibling field whose label stays
+     on 1 line. Reserving 2 lines' worth of height on every label in a row this applies to keeps
+     every select starting at the same y position regardless of which label(s) actually wrap. */
+  .row-align-labels .field label { min-height: 2.4em; }
 
   /* ---- Contact support (user request 08-24) ---- */
   .support-file-chip {
@@ -2154,7 +2161,14 @@
                its own real value here, distinct from the blank/unset placeholder — someone who
                actively picks it is done answering the question, same distinction the migration's
                own check constraint and the broadcast-notification eligibility both rely on. -->
-          <div class="row">
+          <!-- FIX (user report 09-21: "should be at the same level") — "Days a week you
+               exercise" wrapped to 2 lines on narrow screens while "Sex" never did, so the taller
+               label pushed only ITS OWN select down — the two dropdowns landed at different
+               heights despite sharing a .row. Shortened label text ("Exercise days per week")
+               plus a fixed min-height reserving 2 lines' worth of space on both labels (see
+               .row-align-labels below) closes the gap regardless of which one actually wraps at a
+               given width. -->
+          <div class="row row-align-labels">
             <div class="field">
               <label>Sex</label>
               <select id="edit-sex">
@@ -2165,7 +2179,7 @@
               </select>
             </div>
             <div class="field">
-              <label>Days a week you exercise</label>
+              <label>Exercise days per week</label>
               <select id="edit-exercise-days">
                 <option value="">—</option>
                 <option value="0">0</option>
