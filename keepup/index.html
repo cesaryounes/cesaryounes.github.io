@@ -915,11 +915,19 @@
   /* Exercise type multi-select (user request 09-21: "how many days per week you exercise?
      Conventional Gym, Crossfit gym, HIIT, Cardio... Racket sports") — plain toggleable pill
      buttons rather than checkboxes, same "selectable chip" language .nudge-preset-chip already
-     established on this page, just a flex-wrap row instead of a fixed grid since these labels
-     vary a lot more in length than the preset names do. */
-  .exercise-type-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+     established on this page.
+     FIX (user report 09-21, screenshot: "containers needs alignment") — flex-wrap let each row's
+     chip widths ride purely on their own text length, so row edges didn't line up at all (row 1's
+     2 wide chips vs row 2's 3 narrow ones). A 2-column grid gives every chip the same width per
+     column regardless of label length, so both edges of every row align — same fix direction as
+     .nudge-preset-grid's own fixed grid-template-columns, just 2 instead of 3 since these labels
+     run longer. */
+  .exercise-type-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
   .exercise-type-chip {
-    width: auto; min-height: 0; padding: 9px 14px; font-size: 13px; font-weight: 600;
+    /* width:auto stretches to fill its grid column by default (a grid item's own justify-self,
+       unset here, defaults to stretch) — text-align:center keeps the label centered in that wider
+       pill instead of hugging its left edge like a rectangle. */
+    width: auto; min-height: 0; padding: 9px 14px; font-size: 13px; font-weight: 600; text-align: center;
     background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 999px;
     color: var(--text-muted); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
@@ -2137,7 +2145,6 @@
           <div class="field">
             <label>Region</label>
             <select id="edit-region"></select>
-            <p class="muted" style="margin-top:6px;">Powers the Leaderboard tab's Region scope.</p>
           </div>
 
           <!-- Sex + weekly exercise frequency/type (user request 09-21: "can you add to the
@@ -2186,6 +2193,7 @@
               <button type="button" class="exercise-type-chip" data-value="hiit">HIIT</button>
               <button type="button" class="exercise-type-chip" data-value="running">Running</button>
               <button type="button" class="exercise-type-chip" data-value="cycling">Cycling</button>
+              <button type="button" class="exercise-type-chip" data-value="swimming">Swimming</button>
               <button type="button" class="exercise-type-chip" data-value="jump_rope">Jump rope</button>
               <button type="button" class="exercise-type-chip" data-value="racket_sports">Racket sports</button>
               <button type="button" class="exercise-type-chip" data-value="other">Other</button>
@@ -7704,11 +7712,17 @@ function renderExerciseTypeChips() {
   // "Other" (user request 09-21: "have an other where they can tick it and fill") — the text
   // field only ever shows while its own chip is active, same "tied to the chip's own state, not a
   // separate toggle" relationship a disclosure checkbox+detail-field pair usually has.
+  // FIX (user report 09-21: "when other is chosen, user should be able to write") — show()/hide()
+  // take an ELEMENT ID STRING (el(id).classList...) everywhere else this page uses them; this
+  // passed the element itself, so el(anElement) tried document.getElementById(anElement),
+  // coerced to a useless string, got null back, and threw on .classList — the field never
+  // actually revealed itself, or did once but broke every render after. Toggling the class
+  // directly on the already-held element reference sidesteps the id/element mismatch entirely.
   const otherField = el("edit-exercise-type-other");
   if (chipSelectedExerciseTypes.has("other")) {
-    show(otherField);
+    otherField.classList.remove("hidden");
   } else {
-    hide(otherField);
+    otherField.classList.add("hidden");
     otherField.value = "";
   }
 }
