@@ -807,8 +807,19 @@
        max-height, then scrollable within itself past that (overflow-y). resize:none because the
        grow is automatic, not user-draggable; font-family:inherit because textareas default to a
        monospace UA font unlike inputs. */
-    flex: 1; min-width: 0; background: none; border: none; outline: none; padding: 8px 4px;
+    /* CORRECTION: a "too much space...text box have more space" screenshot (09-21) was first
+       investigated here, on the theory that Chrome's mobile "font boosting" (its text-autosizer,
+       which can inflate text size in a narrow flex column independent of the column's actual
+       pixel width — a real-device-only behavior desktop devtools' mobile emulation doesn't
+       replicate) was inflating this field's text past what the box math predicted. The user then
+       clarified that screenshot was the ANDROID APP (ClubChatScreen.kt), not this web page — see
+       that file's own composer fix for the real cause (Material3 IconButton's 48dp default touch
+       target eating the row's width) and its own comment for the "scroll lag" report too. Kept
+       text-size-adjust:100% and width:0 here anyway since they're harmless, standard defensive
+       practice for a form field's text/sizing regardless — just not "the fix" for that report. */
+    flex: 1; min-width: 0; width: 0; background: none; border: none; outline: none; padding: 8px 4px;
     color: var(--text-main); font-size: 14px; font-family: inherit;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
     resize: none; max-height: 120px; overflow-y: auto; line-height: 1.35;
     /* One line (14px x 1.35, plus the 8px padding either side, under the global border-box).
        The JS sets an inline height on every keystroke and that wins — this only matters when
@@ -6941,19 +6952,34 @@ function pinBannerToViewport(banner) {
 // chat is open, closing the gap regardless of exactly how iOS decides to scroll/resize things.
 // No-op on a browser without the API (desktop never needs this — plain `inset:0` is already
 // correct there, which is also why the style resets are restored, not left stamped, on cleanup).
+// FIX (found while investigating a "scrolling in the chat lags...the screen starts flickering"
+// report — 09-21, later clarified as the ANDROID APP, so this specific web function was never the
+// actual cause, but the excess it removes is real regardless): the "scroll" listener below (copied
+// from pinBannerToViewport's own shape) fires on every single visualViewport scroll tick, each
+// firing rewriting TWO inline styles on this full-screen overlay — needless reflow this function
+// never actually needed to pay for. Dropped "scroll" entirely: what actually changes when the
+// keyboard opens/closes is visualViewport.height, which reliably fires "resize" on its own —
+// unlike pinBannerToViewport's small banner, this full-screen overlay never needs to track
+// address-bar-collapse-style scroll panning. Also skips the actual style writes when the values
+// haven't changed, so even a genuine resize can't force a needless reflow.
 function pinClubChatOverlayToViewport() {
   if (!window.visualViewport) return () => {};
   const screen = el("screen-club-chat");
+  let lastTop = null;
+  let lastHeight = null;
   const reposition = () => {
-    screen.style.top = `${window.visualViewport.offsetTop}px`;
-    screen.style.height = `${window.visualViewport.height}px`;
+    const top = window.visualViewport.offsetTop;
+    const height = window.visualViewport.height;
+    if (top === lastTop && height === lastHeight) return;
+    lastTop = top;
+    lastHeight = height;
+    screen.style.top = `${top}px`;
+    screen.style.height = `${height}px`;
   };
   reposition();
   window.visualViewport.addEventListener("resize", reposition);
-  window.visualViewport.addEventListener("scroll", reposition);
   return () => {
     window.visualViewport.removeEventListener("resize", reposition);
-    window.visualViewport.removeEventListener("scroll", reposition);
     screen.style.top = "";
     screen.style.height = "";
   };
