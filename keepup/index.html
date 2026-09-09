@@ -5189,26 +5189,37 @@ async function openClubChat() {
   // while chat was only reachable from there, but the leaderboard's pill chat icon (09-18) opens
   // chat directly and skips that step, so every sender fell back to clubChatSenderLabel's
   // "Member" default. Auto-share display preference (09-19, see clubChatHideAutoShare's own
-  // comment) fetched here too. All three run together (Promise.all, not sequential) rather than
-  // one after another — no extra round-trips added to the critical path for either.
-  const [{ data, error }, membersRes, prefRes] = await Promise.all([
-    supabase
-      .from("club_messages")
-      .select("*")
-      .eq("group_id", group.id)
-      .order("created_at", { ascending: true })
-      .limit(200),
-    supabase.rpc("fn_get_club_members", { p_group_id: group.id }),
-    supabase.from("profiles").select("show_club_auto_share_messages").eq("id", currentSession.user.id).single(),
-  ]);
+  // comment) fetched here too — see the FIX below for how these three now relate to each other.
+  // FIX (user report 09-21, with a screenshot of "Loading…" sitting for a while: "loading message
+  // twkes time, can you have look and enhance?"): all three requests were already fired together
+  // (Promise.all, not sequential) — but that still meant the message LIST stayed hidden behind
+  // "Loading…" until the SLOWEST of the three came back, even though the messages themselves are
+  // usually the fastest to matter to someone opening a chat, and fn_get_club_members (an RPC, two
+  // joins, plus its own membership-check subquery) or the profile lookup could easily be the long
+  // pole while the message history was sitting there ready. Now the three still start together —
+  // no extra round-trips added — but only the messages fetch gates the render; members/prefs are
+  // applied (and the messages re-rendered with real sender names/mentions once they land) whenever
+  // they finish, which for most opens is imperceptibly close to instant, and for a slow one no
+  // longer holds the whole screen hostage. Same fix also moves the realtime subscribe up to right
+  // after the history load instead of after all three — it only ever needed to wait on the
+  // messages query (see its own comment below), so it was being needlessly delayed by the other
+  // two every time they were the slower pair.
+  const messagesPromise = supabase
+    .from("club_messages")
+    .select("*")
+    .eq("group_id", group.id)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  const membersPromise = supabase.rpc("fn_get_club_members", { p_group_id: group.id });
+  const prefPromise = supabase.from("profiles").select("show_club_auto_share_messages").eq("id", currentSession.user.id).single();
+
+  const { data, error } = await messagesPromise;
   if (mySeq !== clubChatOpenSeq) return; // a newer openClubChat() call has since taken over
   if (error) {
     console.error("Couldn't load club chat:", error);
     el("club-chat-empty").textContent = "Couldn't load chat right now.";
     return;
   }
-  if (membersRes.error) console.error("Couldn't load club members for chat:", membersRes.error);
-  else currentClubMembers = membersRes.data || [];
   // Marks this club's chat read (09-19's unread indicator on the leaderboard pill — see
   // fn_club_chat_unread_status/renderScopePills) — fire-and-forget, doesn't block the chat from
   // opening, and non-fatal if it fails (worst case the pill just stays marked unread a bit
@@ -5216,15 +5227,29 @@ async function openClubChat() {
   supabase.rpc("fn_mark_club_chat_read", { p_group_id: group.id }).then(({ error: readErr }) => {
     if (readErr) console.error("Couldn't mark club chat read:", readErr);
   });
-  // Defaults to showing them (false = don't hide) if the read fails for any reason — same
-  // fail-open choice as every other best-effort preference read on this page; a real column
-  // default of true backs this up server-side regardless.
-  clubChatHideAutoShare = prefRes.error ? false : prefRes.data?.show_club_auto_share_messages === false;
   renderClubChatMessages(data || []);
   refreshClubChatReactions(Array.from(clubChatMessagesById.keys()));
 
+  // Members + the auto-share preference apply as soon as they land, whichever order that is in —
+  // re-rendering the already-visible message list to pick up real sender names/mentions and the
+  // auto-share filter rather than leaving it on the "Member" fallback / unfiltered view it opened
+  // with. Guarded by mySeq the same way the history load is, since this can resolve well after a
+  // newer openClubChat() call has since taken over.
+  Promise.all([membersPromise, prefPromise]).then(([membersRes, prefRes]) => {
+    if (mySeq !== clubChatOpenSeq) return;
+    if (membersRes.error) console.error("Couldn't load club members for chat:", membersRes.error);
+    else currentClubMembers = membersRes.data || [];
+    // Defaults to showing them (false = don't hide) if the read fails for any reason — same
+    // fail-open choice as every other best-effort preference read on this page; a real column
+    // default of true backs this up server-side regardless.
+    clubChatHideAutoShare = prefRes.error ? false : prefRes.data?.show_club_auto_share_messages === false;
+    renderClubChatMessages(data || []);
+  });
+
   // Realtime — set up the listener, then subscribe (same order Supabase's own docs require:
-  // handlers registered before the channel joins won't be missed, ones added after can be).
+  // handlers registered before the channel joins won't be missed, ones added after can be). Only
+  // ever needed the history load (messagesPromise) to finish first, not members/prefs — moved up
+  // here accordingly (see this function's header comment).
   if (clubChatChannel) {
     supabase.removeChannel(clubChatChannel);
     clubChatChannel = null;
