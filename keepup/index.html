@@ -912,6 +912,18 @@
   /* 3 columns of small mascot animations (user request 08-24: "can't we see the Mascots, instead
      of the text?") — was 2 columns of plain text chips; mascots read fine smaller, and 3-up fits
      nine presets in 3 rows instead of 5 inside .modal-card's 420px cap. */
+  /* Exercise type multi-select (user request 09-21: "how many days per week you exercise?
+     Conventional Gym, Crossfit gym, HIIT, Cardio... Racket sports") — plain toggleable pill
+     buttons rather than checkboxes, same "selectable chip" language .nudge-preset-chip already
+     established on this page, just a flex-wrap row instead of a fixed grid since these labels
+     vary a lot more in length than the preset names do. */
+  .exercise-type-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .exercise-type-chip {
+    width: auto; min-height: 0; padding: 9px 14px; font-size: 13px; font-weight: 600;
+    background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 999px;
+    color: var(--text-muted); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .exercise-type-chip.active { background: var(--accent); border-color: var(--accent); color: #0B0E14; }
   .nudge-preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .nudge-preset-chip {
     width: auto; min-height: 0; padding: 8px 6px 6px; font-size: 11px; font-weight: 700;
@@ -2126,6 +2138,49 @@
             <label>Region</label>
             <select id="edit-region"></select>
             <p class="muted" style="margin-top:6px;">Powers the Leaderboard tab's Region scope.</p>
+          </div>
+
+          <!-- Sex + weekly exercise frequency/type (user request 09-21: "can you add to the
+               profile definition: the sex and how many days per week you exercise? Conventional
+               Gym, Crossfit gym, HIIT, Cardio... Racket sports... push a notification for people
+               to fill it") — see 0142_profile_sex_and_exercise_details.sql. "Prefer not to say" is
+               its own real value here, distinct from the blank/unset placeholder — someone who
+               actively picks it is done answering the question, same distinction the migration's
+               own check constraint and the broadcast-notification eligibility both rely on. -->
+          <div class="row">
+            <div class="field">
+              <label>Sex</label>
+              <select id="edit-sex">
+                <option value="">Select…</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="prefer_not_to_say">Prefer not to say</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Days a week you exercise</label>
+              <select id="edit-exercise-days">
+                <option value="">—</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>What kind of exercise? (pick all that apply)</label>
+            <div class="exercise-type-chips" id="edit-exercise-types">
+              <button type="button" class="exercise-type-chip" data-value="conventional_gym">Conventional Gym</button>
+              <button type="button" class="exercise-type-chip" data-value="crossfit">Crossfit Gym</button>
+              <button type="button" class="exercise-type-chip" data-value="hiit">HIIT</button>
+              <button type="button" class="exercise-type-chip" data-value="cardio">Cardio (run, cycling, jump rope)</button>
+              <button type="button" class="exercise-type-chip" data-value="racket_sports">Racket sports</button>
+            </div>
           </div>
 
           <button class="btn-primary" id="save-profile-btn">Save changes</button>
@@ -7090,6 +7145,12 @@ async function handleNotificationRouting(type, title, body, presetId, senderName
       currentClubDetail = club;
       openClubChat();
     }
+  } else if (type === "profile_details_prompt") {
+    // fn_process_profile_details_prompt_notifications (0142) — lands straight on the Edit
+    // profile card's new sex/exercise fields rather than just the generic Profile tab, same
+    // "open exactly where the tap should act" intent club_message's own routing follows above.
+    switchTab("profile");
+    el("edit-sex")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
@@ -7612,10 +7673,31 @@ function renderAvatar(container, name, avatarUrl, sizePx) {
   container.appendChild(div);
 }
 
+// Exercise type multi-select (user request 09-21) — a plain Set of the chip values currently
+// toggled on, since the chips themselves are just <button>s with no native form value/checked
+// state to read back from the way a checkbox group would have. renderExerciseTypeChips() is the
+// only thing that ever touches the chip buttons' "active" class — always driven from this Set,
+// never read back off the DOM, so there's one source of truth regardless of whether it changed
+// via a click or a fresh profile load.
+let chipSelectedExerciseTypes = new Set();
+function renderExerciseTypeChips() {
+  el("edit-exercise-types").querySelectorAll(".exercise-type-chip").forEach((btn) => {
+    btn.classList.toggle("active", chipSelectedExerciseTypes.has(btn.dataset.value));
+  });
+}
+el("edit-exercise-types").querySelectorAll(".exercise-type-chip").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const v = btn.dataset.value;
+    if (chipSelectedExerciseTypes.has(v)) chipSelectedExerciseTypes.delete(v);
+    else chipSelectedExerciseTypes.add(v);
+    renderExerciseTypeChips();
+  });
+});
+
 async function loadProfile() {
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until, first_name, family_name, date_of_birth, region_code")
+    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until, first_name, family_name, date_of_birth, region_code, sex, exercise_days_per_week, exercise_types")
     .eq("id", currentSession.user.id)
     .single();
 
@@ -7647,6 +7729,14 @@ async function loadProfile() {
   if (document.activeElement !== el("edit-display-name")) el("edit-display-name").value = profile.display_name || "";
   if (document.activeElement !== el("edit-dob")) el("edit-dob").value = profile.date_of_birth || "";
   if (document.activeElement !== el("edit-region")) el("edit-region").value = profile.region_code || "";
+  if (document.activeElement !== el("edit-sex")) el("edit-sex").value = profile.sex || "";
+  if (document.activeElement !== el("edit-exercise-days")) el("edit-exercise-days").value = profile.exercise_days_per_week ?? "";
+  // Exercise type chips aren't a native form control with a .value/activeElement of their own —
+  // re-render is safe to always run (no "currently focused" guard needed the way the inputs
+  // above have one) since a chip click updates chipSelectedExerciseTypes directly rather than
+  // going through this function at all; this only ever runs from a fresh profile load.
+  chipSelectedExerciseTypes = new Set(profile.exercise_types || []);
+  renderExerciseTypeChips();
   renderAvatar(el("edit-avatar-preview"), profile.display_name, profile.avatar_url, 64);
 
   renderAvatar(el("profile-avatar"), profile.display_name, profile.avatar_url, 56);
@@ -7761,8 +7851,19 @@ el("save-profile-btn").addEventListener("click", async () => {
       // silently overwritten by anything auto-detected.
       region_code: el("edit-region").value || null,
       region_code_source: "manual",
+      sex: el("edit-sex").value || null,
+      exercise_days_per_week: el("edit-exercise-days").value === "" ? null : Number(el("edit-exercise-days").value),
+      exercise_types: chipSelectedExerciseTypes.size > 0 ? Array.from(chipSelectedExerciseTypes) : null,
     };
     if (avatarUrl) update.avatar_url = avatarUrl;
+    // Cancels the one-time "fill this in" nudge the moment all three are actually filled in,
+    // rather than leaving profile_details_prompt_pending true until the cron's next sweep gets
+    // to them — nobody should get nudged to do something they've already done (0142's own header
+    // comment covers the other half of this: the flag also clears itself, unconditionally, the
+    // moment the nudge is actually sent, whether or not it worked).
+    if (update.sex && update.exercise_days_per_week !== null && update.exercise_types) {
+      update.profile_details_prompt_pending = false;
+    }
 
     const { error } = await supabase.from("profiles").update(update).eq("id", currentSession.user.id);
     if (error) throw error;
