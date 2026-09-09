@@ -2172,15 +2172,32 @@
               </select>
             </div>
           </div>
+          <!-- FIX (user request 09-21, immediate follow-up: "let's split the cardio, each
+               alone... and have an other where they can tick it and fill") — "Cardio (run,
+               cycling, jump rope)" was one chip standing in for three different activities; now
+               each is its own pickable value (0143_split_cardio_exercise_types.sql), and a
+               genuinely open-ended "Other" chip reveals a free-text field when ticked instead of
+               forcing everything into the fixed list. -->
           <div class="field">
             <label>What kind of exercise? (pick all that apply)</label>
             <div class="exercise-type-chips" id="edit-exercise-types">
               <button type="button" class="exercise-type-chip" data-value="conventional_gym">Conventional Gym</button>
               <button type="button" class="exercise-type-chip" data-value="crossfit">Crossfit Gym</button>
               <button type="button" class="exercise-type-chip" data-value="hiit">HIIT</button>
-              <button type="button" class="exercise-type-chip" data-value="cardio">Cardio (run, cycling, jump rope)</button>
+              <button type="button" class="exercise-type-chip" data-value="running">Running</button>
+              <button type="button" class="exercise-type-chip" data-value="cycling">Cycling</button>
+              <button type="button" class="exercise-type-chip" data-value="jump_rope">Jump rope</button>
               <button type="button" class="exercise-type-chip" data-value="racket_sports">Racket sports</button>
+              <button type="button" class="exercise-type-chip" data-value="other">Other</button>
             </div>
+            <input
+              type="text"
+              id="edit-exercise-type-other"
+              class="hidden"
+              placeholder="What else?"
+              maxlength="200"
+              style="margin-top:8px;"
+            />
           </div>
 
           <button class="btn-primary" id="save-profile-btn">Save changes</button>
@@ -7684,6 +7701,16 @@ function renderExerciseTypeChips() {
   el("edit-exercise-types").querySelectorAll(".exercise-type-chip").forEach((btn) => {
     btn.classList.toggle("active", chipSelectedExerciseTypes.has(btn.dataset.value));
   });
+  // "Other" (user request 09-21: "have an other where they can tick it and fill") — the text
+  // field only ever shows while its own chip is active, same "tied to the chip's own state, not a
+  // separate toggle" relationship a disclosure checkbox+detail-field pair usually has.
+  const otherField = el("edit-exercise-type-other");
+  if (chipSelectedExerciseTypes.has("other")) {
+    show(otherField);
+  } else {
+    hide(otherField);
+    otherField.value = "";
+  }
 }
 el("edit-exercise-types").querySelectorAll(".exercise-type-chip").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -7691,13 +7718,14 @@ el("edit-exercise-types").querySelectorAll(".exercise-type-chip").forEach((btn) 
     if (chipSelectedExerciseTypes.has(v)) chipSelectedExerciseTypes.delete(v);
     else chipSelectedExerciseTypes.add(v);
     renderExerciseTypeChips();
+    if (v === "other" && chipSelectedExerciseTypes.has("other")) el("edit-exercise-type-other").focus();
   });
 });
 
 async function loadProfile() {
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until, first_name, family_name, date_of_birth, region_code, sex, exercise_days_per_week, exercise_types")
+    .select("display_name, avatar_url, total_xp, level, current_streak, longest_streak, streak_freezes_available, gems, premium_until, first_name, family_name, date_of_birth, region_code, sex, exercise_days_per_week, exercise_types, exercise_type_other")
     .eq("id", currentSession.user.id)
     .single();
 
@@ -7737,6 +7765,7 @@ async function loadProfile() {
   // going through this function at all; this only ever runs from a fresh profile load.
   chipSelectedExerciseTypes = new Set(profile.exercise_types || []);
   renderExerciseTypeChips();
+  if (document.activeElement !== el("edit-exercise-type-other")) el("edit-exercise-type-other").value = profile.exercise_type_other || "";
   renderAvatar(el("edit-avatar-preview"), profile.display_name, profile.avatar_url, 64);
 
   renderAvatar(el("profile-avatar"), profile.display_name, profile.avatar_url, 56);
@@ -7854,6 +7883,10 @@ el("save-profile-btn").addEventListener("click", async () => {
       sex: el("edit-sex").value || null,
       exercise_days_per_week: el("edit-exercise-days").value === "" ? null : Number(el("edit-exercise-days").value),
       exercise_types: chipSelectedExerciseTypes.size > 0 ? Array.from(chipSelectedExerciseTypes) : null,
+      // Only meaningful while the "Other" chip is actually selected — cleared to null otherwise
+      // so unchecking it doesn't leave a stale value lingering in the row (0143_split_cardio
+      // _exercise_types.sql).
+      exercise_type_other: chipSelectedExerciseTypes.has("other") ? (el("edit-exercise-type-other").value.trim() || null) : null,
     };
     if (avatarUrl) update.avatar_url = avatarUrl;
     // Cancels the one-time "fill this in" nudge the moment all three are actually filled in,
