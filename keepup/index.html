@@ -80,6 +80,20 @@
     --accent: #CCFF00;
     --accent-soft: rgba(204,255,0,0.12);
     --amber: #FFC400;
+    /* FIX (user report 09-09, with a screenshot — "the message colour could be lighter and
+       fresh"): "mine" bubbles were accent(#CCFF00)→amber(#FFC400), a lime-into-gold ramp whose
+       middle is olive. Every gradient passes through the mix of its two stops, and lime and amber
+       mix to mud — the bubble read heavy and dark green rather than as the app's bright lime.
+       Lime→mint keeps the lime end (still the brand) and replaces the amber end with a cool stop,
+       so the middle stays light instead of turning to olive. Named vars rather than literals
+       because the send button is deliberately the same pair (see .club-chat-send-btn). */
+    --bubble-mine-a: #E4FF8A;
+    --bubble-mine-b: #6FE3C4;
+    /* A mention inside a "mine" bubble. NOT --accent: the bubble IS --accent, so an
+       accent-coloured mention was lime on lime — the reported "@name is not compatible with the
+       message colour". Deep blue against a light warm-to-cool bubble is both legible (5.7:1 at
+       the mint end) and unmistakably a mention rather than emphasis. */
+    --bubble-mine-mention: #0A4A8F;
     --text-main: #F0F6FC;
     --text-muted: #8B949E;
     --danger: #FF6B5C;
@@ -635,9 +649,12 @@
      only ever affects text selection, never click handling. */
   .club-chat-bubble { background: rgba(255,255,255,0.06); border-radius: 16px; padding: 9px 13px; font-size: 14px; line-height: 1.35; word-break: break-word; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .club-chat-row.mine .club-chat-bubble {
-    background: linear-gradient(135deg, var(--accent), var(--amber));
+    background: linear-gradient(135deg, var(--bubble-mine-a), var(--bubble-mine-b));
     color: #0B0E14; font-weight: 600;
   }
+  /* The mention override — see --bubble-mine-mention. Only inside "mine": on a "theirs" bubble
+     (translucent white on the dark ground) the plain --accent lime is already correct. */
+  .club-chat-row.mine .club-chat-mention { color: var(--bubble-mine-mention); font-weight: 700; }
   /* REMOVED (user report 09-18 — sent 3 separate screenshots circling it: "i can still see the
      green tick on button right of every message"): this used to be a small WhatsApp-style
      speech-bubble tail (09-11) — a solid-accent-lime triangle clipped onto the bubble's own
@@ -786,6 +803,11 @@
     flex: 1; min-width: 0; background: none; border: none; outline: none; padding: 8px 4px;
     color: var(--text-main); font-size: 14px; font-family: inherit;
     resize: none; max-height: 120px; overflow-y: auto; line-height: 1.35;
+    /* One line (14px x 1.35, plus the 8px padding either side, under the global border-box).
+       The JS sets an inline height on every keystroke and that wins — this only matters when
+       there is no inline height yet, or when one was written from a bad measurement. Belt and
+       braces for the 09-09 collapsed-field report. */
+    min-height: 36px;
   }
   /* Plain icon buttons living INSIDE the pill — no circle/background of their own, matching the
      reference exactly (only Send gets a filled circle, kept outside the pill below). */
@@ -803,18 +825,19 @@
   }
   .club-chat-pill-icon svg { width: 21px; height: 21px; }
   /* FIX (user request 09-09/09-13 — sporty, clickable send button, not a plain ghost icon or a
-     misshapen oval): filled gradient circle, same accent→amber pair as the "mine" bubble above.
+     misshapen oval): filled gradient circle, same pair as the "mine" bubble above — deliberately
+     linked, so it moved with the bubble when that went lime→mint (09-09).
      A soft glow (box-shadow, not a border) + a scale-down on press makes it read as a real
      pressable CTA rather than a static icon — the "it is not a click" part of the same report. */
   .club-chat-send-btn {
     width: 44px; height: 44px; min-width: 0; min-height: 0; border-radius: 50%; border: none; padding: 0; margin: 0;
     flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, var(--accent), var(--amber)); color: #0B0E14;
-    box-shadow: 0 2px 10px rgba(204,255,0,0.35);
+    background: linear-gradient(135deg, var(--bubble-mine-a), var(--bubble-mine-b)); color: #0B0E14;
+    box-shadow: 0 2px 10px rgba(111,227,196,0.35);
     transition: transform 0.1s ease, box-shadow 0.1s ease;
     cursor: pointer;
   }
-  .club-chat-send-btn:active { transform: scale(0.92); box-shadow: 0 1px 4px rgba(204,255,0,0.3); }
+  .club-chat-send-btn:active { transform: scale(0.92); box-shadow: 0 1px 4px rgba(111,227,196,0.3); }
   .club-chat-send-btn svg { width: 21px; height: 21px; margin-left: 2px; }
   /* Emoji picker (user report 09-10/09-11 — "make it like whatsapp... for the text, emoji and
      all"): a full-width panel below the composer instead of a small anchored popover, same
@@ -5149,10 +5172,12 @@ async function openClubChat() {
   show("club-chat-empty");
   hide("club-chat-list");
   el("club-chat-input").value = "";
-  autoGrowClubChatInput();
   hideClubChatMentionDropdown();
   cancelClubChatReply();
   show("screen-club-chat");
+  // AFTER show(): the textarea has to be laid out before its height can be measured. See
+  // autoGrowClubChatInput.
+  autoGrowClubChatInput();
   // openOverlay/closeClubChatCleanup (not the generic data-close-screen wiring) so the browser
   // back button/gesture runs the SAME realtime teardown the explicit back arrow does — see
   // closeClubChatCleanup's own comment for why that matters.
@@ -5544,11 +5569,27 @@ async function deleteClubChatMessage(messageId) {
 // screen. Called on every keystroke (the 'input' listener below) AND after every place code sets
 // .value directly (openClubChat's reset, sendClubChatText's post-send reset, insertEmoji) since
 // none of those fire an 'input' event on their own.
+//
+// FIX (user report 09-09, with a screenshot — "the first time you open the chat, the message
+// written is not aligned, and it is scrollable even before writing anything"): a display:none
+// element has NO layout box, so scrollHeight comes back 0, and this wrote height:0px onto the
+// textarea. openClubChat called it one line BEFORE show("screen-club-chat") — so every first
+// open set the field to zero height. What you then saw was the padding alone (16px of a ~36px
+// field) with the placeholder clipped against the bottom edge, and overflow-y:auto made that
+// stub scrollable because its content genuinely was taller than its 0px content box. It fixed
+// itself on the first keystroke, which is why it only ever showed up "the first time".
+//
+// Two fixes, because either alone leaves the trap open: openClubChat now grows AFTER showing,
+// and this refuses to write a height it could not measure. A caller that runs while the chat is
+// hidden now leaves the CSS min-height in charge instead of stamping a wrong number over it.
 const CLUB_CHAT_INPUT_MAX_HEIGHT = 120;
 function autoGrowClubChatInput() {
   const input = el("club-chat-input");
   input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, CLUB_CHAT_INPUT_MAX_HEIGHT) + "px";
+  const measured = input.scrollHeight;
+  // 0 means "not laid out", never "empty" — an empty textarea still has one line's height.
+  if (measured <= 0) return;
+  input.style.height = Math.min(measured, CLUB_CHAT_INPUT_MAX_HEIGHT) + "px";
 }
 
 // FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
