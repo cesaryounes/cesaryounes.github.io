@@ -5178,6 +5178,10 @@ async function openClubChat() {
   // AFTER show(): the textarea has to be laid out before its height can be measured. See
   // autoGrowClubChatInput.
   autoGrowClubChatInput();
+  // AFTER show() too, same reason — pinning to the visual viewport needs the overlay actually
+  // laid out first. See pinClubChatOverlayToViewport's own comment (iOS keyboard leak fix).
+  if (clubChatViewportUnpin) clubChatViewportUnpin();
+  clubChatViewportUnpin = pinClubChatOverlayToViewport();
   // openOverlay/closeClubChatCleanup (not the generic data-close-screen wiring) so the browser
   // back button/gesture runs the SAME realtime teardown the explicit back arrow does — see
   // closeClubChatCleanup's own comment for why that matters.
@@ -5296,6 +5300,10 @@ function closeClubChat() {
 function closeClubChatCleanup() {
   hide("screen-club-chat");
   hide("club-chat-reaction-picker");
+  if (clubChatViewportUnpin) {
+    clubChatViewportUnpin();
+    clubChatViewportUnpin = null;
+  }
   cancelClubChatReply();
   clubChatMessagesById = new Map();
   clubChatReactionsByMessageId = new Map();
@@ -6820,6 +6828,41 @@ function pinBannerToViewport(banner) {
     window.visualViewport.removeEventListener("scroll", reposition);
   };
 }
+
+// FIX (user report 09-21, Apple screenshot circling a strip of leaderboard content — "LV 1",
+// an avatar, a score — visible right above the keyboard while typing in club chat; same report:
+// "@mention... does not seem to work on apple phone"): same root cause pinBannerToViewport above
+// already works around, just with higher stakes here since it's a full-screen overlay, not a
+// small banner. #screen-club-chat is `.screen-overlay`'s `position: fixed; inset: 0` — correct
+// against the LAYOUT viewport, which iOS Safari does NOT resize when the on-screen keyboard
+// opens. But iOS also scrolls/resizes the VISUAL viewport to keep the focused field above the
+// keyboard, and on some iOS versions that leaves the fixed overlay's rendered box not actually
+// covering the real visible area any more — exposing whatever sits behind it (the leaderboard)
+// in the gap. That gap sits exactly where the composer and mention dropdown live, which is why it
+// read as "mentions don't work" as much as a cosmetic glitch — the dropdown was very likely still
+// there underneath, just not what was visible. Pins both `top` AND `height` (not just `top`, like
+// the banner — the keyboard shrinks the visible height too) to the live visual viewport while the
+// chat is open, closing the gap regardless of exactly how iOS decides to scroll/resize things.
+// No-op on a browser without the API (desktop never needs this — plain `inset:0` is already
+// correct there, which is also why the style resets are restored, not left stamped, on cleanup).
+function pinClubChatOverlayToViewport() {
+  if (!window.visualViewport) return () => {};
+  const screen = el("screen-club-chat");
+  const reposition = () => {
+    screen.style.top = `${window.visualViewport.offsetTop}px`;
+    screen.style.height = `${window.visualViewport.height}px`;
+  };
+  reposition();
+  window.visualViewport.addEventListener("resize", reposition);
+  window.visualViewport.addEventListener("scroll", reposition);
+  return () => {
+    window.visualViewport.removeEventListener("resize", reposition);
+    window.visualViewport.removeEventListener("scroll", reposition);
+    screen.style.top = "";
+    screen.style.height = "";
+  };
+}
+let clubChatViewportUnpin = null;
 
 // FIX (user report 08-25: "received nudges on the web, is not playing or showing any animation")
 // — shared by showNotifToast/showTipBanner. A received nudge carries its sender's chosen
