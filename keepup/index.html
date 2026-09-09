@@ -723,13 +723,42 @@
      destructive one-off action rather than another reaction choice. */
   .club-chat-reaction-picker-delete { color: var(--danger); display: flex; align-items: center; justify-content: center; }
   .club-chat-reaction-picker-delete svg { width: 18px; height: 18px; }
+  /* @mention dropdown (user request 09-21) — same card/hairline language as the reaction picker
+     above, sized to show ~4-5 rows before scrolling internally so a big club never pushes the
+     composer off-screen. flex-shrink:0 so it never gets squeezed by the message list, same as
+     every other fixed-purpose row in this column. */
+  .club-chat-mention-dropdown {
+    flex-shrink: 0; max-height: 220px; overflow-y: auto; margin-top: 8px;
+    background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 14px;
+    padding: 4px;
+  }
+  .club-chat-mention-option {
+    width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    background: none; border: none; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+    color: var(--text-main); font-size: 14px;
+  }
+  .club-chat-mention-option:hover, .club-chat-mention-option.active { background: rgba(255,255,255,0.06); }
+  .club-chat-mention-avatar {
+    width: 26px; height: 26px; min-width: 26px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; color: #0B0E14; font-size: 12px; font-weight: 700;
+  }
+  /* Rendered mentions inside a sent message (highlightClubChatMentions, JS) — accent-tinted, not
+     a full pill, so it reads as emphasis within the sentence rather than a separate chip. */
+  .club-chat-mention {
+    color: var(--accent); font-weight: 600;
+  }
   /* Composer (user request 09-11, with a WhatsApp screenshot — "can you make this? i dont like
      the current we have"): one rounded field/pill holds the emoji toggle, text input, attach and
      camera icons; Send is the only element outside it. Replaces the earlier version's 4 separate
      circular buttons floating around the input. */
   .club-chat-composer { display: flex; align-items: center; gap: 8px; padding-top: 10px; flex-shrink: 0; }
   .club-chat-input-pill {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px;
+    /* FIX (user request 09-21 — auto-growing textarea): align-items was "center", fine for a
+       single-line input where everything shared one line height. Now that the textarea can grow
+       to several lines, "center" would float the icon buttons to the vertical middle of the whole
+       pill as it grows; "flex-end" keeps them bottom-anchored against the textarea's last line,
+       matching WhatsApp/iMessage's own growing-composer behavior. */
+    flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px;
     background: var(--card-raised); border: 1px solid var(--hairline); border-radius: 24px;
     padding: 4px 6px 4px 4px;
   }
@@ -741,16 +770,22 @@
      focused search/composer field usually gives, just shaped to match this component instead of
      a generic rectangle. */
   .club-chat-input-pill:focus-within { border-color: var(--accent); }
-  .club-chat-input-pill input[type="text"] {
+  .club-chat-input-pill textarea {
     /* FIX (user report 09-11 — "the chat screen is not fitting on the web... scroll left and
        right"): flex:1 alone doesn't let a text input shrink below its own default minimum content
        width (a plain UA-stylesheet floor, well over 100px on most browsers) — with the pill's own
        icon buttons already claiming real width, that floor could push the composer row past a
        narrow phone's viewport, which is exactly what #screen-club-chat's own overflow-x fix below
        was turning into an actual horizontal scrollbar rather than just clipping. min-width:0 is
-       what actually lets flex:1 shrink this all the way down to fit. */
+       what actually lets flex:1 shrink this all the way down to fit.
+       FIX (user request 09-21 — "the text container must become bigger...and scrollable"): was a
+       single-line <input>, now a <textarea> auto-grown by autoGrowClubChatInput() up to
+       max-height, then scrollable within itself past that (overflow-y). resize:none because the
+       grow is automatic, not user-draggable; font-family:inherit because textareas default to a
+       monospace UA font unlike inputs. */
     flex: 1; min-width: 0; background: none; border: none; outline: none; padding: 8px 4px;
-    color: var(--text-main); font-size: 14px;
+    color: var(--text-main); font-size: 14px; font-family: inherit;
+    resize: none; max-height: 120px; overflow-y: auto; line-height: 1.35;
   }
   /* Plain icon buttons living INSIDE the pill — no circle/background of their own, matching the
      reference exactly (only Send gets a filled circle, kept outside the pill below). */
@@ -2261,6 +2296,14 @@
     </div>
     <p class="muted" id="club-chat-empty">Loading…</p>
     <ul class="club-chat-list hidden" id="club-chat-list"></ul>
+    <!-- @mention autocomplete (user request 09-21: "user should be able to mention another user
+         using @") — sits inline between the list and the composer, not absolutely positioned:
+         the composer's own height already varies (reply bar, the now-growable textarea), so
+         letting this take normal flex-column flow means it always sits flush above the composer
+         with no coordinate math, at the cost of shrinking the message list slightly while open —
+         a fine trade, same as the reply bar right below already accepts. Populated by
+         renderClubChatMentionDropdown() (JS). -->
+    <div class="club-chat-mention-dropdown hidden" id="club-chat-mention-dropdown"></div>
     <!-- Composer (user request 09-11, with a WhatsApp screenshot: "can you make this? i dont
          like the current we have") — one pill holding the emoji toggle, the text field, and the
          attach/camera icons, with only Send as a separate round button outside it, matching the
@@ -2287,7 +2330,12 @@
              JS), since this button's job switches between "open the emoji panel" and "go back to
              typing" depending on state. -->
         <button type="button" class="club-chat-pill-icon" id="club-chat-emoji-btn" aria-label="Add an emoji">😊</button>
-        <input type="text" id="club-chat-input" placeholder="Message" maxlength="1000" />
+        <!-- FIX (user request 09-21: "when typing lf text, the text container must become
+             bigger...and scrollable"): a plain <input type="text"> can never wrap or grow at
+             all — switched to a <textarea>, auto-grown by JS on every keystroke
+             (autoGrowClubChatInput) up to a max height, then scrollable within itself beyond
+             that (CSS max-height + overflow-y). rows="1" is just the initial collapsed state. -->
+        <textarea id="club-chat-input" placeholder="Message" maxlength="1000" rows="1"></textarea>
         <button type="button" class="club-chat-pill-icon" id="club-chat-attach-btn" aria-label="Attach from gallery">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
@@ -5101,6 +5149,8 @@ async function openClubChat() {
   show("club-chat-empty");
   hide("club-chat-list");
   el("club-chat-input").value = "";
+  autoGrowClubChatInput();
+  hideClubChatMentionDropdown();
   cancelClubChatReply();
   show("screen-club-chat");
   // openOverlay/closeClubChatCleanup (not the generic data-close-screen wiring) so the browser
@@ -5243,6 +5293,27 @@ function linkifyText(text) {
   });
 }
 
+// @mentions (user request 09-21 — "user should be able to mention another user using @"). Stored
+// in the message body as plain "@DisplayName " text, not an id-encoded format — consistent with
+// this page's existing "resolve names client-side against currentClubMembers, don't store a
+// redundant copy" approach (clubChatSenderLabel does the same for the sender field itself). That
+// means rendering has to re-match real member names against the text on the way out, same as this
+// does here — run AFTER linkifyText so it only ever sees already-escaped, already-safe text.
+// Longest name first so e.g. "Sam" doesn't shadow a match for "Samantha" sharing the same prefix.
+function highlightClubChatMentions(html) {
+  if (!currentClubMembers || currentClubMembers.length === 0) return html;
+  const names = currentClubMembers
+    .map((m) => m.display_name)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  if (names.length === 0) return html;
+  const pattern = new RegExp(
+    "@(" + names.map((n) => escapeHtml(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\b",
+    "g"
+  );
+  return html.replace(pattern, (match, name) => `<span class="club-chat-mention">@${name}</span>`);
+}
+
 /** Quoted-reply preview inside a bubble (user request 09-12/09-14: "swipe right to reply" / "if
  *  reply message is clicked, it should take the user to the message in the chat") — looks the
  *  original message up in clubChatMessagesById rather than a fresh query; if it's not there (a
@@ -5279,7 +5350,7 @@ function clubChatBubbleHtml(message) {
   const isMine = message.sender_id === currentSession.user.id;
   const inner = message.image_url
     ? `<img src="${message.image_url}" alt="Shared screenshot" draggable="false" />`
-    : linkifyText(message.body || "");
+    : highlightClubChatMentions(linkifyText(message.body || ""));
   const senderLabel = clubChatSenderLabel(message.sender_id);
   const avatarHtml = isMine
     ? ""
@@ -5463,6 +5534,23 @@ async function deleteClubChatMessage(messageId) {
   }
 }
 
+// FIX (user request 09-21 — "when typing lf text, the text container must become bigger...and
+// scrollable"): #club-chat-input is a <textarea> now (was a single-line <input>). Height can't
+// just be left to grow on its own — a textarea's scrollHeight only reports correctly once its own
+// height is reset to "auto" first (otherwise it reports the CURRENT height back, since that
+// height is itself constraining what content appears to need), so every resize is a two-step
+// reset-then-measure. Capped at the same 120px max-height set in CSS, past which the textarea
+// scrolls internally instead of keeping the composer/pill growing forever off the bottom of the
+// screen. Called on every keystroke (the 'input' listener below) AND after every place code sets
+// .value directly (openClubChat's reset, sendClubChatText's post-send reset, insertEmoji) since
+// none of those fire an 'input' event on their own.
+const CLUB_CHAT_INPUT_MAX_HEIGHT = 120;
+function autoGrowClubChatInput() {
+  const input = el("club-chat-input");
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, CLUB_CHAT_INPUT_MAX_HEIGHT) + "px";
+}
+
 // FIX (user report 09-10 — "when sending a message or picture, i see a duplicate then it
 // disappears"): the optimistic bubble used a client-generated id, but the INSERT below never
 // passed that id along — Postgres assigned its own via club_messages.id's gen_random_uuid()
@@ -5479,6 +5567,8 @@ async function sendClubChatText() {
   const body = input.value.trim();
   if (!body) return;
   input.value = "";
+  autoGrowClubChatInput();
+  hideClubChatMentionDropdown();
   // Reply target (user request 09-12) — read and cleared BEFORE the round trip so the reply bar
   // closes immediately, same "update local state first" shape the rest of this send flow uses.
   const replyToId = clubChatReplyTarget?.id ?? null;
@@ -5561,8 +5651,133 @@ el("club-chat-open-btn").addEventListener("click", openClubChat);
 // screen, and openClubChat() already calls openOverlay(closeClubChatCleanup) itself directly.
 el("club-chat-back-btn").addEventListener("click", closeClubChat);
 el("club-chat-send-btn").addEventListener("click", sendClubChatText);
+// ---------- @mentions (user request 09-21: "user should be able to mention another user using
+// @") ----------
+// Tracks the current in-progress "@query" token, if any: where it starts in the textarea's value
+// (so a pick knows exactly what range to replace) and the filtered match list currently shown
+// (so arrow-key nav and Enter-to-pick have something to act on).
+let clubChatMentionStart = -1;
+let clubChatMentionMatches = [];
+let clubChatMentionActiveIndex = 0;
+
+/** Looks backward from the cursor for an "@" that starts the CURRENT word — i.e. nothing but
+ *  non-whitespace between it and the cursor, and either the very start of the message or
+ *  whitespace right before the "@" (so an email-like "user@x.com" typed elsewhere in the message
+ *  doesn't trigger this). Returns the query text typed so far (no "@"), or null if the cursor
+ *  isn't inside a mention token at all. */
+function currentClubChatMentionQuery(input) {
+  const cursor = input.selectionStart;
+  const value = input.value;
+  const at = value.lastIndexOf("@", cursor - 1);
+  if (at === -1) return null;
+  const between = value.slice(at + 1, cursor);
+  if (/\s/.test(between)) return null; // cursor's moved past this token onto a new word
+  if (at > 0 && !/\s/.test(value[at - 1])) return null; // "@" isn't at a word boundary
+  clubChatMentionStart = at;
+  return between;
+}
+
+function hideClubChatMentionDropdown() {
+  clubChatMentionStart = -1;
+  clubChatMentionMatches = [];
+  hide("club-chat-mention-dropdown");
+}
+
+function renderClubChatMentionDropdown() {
+  const dropdown = el("club-chat-mention-dropdown");
+  dropdown.innerHTML = clubChatMentionMatches
+    .map((m, i) => `
+      <button type="button" class="club-chat-mention-option${i === clubChatMentionActiveIndex ? " active" : ""}" data-index="${i}">
+        <span class="club-chat-mention-avatar" style="background:${clubChatAvatarColorFor(m.user_id)};">${escapeHtml((m.display_name || "?").slice(0, 1).toUpperCase())}</span>
+        ${escapeHtml(m.display_name)}
+      </button>
+    `)
+    .join("");
+  dropdown.querySelectorAll(".club-chat-mention-option").forEach((btn) => {
+    btn.addEventListener("click", () => pickClubChatMention(clubChatMentionMatches[Number(btn.dataset.index)]));
+  });
+  show("club-chat-mention-dropdown");
+}
+
+/** Runs on every keystroke (alongside autoGrowClubChatInput) — updates the dropdown to match
+ *  whatever mention token (if any) the cursor is currently sitting inside. */
+function detectClubChatMention() {
+  const input = el("club-chat-input");
+  const query = currentClubChatMentionQuery(input);
+  if (query === null) {
+    hideClubChatMentionDropdown();
+    return;
+  }
+  const q = query.toLowerCase();
+  clubChatMentionMatches = currentClubMembers
+    .filter((m) => m.display_name && m.display_name.toLowerCase().includes(q))
+    .slice(0, 6);
+  clubChatMentionActiveIndex = 0;
+  if (clubChatMentionMatches.length === 0) {
+    hideClubChatMentionDropdown();
+    return;
+  }
+  renderClubChatMentionDropdown();
+}
+
+/** Replaces the in-progress "@query" token with "@DisplayName " (trailing space so typing
+ *  continues right after it as a new word, not glued onto the name) and puts the cursor right
+ *  after it. */
+function pickClubChatMention(member) {
+  if (!member || clubChatMentionStart === -1) return;
+  const input = el("club-chat-input");
+  const cursor = input.selectionStart;
+  const before = input.value.slice(0, clubChatMentionStart);
+  const after = input.value.slice(cursor);
+  const inserted = `@${member.display_name} `;
+  input.value = before + inserted + after;
+  const newCursor = before.length + inserted.length;
+  input.setSelectionRange(newCursor, newCursor);
+  hideClubChatMentionDropdown();
+  autoGrowClubChatInput();
+  input.focus();
+}
+
+// FIX (user request 09-21 — now a multi-line-capable textarea): plain Enter used to be the only
+// way to send anyway, since a single-line <input> couldn't insert a newline in the first place.
+// Now that it's a <textarea>, plain Enter would just insert a newline like any other textarea —
+// preventDefault() + send keeps Enter-to-send as the primary behavior (matches WhatsApp/iMessage
+// on desktop), with Shift+Enter left alone to fall through to its native newline-insert behavior.
+// When the mention dropdown is open, arrow keys/Enter/Escape act on IT instead — same "the
+// autocomplete popover owns these keys while it's open" convention as any editor's own @mention or
+// slash-command menu.
 el("club-chat-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendClubChatText();
+  if (clubChatMentionMatches.length > 0) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      clubChatMentionActiveIndex = (clubChatMentionActiveIndex + 1) % clubChatMentionMatches.length;
+      renderClubChatMentionDropdown();
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      clubChatMentionActiveIndex = (clubChatMentionActiveIndex - 1 + clubChatMentionMatches.length) % clubChatMentionMatches.length;
+      renderClubChatMentionDropdown();
+      return;
+    }
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      pickClubChatMention(clubChatMentionMatches[clubChatMentionActiveIndex]);
+      return;
+    }
+    if (e.key === "Escape") {
+      hideClubChatMentionDropdown();
+      return;
+    }
+  }
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendClubChatText();
+  }
+});
+el("club-chat-input").addEventListener("input", () => {
+  autoGrowClubChatInput();
+  detectClubChatMention();
 });
 el("club-chat-reply-cancel-btn").addEventListener("click", cancelClubChatReply);
 
@@ -5825,6 +6040,7 @@ function addRecentEmoji(emoji) {
 function insertEmoji(emoji) {
   const input = el("club-chat-input");
   input.value += emoji;
+  autoGrowClubChatInput();
   addRecentEmoji(emoji);
 }
 // emojis: plain glyph strings (Recents/search results) OR [glyph, keywords] tuples (a category) —
