@@ -550,6 +550,42 @@
     font-size: 10px; font-weight: 800; color: var(--amber); text-transform: uppercase;
     letter-spacing: 0.03em; margin-left: 6px;
   }
+  /* ---- Head-to-head club challenges (0146_head_to_head_challenges.sql, user request 09-13:
+     "spec out club-scoped challenges" -> ... -> "can u do the ui" -> web dashboard version) —
+     mirrors ChallengesScreen.kt's own visual language (a flat list, a status badge per row, a
+     two-segment score bar for anything with points to show) rather than introducing new ones. ---- */
+  .challenge-row {
+    display: flex; flex-direction: column; gap: 10px; padding: 14px;
+    background: var(--accent-soft); border-radius: 16px; margin-bottom: 10px;
+  }
+  .challenge-row-top { display: flex; align-items: center; gap: 10px; }
+  .challenge-row-title { flex: 1; min-width: 0; }
+  .challenge-row-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
+  .challenge-row-sub { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .challenge-badge {
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 4px 8px; border-radius: 8px; flex-shrink: 0;
+  }
+  .challenge-score-row { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; }
+  .challenge-score-track {
+    height: 6px; border-radius: 3px; background: var(--card); overflow: hidden; display: flex;
+  }
+  .challenge-score-fill-mine { background: var(--accent); height: 100%; }
+  .challenge-score-fill-theirs { background: rgba(139,148,158,0.35); height: 100%; }
+  .challenge-actions { display: flex; gap: 8px; }
+  .challenge-action-chip {
+    border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .challenge-picker-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; cursor: pointer;
+  }
+  .challenge-picker-row.selected { background: var(--accent-soft); }
+  .duration-chip-row { display: flex; gap: 8px; margin-top: 8px; }
+  .duration-chip {
+    border: none; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+    background: var(--card-raised); color: var(--text-main);
+  }
+  .duration-chip.selected { background: var(--accent); color: #0B0E14; }
   /* ---- Nudge picker modal (user request 08-24) — first real centered-modal pattern on this page
      (everything else is either a full .screen-overlay takeover or the small anchored .more-menu
      popover); a full-screen takeover would be overkill for "pick a message and send", so this is
@@ -2302,6 +2338,13 @@
       <button class="screen-header-btn" id="club-chat-open-btn" aria-label="Club chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
       </button>
+      <!-- Head-to-head club challenges (0146_head_to_head_challenges.sql, user request 09-13) —
+           same "every visitor here is already a member" reasoning as club chat's own comment
+           just above; the insert policy's own WITH CHECK re-verifies club co-membership
+           server-side regardless either way. -->
+      <button class="screen-header-btn" id="challenges-open-btn" aria-label="Club challenges">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a2 2 0 0 0 0 4h.5M17 6h3a2 2 0 0 1 0 4h-.5"/></svg>
+      </button>
     </div>
 
     <!-- FIX (user request 08-26: "make the web one closer to the app, which is more compact") —
@@ -2528,6 +2571,52 @@
       <button type="button" class="club-chat-reaction-picker-delete hidden" id="club-chat-delete-btn" aria-label="Delete message">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
       </button>
+    </div>
+  </div>
+
+  <!-- Head-to-head club challenges (0146_head_to_head_challenges.sql, user request 09-13: "spec
+       out club-scoped challenges" -> "start on the migration and data model" -> "also build the
+       ui" -> "can u do the ui" [web dashboard]) — opened via the trophy header icon on
+       screen-club-detail above. Same "no Realtime subscription for v1, manual refresh instead"
+       scope call ChallengesScreen.kt (Android) already made — see that file's own doc comment. -->
+  <div class="screen-overlay hidden" id="screen-challenges">
+    <div class="screen-header">
+      <button class="screen-back-btn" data-close-screen="screen-challenges">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <p class="screen-title" style="flex:1;">Challenges</p>
+      <button class="screen-header-btn" id="challenges-refresh-btn" aria-label="Refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+    </div>
+    <button class="btn-primary" id="challenge-new-btn" style="margin: 4px 20px 14px;">Challenge a club member</button>
+    <div class="card">
+      <p class="muted" id="challenges-empty">Loading…</p>
+      <div id="challenges-list"></div>
+    </div>
+  </div>
+
+  <!-- Challenge picker (member + duration) — same centered .modal-backdrop shape
+       nudge-modal-backdrop above established, not a second nested screen-overlay (this page's own
+       "everything is either a full screen-overlay or a small anchored popover/centered modal"
+       convention, matching ChallengesScreen.kt's own "AlertDialog, not a nested sheet" call for
+       the identical reason). -->
+  <div class="modal-backdrop hidden" id="challenge-picker-backdrop">
+    <div class="modal-card">
+      <p class="section-label" style="margin-bottom:14px;">Challenge who?</p>
+      <p class="muted hidden" id="challenge-picker-empty">No other members in this club yet.</p>
+      <div id="challenge-picker-list"></div>
+      <div id="challenge-picker-duration-wrap" class="hidden">
+        <p class="muted" style="margin-top:14px;">Duration</p>
+        <div class="duration-chip-row" id="challenge-duration-chips">
+          <button type="button" class="duration-chip" data-days="3">3 days</button>
+          <button type="button" class="duration-chip selected" data-days="7">7 days</button>
+          <button type="button" class="duration-chip" data-days="14">14 days</button>
+        </div>
+        <button class="btn-primary" id="challenge-send-btn" style="margin-top:16px;" disabled>Send challenge</button>
+      </div>
+      <button class="btn-text" id="challenge-picker-cancel-btn" style="margin-top:10px;">Cancel</button>
+      <p class="muted hidden" id="challenge-picker-message" style="margin-top:8px;"></p>
     </div>
   </div>
 
@@ -5232,6 +5321,206 @@ function renderClubMembers(members, pendingInvites = []) {
   wireHistoryChevrons(list);
 }
 
+// ---------- Head-to-head club challenges (0146_head_to_head_challenges.sql, user request 09-13)
+// — opened via the trophy header icon on screen-club-detail. A plain fetch-on-open + manual
+// refresh, same "no Realtime subscription for v1" scope call ChallengesScreen.kt (Android) made —
+// see that file's own doc comment for why that's a reasonable v1 call, not a data-model gap. ----
+let currentChallenges = [];
+// challenge id -> {challenger_points, challenged_points} for every currently-ACTIVE challenge,
+// fetched via fn_challenge_live_points — never populated for a "completed" one, which already
+// carries its own final snapshot straight off the row (see that RPC's own migration comment for
+// why standings are computed fresh rather than trusted from a stored counter).
+let challengeLivePointsById = new Map();
+let challengePickerSelectedId = null;
+
+async function openChallenges() {
+  if (!currentClubDetail) return;
+  openScreen("screen-challenges");
+  await loadChallenges();
+}
+
+async function loadChallenges() {
+  const group = currentClubDetail;
+  if (!group) return;
+  el("challenges-empty").textContent = "Loading…";
+  show("challenges-empty");
+  el("challenges-list").innerHTML = "";
+
+  const { data, error } = await supabase
+    .from("challenges")
+    .select("*")
+    .eq("group_id", group.id)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Couldn't load challenges:", error);
+    el("challenges-empty").textContent = "Couldn't load challenges right now.";
+    return;
+  }
+  currentChallenges = data || [];
+
+  // Live points for every active challenge, fetched in parallel — same "fetch fresh, never
+  // trust a stored total" reasoning as fn_challenge_live_points' own migration comment.
+  challengeLivePointsById = new Map();
+  const activeIds = currentChallenges.filter((c) => c.status === "active").map((c) => c.id);
+  await Promise.all(activeIds.map(async (id) => {
+    const { data: pts, error: ptsErr } = await supabase.rpc("fn_challenge_live_points", { p_challenge_id: id });
+    if (ptsErr) { console.error(`Couldn't load live points for challenge ${id}:`, ptsErr); return; }
+    const row = Array.isArray(pts) ? pts[0] : pts;
+    if (row) challengeLivePointsById.set(id, row);
+  }));
+
+  renderChallenges();
+}
+
+function challengeStatusBadge(challenge, myId) {
+  const iAmChallenger = challenge.challenger_id === myId;
+  const won = challenge.status === "completed" && challenge.winner_id === myId;
+  const lost = challenge.status === "completed" && challenge.winner_id && challenge.winner_id !== myId;
+  switch (challenge.status) {
+    case "pending": return '<span class="challenge-badge badge-medium">Pending</span>';
+    case "active": return '<span class="challenge-badge badge-high">Active</span>';
+    case "declined": return '<span class="challenge-badge" style="background:var(--card-raised);color:var(--text-muted);">Declined</span>';
+    case "cancelled": return '<span class="challenge-badge" style="background:var(--card-raised);color:var(--text-muted);">Cancelled</span>';
+    case "completed":
+      if (won) return '<span class="challenge-badge badge-high">Won</span>';
+      if (lost) return '<span class="challenge-badge badge-low">Lost</span>';
+      return '<span class="challenge-badge" style="background:var(--card-raised);color:var(--text-muted);">Tie</span>';
+    default: return "";
+  }
+}
+
+function renderChallenges() {
+  const list = el("challenges-list");
+  list.innerHTML = "";
+  if (currentChallenges.length === 0) {
+    el("challenges-empty").textContent = "No challenges yet — start one above.";
+    show("challenges-empty");
+    return;
+  }
+  hide("challenges-empty");
+  const myId = currentSession.user.id;
+  const membersById = new Map(currentClubMembers.map((m) => [m.user_id, m]));
+
+  currentChallenges.forEach((challenge) => {
+    const iAmChallenger = challenge.challenger_id === myId;
+    const iAmChallenged = challenge.challenged_id === myId;
+    const opponentId = iAmChallenger ? challenge.challenged_id : challenge.challenger_id;
+    const opponent = membersById.get(opponentId);
+    const opponentName = opponent?.display_name || "a member";
+
+    let myPoints = null, theirPoints = null;
+    if (challenge.status === "completed") {
+      myPoints = iAmChallenger ? challenge.challenger_points : challenge.challenged_points;
+      theirPoints = iAmChallenger ? challenge.challenged_points : challenge.challenger_points;
+    } else if (challenge.status === "active" && challengeLivePointsById.has(challenge.id)) {
+      const live = challengeLivePointsById.get(challenge.id);
+      myPoints = iAmChallenger ? live.challenger_points : live.challenged_points;
+      theirPoints = iAmChallenger ? live.challenged_points : live.challenger_points;
+    }
+
+    const row = document.createElement("div");
+    row.className = "challenge-row";
+    let scoreHtml = "";
+    if (myPoints != null && theirPoints != null) {
+      const total = Math.max(myPoints + theirPoints, 0.01);
+      const myPct = Math.min(96, Math.max(4, Math.round((myPoints / total) * 100)));
+      scoreHtml = `
+        <div class="challenge-score-row">
+          <span style="color:var(--accent);">You: ${formatChallengePoints(myPoints)}</span>
+          <span style="color:var(--text-muted);">${escapeHtml(opponentName)}: ${formatChallengePoints(theirPoints)}</span>
+        </div>
+        <div class="challenge-score-track">
+          <div class="challenge-score-fill-mine" style="width:${myPct}%;"></div>
+          <div class="challenge-score-fill-theirs" style="width:${100 - myPct}%;"></div>
+        </div>`;
+    }
+
+    let actionsHtml = "";
+    if (challenge.status === "pending" && iAmChallenged) {
+      actionsHtml = `
+        <div class="challenge-actions">
+          <button type="button" class="challenge-action-chip" data-action="active" style="background:var(--accent);color:#0B0E14;">Accept</button>
+          <button type="button" class="challenge-action-chip" data-action="declined" style="background:transparent;color:var(--danger);">Decline</button>
+        </div>`;
+    } else if ((iAmChallenger || iAmChallenged) && (challenge.status === "pending" || challenge.status === "active")) {
+      const label = challenge.status === "active" ? "Forfeit" : "Cancel";
+      actionsHtml = `
+        <div class="challenge-actions">
+          <button type="button" class="challenge-action-chip" data-action="cancelled" style="background:transparent;color:var(--text-muted);">${label}</button>
+        </div>`;
+    }
+
+    row.innerHTML = `
+      <div class="challenge-row-top">
+        ${avatarHtml(opponentName, opponent?.avatar_url, 36)}
+        <div class="challenge-row-title">
+          <div class="challenge-row-name">${iAmChallenger ? "You challenged " : ""}${escapeHtml(opponentName)}${iAmChallenged ? " challenged you" : ""}</div>
+          <div class="challenge-row-sub">${challenge.duration_days}-day challenge</div>
+        </div>
+        ${challengeStatusBadge(challenge, myId)}
+      </div>
+      ${scoreHtml}
+      ${actionsHtml}
+    `;
+    Array.from(row.querySelectorAll(".challenge-action-chip")).forEach((btn) => {
+      btn.addEventListener("click", () => respondToChallenge(challenge.id, btn.dataset.action));
+    });
+    list.appendChild(row);
+  });
+}
+
+function formatChallengePoints(value) {
+  return value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString("en-US");
+}
+
+async function respondToChallenge(challengeId, newStatus) {
+  const { error } = await supabase.from("challenges").update({ status: newStatus }).eq("id", challengeId);
+  if (error) {
+    alert(error.message || "Couldn't update that challenge.");
+    return;
+  }
+  loadChallenges();
+}
+
+function openChallengePicker() {
+  challengePickerSelectedId = null;
+  el("challenge-picker-message").classList.add("hidden");
+  hide("challenge-picker-message");
+  el("challenge-picker-duration-wrap").classList.add("hidden");
+  el("challenge-send-btn").disabled = true;
+  Array.from(el("challenge-duration-chips").querySelectorAll(".duration-chip")).forEach((chip) => {
+    chip.classList.toggle("selected", chip.dataset.days === "7");
+  });
+
+  const myId = currentSession.user.id;
+  const candidates = currentClubMembers.filter((m) => m.user_id !== myId);
+  const list = el("challenge-picker-list");
+  list.innerHTML = "";
+  if (candidates.length === 0) {
+    show("challenge-picker-empty");
+  } else {
+    hide("challenge-picker-empty");
+    candidates.forEach((member) => {
+      const row = document.createElement("div");
+      row.className = "challenge-picker-row";
+      row.dataset.uid = member.user_id;
+      row.innerHTML = `${avatarHtml(member.display_name, member.avatar_url, 32)}<span>${escapeHtml(member.display_name || "Member")}</span>`;
+      row.addEventListener("click", () => {
+        challengePickerSelectedId = member.user_id;
+        Array.from(list.querySelectorAll(".challenge-picker-row")).forEach((r) => r.classList.toggle("selected", r === row));
+        el("challenge-picker-duration-wrap").classList.remove("hidden");
+        el("challenge-send-btn").disabled = false;
+      });
+      list.appendChild(row);
+    });
+  }
+  show("challenge-picker-backdrop");
+}
+
+function closeChallengePicker() {
+  hide("challenge-picker-backdrop");
+}
+
 // ---------- Club chat (0132_club_chat.sql, user request 09-08: "can we have a chat per club?
 // where people in the same club can chat and share screenshot. the closest to whatsapp
 // functionality") — opened via the header icon on screen-club-detail. History loads once (RLS
@@ -5827,6 +6116,9 @@ async function sendClubChatGif(url) {
 }
 
 el("club-chat-open-btn").addEventListener("click", openClubChat);
+el("challenges-open-btn").addEventListener("click", openChallenges);
+el("challenges-refresh-btn").addEventListener("click", loadChallenges);
+el("challenge-new-btn").addEventListener("click", openChallengePicker);
 // Deliberately NOT the generic [data-close-screen] auto-wiring (openScreen()'s own pattern) —
 // this needs to run closeClubChatCleanup specifically (the realtime teardown), not just hide the
 // screen, and openClubChat() already calls openOverlay(closeClubChatCleanup) itself directly.
@@ -6894,6 +7186,37 @@ el("nudge-custom-send-btn").addEventListener("click", () => {
 el("nudge-cancel-btn").addEventListener("click", closeNudgePicker);
 el("nudge-modal-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "nudge-modal-backdrop") closeNudgePicker();
+});
+
+el("challenge-picker-cancel-btn").addEventListener("click", closeChallengePicker);
+el("challenge-picker-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "challenge-picker-backdrop") closeChallengePicker();
+});
+Array.from(el("challenge-duration-chips").querySelectorAll(".duration-chip")).forEach((chip) => {
+  chip.addEventListener("click", () => {
+    Array.from(el("challenge-duration-chips").querySelectorAll(".duration-chip")).forEach((c) => c.classList.remove("selected"));
+    chip.classList.add("selected");
+  });
+});
+el("challenge-send-btn").addEventListener("click", async () => {
+  if (!challengePickerSelectedId || !currentClubDetail) return;
+  const selectedChip = el("challenge-duration-chips").querySelector(".duration-chip.selected");
+  const durationDays = selectedChip ? Number(selectedChip.dataset.days) : 7;
+  el("challenge-send-btn").disabled = true;
+  const { error } = await supabase.from("challenges").insert({
+    group_id: currentClubDetail.id,
+    challenger_id: currentSession.user.id,
+    challenged_id: challengePickerSelectedId,
+    duration_days: durationDays,
+  });
+  if (error) {
+    el("challenge-picker-message").textContent = error.message || "Couldn't send that challenge.";
+    show("challenge-picker-message");
+    el("challenge-send-btn").disabled = false;
+    return;
+  }
+  closeChallengePicker();
+  loadChallenges();
 });
 
 // ---------- Notifications (user request 08-24: "make sure the notification send and receiving is
