@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["4TV9XF754J.com.cesaryounes.keepup"],
+        "appID": "4TV9XF754J.com.cesaryounes.keepup",
+        "paths": ["/join", "/join/", "/join/*"],
+        "components": [
+          { "/": "/join", "comment": "Club invite link (query carries id + inviter)" },
+          { "/": "/join/", "comment": "Club invite link (query carries id + inviter)" },
+          { "/": "/join/*", "comment": "Older /join/<id> links" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["4TV9XF754J.com.cesaryounes.keepup"]
+  }
+}

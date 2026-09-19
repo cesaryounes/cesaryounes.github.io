@@ -170,11 +170,28 @@
         // Best-effort automatic handoff too, in case the app is installed but this device hasn't
         // finished (or ever completed) App Link verification — harmless no-op if it's not.
         window.location.href = deepLink;
+      } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        // iOS (09-19: "iPhone ... directed to web and not the app, although the app is
+        // installed"). With the app installed, a tapped https://.../join/ link normally never
+        // reaches this page at all — iOS opens the app straight from the link, via
+        // .well-known/apple-app-site-association naming it for /join/*. This branch is for the
+        // cases that DO land here (the link opened inside another app's browser, or the app
+        // isn't installed): try the keepup:// scheme the app registers, and keep the web
+        // dashboard one tap away.
+        var iosDeepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        joinCopy.textContent = 'Open this invite in the KeepUp app.';
+        getAppBtn.href = WEB_URL;
+        getAppBtn.textContent = 'Continue on the web instead';
+        installHint.style.display = 'none';
+        openBtn.textContent = 'Open in KeepUp';
+        openBtn.addEventListener('click', function () {
+          window.location.href = iosDeepLink;
+        });
+        window.location.href = iosDeepLink;
       } else {
-        // iOS (and anything else that isn't Android) — no native app to hand off to, so this
-        // just goes straight to the web dashboard. Not carrying the invite id through: the web
-        // dashboard has no "auto-join from a link" flow yet (only Discover/browse), so there's
-        // nothing useful to do with it there today.
+        // Desktop and anything else — no native app to hand off to, so this just goes straight
+        // to the web dashboard. Not carrying the invite id through: the web dashboard has no
+        // "auto-join from a link" flow yet (only Discover/browse).
         joinCopy.textContent = "KeepUp isn't available as an app here yet — continue on the web instead.";
         getAppBtn.href = WEB_URL;
         getAppBtn.textContent = 'Continue to KeepUp Web';
