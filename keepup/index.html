@@ -9219,6 +9219,12 @@ el("save-btn").addEventListener("click", async () => {
     }
 
     await showSavedStep(duration, calories);
+    // Refresh the score/session tallies right away — don't wait for collapseSubmitFlow's Done-only
+    // refresh (user report 09-22: "score wasn't reflected unless I closed and reopened the app").
+    // Any other way of leaving the flow (backdrop tap on the streak celebration, Cancel, back
+    // gesture) routes through collapseSubmitFlow({refresh:false}) and would otherwise leave the
+    // Activity Summary card showing pre-save numbers until the next cold load.
+    loadDashboard();
     checkStreakExtensionAndCelebrate(prevProfile?.current_streak, prevProfile?.gems);
   } catch (err) {
     alert(err.message || "Couldn't save this workout — try again.");
