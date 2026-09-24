@@ -1380,6 +1380,12 @@
   .compare-check { display: inline-flex; width: 18px; height: 18px; }
   .compare-check.yes { color: var(--accent); }
   .compare-check.no { color: var(--text-muted); opacity: 0.35; }
+  /* Standard vs Premium v2 (0171): some cells are values ("3", "4/month", "All time") rather
+     than check/cross icons, and one row carries a small sub-label under its feature name. */
+  .compare-text { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+  .compare-text.premium { color: var(--accent); }
+  .compare-feature-sub { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .compare-lead { font-size: 13px; color: var(--text-muted); line-height: 1.45; margin-bottom: 12px; }
 
   /* ---- Category picker (Log a workout — user request 08-24: "logos for the 6 categories") ----
      Grid, not the flex-row .gear-group-pill/.club-pill scroller pattern elsewhere on this page —
@@ -2708,7 +2714,7 @@
   <div class="modal-backdrop hidden" id="trial-started-backdrop">
     <div class="modal-card" id="trial-started-card">
       <p class="membership-title" style="color:var(--accent); margin-top:0;">Free for 1 month</p>
-      <p class="membership-desc" style="margin-bottom:20px;">Your Premium trial just started — private clubs, streak freezes, nudges and more, no card needed. It runs for 30 days; you can always see how much is left in Membership.</p>
+      <p class="membership-desc" style="margin-bottom:20px;">Your Premium trial just started — private clubs, more clubs, streak freezes and full history, no card needed. It runs for 30 days; you can always see how much is left in Membership.</p>
       <button class="btn-primary" id="trial-started-ok-btn">Let's go</button>
     </div>
   </div>
@@ -2725,7 +2731,7 @@
   <div class="modal-backdrop hidden" id="trial-ended-backdrop">
     <div class="modal-card" id="trial-ended-card">
       <p class="membership-title" style="color:var(--accent); margin-top:0;">Your trial has ended</p>
-      <p class="membership-desc" style="margin-bottom:20px;">Private clubs, streak freezes, nudges and club leaderboards are Premium features from here on. Keep using the Standard plan, or see your options.</p>
+      <p class="membership-desc" style="margin-bottom:20px;">Private clubs, more clubs, streak freezes and full history are Premium features from here on. Keep using the Standard plan, or see your options.</p>
       <div class="btn-row">
         <button class="btn-secondary" id="trial-ended-standard-btn" style="flex:1;">Continue with Standard</button>
         <button class="btn-primary" id="trial-ended-upgrade-btn" style="flex:1;">See options</button>
@@ -2780,6 +2786,7 @@
       <p class="muted hidden" id="promo-message" style="margin-top:10px;"></p>
     </div>
     <p class="section-label" style="margin: 20px 0 10px;">What's included</p>
+    <p class="compare-lead">Both plans include workout sync, points and levels, streaks, every leaderboard, clubs you're invited to, chat, challenges and nudges.</p>
     <div class="compare-table" id="compare-table"></div>
     <p class="muted" style="font-size:12px;">Upgrading itself happens through the KeepUp Android app's own subscription flow (Play Billing) — this page can only show what each plan includes and redeem a promo code.</p>
   </div>
@@ -4837,13 +4844,13 @@ function renderLeaderboardRows(rows) {
 
 // ---------- Club directory (join only — no create, no code needed) ----------
 //
-// Reuses the exact same server-side gates Android's own joinGroup() relies on. Public clubs are
-// free to join (capped at 3 for free accounts, 0072_free_public_club_join.sql) — this is what
-// makes the web page actually usable for someone with no Android app and no way to ever become
-// premium (Play Billing doesn't exist here). A private club with allow_score_uploads on can still
-// show up in this same list (the two settings are independent) — its "Request" button still goes
-// through fn_request_join_private_group, which still requires Premium, unchanged; whatever
-// message an RPC raises (limit hit, premium required, etc.) is just shown as-is, same as every
+// Reuses the exact same server-side gates Android's own joinGroup() relies on. Standard vs
+// Premium v2 (0171_standard_vs_premium_v2.sql): joining ANY club — public directly, private by
+// request — is free for everyone; the only cap is the club limit (Standard 3 clubs of any type,
+// Premium 10, enforced server-side by fn_assert_club_capacity). A private club with
+// allow_score_uploads on can still show up in this same list (the two settings are independent)
+// — its "Request" button goes through fn_request_join_private_group, no Premium needed; whatever
+// message an RPC raises (club limit hit, etc.) is just shown as-is, same as every
 // other error path on this page. groups' own RLS already allows reading any club (public SELECT
 // policy, 0028_fix_permissive_rls_leftovers.sql), so filtering to allow_score_uploads = true here
 // is just this page choosing what's relevant to show, not a new permission — every one of these
@@ -8340,7 +8347,7 @@ function renderMembershipCard(premiumUntil) {
     desc.textContent = `${daysLeft} day${daysLeft === 1 ? "" : "s"} left. Manage or extend from the KeepUp Android app, or redeem another code below.`;
   } else if (everPremium) {
     title.textContent = "Premium expired";
-    desc.textContent = "Your trial or subscription has ended — private clubs, streak freezes, nudges and club leaderboards need Premium. Redeem a code below, or upgrade from the app.";
+    desc.textContent = "Your trial or subscription has ended — private clubs, more clubs, streak freezes and full history need Premium. Redeem a code below, or upgrade from the app.";
   } else {
     title.textContent = "Standard plan";
     desc.textContent = "Upgrade from the KeepUp Android app, or redeem a promo code below.";
@@ -9777,13 +9784,14 @@ el("support-submit-btn").addEventListener("click", async () => {
 });
 
 // ---------- Membership comparison table (PREMIUM_FEATURES, SubscriptionScreen.kt) ----------
+// Standard vs Premium v2 (0171_standard_vs_premium_v2.sql): only the differences are listed —
+// everything both plans share is summed up in the .compare-lead line above the table. Each cell
+// is either true/false (check/cross icon) or a short text value.
 const PREMIUM_FEATURES = [
-  { label: "Global leaderboard", free: true },
-  { label: "Create and join public clubs (up to 3)", free: true },
-  { label: "Create and join private clubs", free: false },
-  { label: "Club leaderboards", free: false },
-  { label: "Streak freezes (4/month)", free: false },
-  { label: "Nudge your clubmates", free: false },
+  { label: "Create private clubs", standard: false, premium: true },
+  { label: "Clubs you can be in", standard: "3", premium: "10" },
+  { label: "Streak freezes", standard: false, premium: "4/month" },
+  { label: "Full history and trends", sub: "Podium archive, record history, 90-day effort", standard: "4 weeks", premium: "All time" },
 ];
 function compareCheckIcon(yes) {
   return yes
@@ -9792,8 +9800,12 @@ function compareCheckIcon(yes) {
 }
 function renderCompareTable() {
   let html = `<div class="compare-head"><span class="compare-feature"></span><span class="compare-col">STANDARD</span><span class="compare-col premium-col">PREMIUM</span></div>`;
+  const cell = (v, isPremium) => typeof v === "boolean"
+    ? compareCheckIcon(v)
+    : `<span class="compare-text${isPremium ? " premium" : ""}">${escapeHtml(v)}</span>`;
   PREMIUM_FEATURES.forEach((f) => {
-    html += `<div class="compare-row"><span class="compare-feature">${escapeHtml(f.label)}</span><span class="compare-col">${compareCheckIcon(f.free)}</span><span class="compare-col">${compareCheckIcon(true)}</span></div>`;
+    const sub = f.sub ? `<span class="compare-feature-sub">${escapeHtml(f.sub)}</span>` : "";
+    html += `<div class="compare-row"><span class="compare-feature">${escapeHtml(f.label)}${sub}</span><span class="compare-col">${cell(f.standard, false)}</span><span class="compare-col">${cell(f.premium, true)}</span></div>`;
   });
   el("compare-table").innerHTML = html;
 }
