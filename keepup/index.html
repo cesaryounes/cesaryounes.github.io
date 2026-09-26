@@ -1287,6 +1287,8 @@
   .activity-hero { display: flex; align-items: baseline; gap: 6px; margin: 18px 0 16px; }
   .activity-hero span:first-child { font-size: 38px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
   .activity-hero-unit { font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; }
+  /* Daily steps (0176_daily_steps.sql): muted "12,340 steps yesterday · +2 pts" under the PTS hero. */
+  .activity-steps-line { font-size: 12px; color: var(--text-muted); margin: -10px 0 14px; font-variant-numeric: tabular-nums; }
   .activity-tiles { display: flex; gap: 8px; }
   .activity-tile { flex: 1; background: var(--card-raised); border-radius: 12px; padding: 10px 6px; text-align: center; }
   .activity-tile-value { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1812,6 +1814,7 @@
             <div class="period-pill" data-period="alltime">All</div>
           </div>
           <div class="activity-hero"><span id="activity-points">—</span><span class="activity-hero-unit">PTS</span></div>
+          <div class="activity-steps-line hidden" id="activity-steps-line"></div>
           <div class="activity-tiles">
             <div class="activity-tile"><div class="activity-tile-value" id="activity-sessions">—</div><div class="activity-tile-label">Sessions</div></div>
             <div class="activity-tile"><div class="activity-tile-value" id="activity-duration">—</div><div class="activity-tile-label">Duration</div></div>
@@ -2396,6 +2399,18 @@
         </div>
         <label class="switch">
           <input type="checkbox" id="club-gear-bonus-toggle" />
+          <span class="track"></span><span class="thumb"></span>
+        </label>
+      </div>
+      <!-- Daily steps (0176_daily_steps.sql): groups.count_daily_steps, default on. Off = this club's
+           leaderboard, podiums and challenges leave step points out (server does the math). -->
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>
+          Count daily steps
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="club-daily-steps-toggle" />
           <span class="track"></span><span class="thumb"></span>
         </label>
       </div>
@@ -3863,7 +3878,7 @@ async function fetchThisWeekStreakData() {
   const mondayIso = isoDate(monday);
 
   const [{ data: workoutRows }, { data: freezeRows }] = await Promise.all([
-    supabase.from("workouts").select("local_date").eq("user_id", currentSession.user.id)
+    supabase.from("workouts").select("local_date, source").eq("user_id", currentSession.user.id)
       .is("rejected_at", null).gte("local_date", mondayIso),
     // streak_freeze_uses has its own "auth.uid() = user_id" SELECT policy — no RPC needed, same
     // as the Android app's own direct read (see 0017_premium_accounts.sql).
@@ -3872,7 +3887,8 @@ async function fetchThisWeekStreakData() {
   ]);
 
   return {
-    workoutLocalDates: (workoutRows || []).map((w) => w.local_date).filter(Boolean),
+    // A daily_steps row (0176) is points, not a workout — it never keeps a streak alive.
+    workoutLocalDates: (workoutRows || []).filter((w) => !isDailyStepsRow(w)).map((w) => w.local_date).filter(Boolean),
     freezeDatesThisWeek: (freezeRows || []).map((f) => f.freeze_date),
   };
 }
@@ -4187,10 +4203,36 @@ el("activity-see-all").addEventListener("click", () => {
   loadHistory();
 });
 
+// Daily steps points (0176_daily_steps.sql): one server-written workouts row per person per day,
+// source 'daily_steps', exercise_type 9000. Counts toward points, never toward workouts.
+function isDailyStepsRow(w) {
+  return w?.source === "daily_steps";
+}
+
+// Muted "12,340 steps yesterday · +2 pts" under the PTS hero — today's row if one exists yet,
+// otherwise yesterday's. Hidden when neither day has a (non-rejected) steps row.
+function renderActivityStepsLine(rows) {
+  const line = el("activity-steps-line");
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const pick = (iso) => (rows || []).find((w) => isDailyStepsRow(w) && !w.rejected_at && w.local_date === iso);
+  const todayRow = pick(isoDate(today));
+  const row = todayRow || pick(isoDate(yesterday));
+  if (!row || !row.steps) {
+    line.classList.add("hidden");
+    return;
+  }
+  const pts = Number(row.points_earned ?? 0);
+  const ptsLabel = Number.isInteger(pts) ? String(pts) : pts.toFixed(1);
+  line.textContent = `${Number(row.steps).toLocaleString()} steps ${todayRow ? "today" : "yesterday"} · +${ptsLabel} pts`;
+  line.classList.remove("hidden");
+}
+
 async function loadActivitySummary() {
   const { data, error } = await supabase
     .from("workouts")
-    .select("points_earned, duration_mins, calories, created_at, rejected_at")
+    .select("points_earned, duration_mins, calories, created_at, rejected_at, source, local_date, steps")
     .eq("user_id", currentSession.user.id);
   if (error || !data) {
     console.error("Couldn't load activity summary:", error);
@@ -4202,12 +4244,16 @@ async function loadActivitySummary() {
     .filter((w) => !w.rejected_at)
     .filter((w) => start === null || (w.created_at && new Date(w.created_at).getTime() >= start));
 
+  // Points include daily_steps rows (0176_daily_steps.sql); sessions/duration/calories are
+  // workouts only, so a steps day never counts as a session.
   const points = inPeriod.reduce((sum, w) => sum + Number(w.points_earned ?? 0), 0);
-  const duration = inPeriod.reduce((sum, w) => sum + Number(w.duration_mins ?? 0), 0);
-  const calories = inPeriod.reduce((sum, w) => sum + Number(w.calories ?? 0), 0);
+  const workoutsOnly = inPeriod.filter((w) => !isDailyStepsRow(w));
+  const duration = workoutsOnly.reduce((sum, w) => sum + Number(w.duration_mins ?? 0), 0);
+  const calories = workoutsOnly.reduce((sum, w) => sum + Number(w.calories ?? 0), 0);
 
   el("activity-points").textContent = formatHeroPoints(points);
-  el("activity-sessions").textContent = formatCompactCount(inPeriod.length);
+  el("activity-sessions").textContent = formatCompactCount(workoutsOnly.length);
+  renderActivityStepsLine(data);
   el("activity-duration").textContent = `${formatCompactCount(duration)} min`;
   el("activity-calories").textContent = formatCompactCount(calories);
 }
@@ -4280,7 +4326,7 @@ let lbSearchQuery = "";
 async function fetchMyClubs() {
   const { data, error } = await supabase
     .from("group_members")
-    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads, allow_gear_multipliers, owner_id, photo_url)")
+    .select("group_id, groups!inner(id, name, is_public, allow_score_uploads, allow_gear_multipliers, count_daily_steps, owner_id, photo_url)")
     .eq("user_id", currentSession.user.id);
   if (error) {
     console.error("Couldn't load your clubs:", error);
@@ -5220,6 +5266,7 @@ async function openClubDetail(group) {
     el("club-visibility-toggle").checked = !!group.is_public;
     el("club-score-uploads-toggle").checked = !!group.allow_score_uploads;
     el("club-gear-bonus-toggle").checked = !!group.allow_gear_multipliers;
+    el("club-daily-steps-toggle").checked = group.count_daily_steps !== false;
     el("club-invite-input").value = "";
     hide("club-manage-message");
     // Rename/Invite fields collapse behind their icon buttons again on every fresh open — see the
@@ -6818,6 +6865,18 @@ el("club-gear-bonus-toggle").addEventListener("change", async (e) => {
   currentClubDetail.allow_gear_multipliers = enabled;
 });
 
+el("club-daily-steps-toggle").addEventListener("change", async (e) => {
+  if (!currentClubDetail) return;
+  const enabled = e.target.checked;
+  const { error } = await supabase.from("groups").update({ count_daily_steps: enabled }).eq("id", currentClubDetail.id);
+  if (error) {
+    e.target.checked = !enabled;
+    alert(error.message);
+    return;
+  }
+  currentClubDetail.count_daily_steps = enabled;
+});
+
 // ---------- Club-owner workout audit (user request 08-26) ----------
 // Split from the button's own click handler (below) so exclude/restore can refresh the list
 // without re-calling openScreen()/history.pushState() a second time — that would leave a
@@ -6849,6 +6908,9 @@ el("club-audit-btn").addEventListener("click", () => {
 const CLUB_AUDIT_VERDICT_BADGE = { Clean: "badge-high", "Worth a look": "badge-medium", Flagged: "badge-low" };
 
 function renderClubAuditList(rows) {
+  // fn_club_workout_audit returns every workouts row, including server-written daily_steps rows
+  // (0176) — those aren't a workout to audit/exclude here, so drop them.
+  rows = rows.filter((r) => !isDailyStepsRow(r));
   const list = el("club-audit-list");
   if (rows.length === 0) {
     el("club-audit-empty").textContent = "No workouts logged in this club yet.";
@@ -7002,7 +7064,7 @@ function renderClubmateWorkoutsList(rows) {
           <div class="workout-icon-tile">${iconHtml}</div>
           <div style="min-width:0; flex:1;">
             <strong>${escapeHtml(label)}</strong>
-            <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(w.local_date || "")} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
+            <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(workoutMetaLine(w, w.local_date || ""))}</div>
           </div>
           <div class="history-row-score">${scoreHtml}</div>
         </div>
@@ -9386,6 +9448,8 @@ const EXERCISE_TYPE_LABELS = {
   73: "Open Water Swim", 74: "Swimming", 75: "Table Tennis", 76: "Tennis",
   78: "Volleyball", 79: "Walking", 80: "Water Polo", 81: "Weightlifting",
   82: "Wheelchair", 83: "Yoga",
+  // Not a Health Connect type — KeepUp's own server-written daily_steps row (0176_daily_steps.sql).
+  9000: "Daily steps",
 };
 
 async function loadHistory() {
@@ -9398,6 +9462,9 @@ async function loadHistory() {
     .from("workouts")
     .select("id, exercise_type, duration_mins, calories, avg_heart_rate, local_date, created_at, points_earned, rejected_at, rejected_reason, source")
     .eq("user_id", currentSession.user.id)
+    // Daily steps rows (0176_daily_steps.sql) are points, not workouts — keep them out of the list.
+    // (source can be null on old rows, and a plain neq would drop those too.)
+    .or("source.is.null,source.neq.daily_steps")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -9429,7 +9496,7 @@ const EXERCISE_ICON_FILES = {
   56: "run", 57: "run", 79: "walk", 37: "hike", 8: "cycle", 9: "cycle", 74: "swim", 73: "swim",
   70: "lift", 81: "lift", 11: "box", 44: "kick", 83: "yoga", 71: "stretch", 53: "row", 54: "row",
   61: "ski", 76: "tennis", 75: "tennis", 5: "ball", 64: "foot", 16: "dance", 51: "climb",
-  60: "skate", 39: "skate", 72: "surf",
+  60: "skate", 39: "skate", 72: "surf", 9000: "walk",
 };
 function workoutIconUrl(exerciseType) {
   const file = EXERCISE_ICON_FILES[exerciseType];
@@ -9452,8 +9519,18 @@ function categoryKeyForExerciseType(type) {
   // FIX (09-06): Walking (79) is now its own category (see CATEGORY_TO_CODE) — without this
   // branch a genuinely-walking web_photo row would fall into the "cardio" catch-all below and
   // silently show/default-edit as Cardio/HIIT instead of Walking.
-  if (type === 79) return "walking";
+  if (type === 79 || type === 9000) return "walking";
   return "cardio";
+}
+
+// "date · 45 min · 320 cal · 132 bpm" for a workout; a stray daily_steps row (exercise_type 9000,
+// 0176_daily_steps.sql) has no duration/calories/HR, so it reads "date · 12,340 steps" instead.
+function workoutMetaLine(w, dateLabel) {
+  if (w.exercise_type === 9000 || isDailyStepsRow(w)) {
+    const steps = w.steps != null ? `${Number(w.steps).toLocaleString()} steps` : "Daily steps";
+    return dateLabel ? `${dateLabel} · ${steps}` : steps;
+  }
+  return `${dateLabel} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm`;
 }
 
 function renderHistoryRow(w) {
@@ -9496,7 +9573,7 @@ function renderHistoryRow(w) {
     }</div>
     <div style="min-width:0; flex:1;">
       <strong>${escapeHtml(label)}</strong>${isWebUpload ? "" : `<span class="source-tag">via app</span>`}
-      <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(dateLabel)} · ${w.duration_mins} min · ${w.calories} cal · ${w.avg_heart_rate} bpm</div>
+      <div class="muted" style="font-size:12px; margin-top:2px;">${escapeHtml(workoutMetaLine(w, dateLabel))}</div>
       ${isRejected && w.rejected_reason ? `<div class="rejected-reason">${escapeHtml(w.rejected_reason)}</div>` : ""}
     </div>
     <div class="history-row-score">${scoreHtml}</div>
