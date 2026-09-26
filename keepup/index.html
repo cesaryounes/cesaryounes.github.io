@@ -783,6 +783,59 @@
      destructive one-off action rather than another reaction choice. */
   .club-chat-reaction-picker-delete { color: var(--danger); display: flex; align-items: center; justify-content: center; }
   .club-chat-reaction-picker-delete svg { width: 18px; height: 18px; }
+  /* Report (moderation, 0181_moderation_reports_blocks.sql) — same picker strip, only ever on
+     someone else's message; muted rather than danger-tinted since it opens a sheet, not a
+     one-tap destructive action. */
+  .club-chat-reaction-picker-report { color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+  .club-chat-reaction-picker-report svg { width: 18px; height: 18px; }
+  /* Tombstoned message (deleted by its sender, hidden after reports, or removed by KeepUp) — a
+     quiet dashed outline in place of the bubble fill, on both sides of the conversation. */
+  .club-chat-row .club-chat-bubble.is-tombstone {
+    background: transparent; border: 1px dashed var(--hairline); color: var(--text-muted);
+    font-style: italic; font-weight: 500;
+  }
+  .club-chat-avatar[data-uid], .club-chat-sender[data-uid] { cursor: pointer; }
+
+  /* ---- Moderation (0181): report sheet, member actions, blocked members ---- */
+  /* Above the chat overlay (50) and its reaction picker (60) — both sheets can open from chat. */
+  .modal-backdrop.modal-top { z-index: 65; }
+  .report-reason-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .report-reason {
+    display: flex; align-items: center; gap: 12px; text-align: left; min-height: 0;
+    background: var(--card-raised); border: 1px solid var(--hairline); color: var(--text-main);
+    border-radius: 12px; padding: 12px 14px; font-size: 14px; font-weight: 600;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .report-reason::before {
+    content: ""; width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid var(--text-muted); box-sizing: border-box; transition: all 0.15s ease;
+  }
+  .report-reason.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .report-reason.selected::before { border: 5px solid var(--accent); }
+  .report-done-icon {
+    width: 48px; height: 48px; border-radius: 50%; margin: 4px auto 12px; background: var(--accent-soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .report-done-icon svg { width: 24px; height: 24px; }
+  .member-action-list { display: flex; flex-direction: column; gap: 8px; }
+  .member-action-list button { min-height: 46px; }
+  .btn-danger-outline { color: var(--danger) !important; border-color: rgba(255,107,92,0.4) !important; }
+  .row-more-btn {
+    width: 28px; height: 28px; min-height: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: none; border: none; padding: 0; margin: 0; color: var(--text-muted); cursor: pointer;
+  }
+  .row-more-btn svg { width: 18px; height: 18px; }
+  .blocked-tag {
+    font-size: 10px; font-weight: 800; color: var(--danger); text-transform: uppercase;
+    letter-spacing: 0.03em; margin-left: 6px;
+  }
+  .blocked-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .blocked-row:last-child { border-bottom: none; }
+  .blocked-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .blocked-row button { width: auto; min-height: 36px; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
+  .legal-note { font-size: 12px; color: var(--text-muted); margin-top: 16px; line-height: 1.5; }
+  .legal-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .legal-note a:hover { text-decoration: underline; }
   /* @mention dropdown (user request 09-21) — same card/hairline language as the reaction picker
      above, sized to show ~4-5 rows before scrolling internally so a big club never pushes the
      composer off-screen. flex-shrink:0 so it never gets squeezed by the message list, same as
@@ -1665,6 +1718,7 @@
       <p class="muted" style="margin-bottom:16px;">Sign in with the same Google account you use on KeepUp.</p>
       <div id="google-signin-button" style="display:flex; justify-content:center;"></div>
       <p class="muted hidden" id="google-signin-error" style="margin-top:12px; color:var(--danger);"></p>
+      <p class="legal-note">By continuing you agree to KeepUp's <a href="https://cesaryounes.github.io/terms/" target="_blank" rel="noopener">Terms of Use</a> and <a href="https://cesaryounes.github.io/privacy/" target="_blank" rel="noopener">Privacy Policy</a>.</p>
     </div>
 
     <!-- Signed in -->
@@ -2592,6 +2646,11 @@
       <button type="button" class="club-chat-reaction-picker-delete hidden" id="club-chat-delete-btn" aria-label="Delete message">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
       </button>
+      <!-- Report (moderation, 0181) — the mirror image of the trash button above: only ever shown
+           on someone ELSE's message (fn_report_message rejects your own server-side anyway). -->
+      <button type="button" class="club-chat-reaction-picker-report hidden" id="club-chat-report-btn" aria-label="Report message" title="Report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+      </button>
     </div>
   </div>
 
@@ -2668,7 +2727,8 @@
       <p class="section-label" id="clubmate-workouts-title" style="margin-bottom:14px;">Workouts</p>
       <p class="muted" id="clubmate-workouts-empty">Loading…</p>
       <ul class="history-list hidden" id="clubmate-workouts-list"></ul>
-      <button class="btn-text" id="clubmate-workouts-close-btn" style="margin-top:10px;">Close</button>
+      <button class="btn-text hidden" id="clubmate-workouts-more-btn" style="margin-top:10px;">Report or block</button>
+      <button class="btn-text" id="clubmate-workouts-close-btn" style="margin-top:4px;">Close</button>
     </div>
   </div>
 
@@ -2697,6 +2757,55 @@
       </div>
       <button class="btn-text" id="nudge-cancel-btn" style="margin-top:10px;">Cancel</button>
       <p class="muted hidden" id="nudge-modal-message" style="margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <!-- Report sheet (moderation, 0181_moderation_reports_blocks.sql) — shared by "Report" on a chat
+       message (fn_report_message) and "Report member" (fn_report_member); same reasons/limits the
+       apps use. Two states in one card: the form, then a confirmation with an "Also block" offer.
+       .modal-top because it opens from on top of the club chat overlay. -->
+  <div class="modal-backdrop modal-top hidden" id="report-backdrop">
+    <div class="modal-card">
+      <div class="sheet-handle"></div>
+      <div id="report-form-view">
+        <p class="section-label" id="report-title" style="margin-bottom:6px;">Report message</p>
+        <p class="muted" style="margin-bottom:14px; font-size:13px;">Why are you reporting this? KeepUp reviews every report.</p>
+        <div class="report-reason-list" id="report-reason-list">
+          <button type="button" class="report-reason" data-reason="spam">Spam</button>
+          <button type="button" class="report-reason" data-reason="harassment">Harassment or bullying</button>
+          <button type="button" class="report-reason" data-reason="inappropriate">Inappropriate content</button>
+          <button type="button" class="report-reason" data-reason="other">Something else</button>
+        </div>
+        <div class="field">
+          <label for="report-details-input">Details (optional)</label>
+          <textarea id="report-details-input" rows="3" maxlength="500" placeholder="Anything that helps us understand what happened"></textarea>
+        </div>
+        <button class="btn-primary" id="report-send-btn" disabled>Send report</button>
+        <button class="btn-text" id="report-cancel-btn" style="margin-top:6px;">Cancel</button>
+        <p class="muted hidden" id="report-error" style="margin-top:8px; color:var(--danger);"></p>
+      </div>
+      <div class="hidden" id="report-done-view" style="text-align:center;">
+        <div class="report-done-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <p style="font-size:15px; font-weight:700; margin:0 0 16px;" id="report-done-text">Thanks — we'll review it.</p>
+        <button class="btn-secondary btn-danger-outline" id="report-also-block-btn">Also block</button>
+        <button class="btn-text" id="report-done-btn" style="margin-top:6px;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member actions (moderation, 0181) — opened from the ••• on a club member row, or by tapping
+       a sender's avatar/name in club chat. Report needs a club to report them in (fn_report_member's
+       p_group_id), so that row only shows when one is known; Block/Unblock always does. -->
+  <div class="modal-backdrop modal-top hidden" id="member-actions-backdrop">
+    <div class="modal-card">
+      <div class="sheet-handle"></div>
+      <p class="section-label" id="member-actions-title" style="margin-bottom:14px;">Member</p>
+      <div class="member-action-list">
+        <button class="btn-secondary" id="member-actions-report-btn">Report member</button>
+        <button class="btn-secondary btn-danger-outline" id="member-actions-block-btn">Block</button>
+      </div>
+      <button class="btn-text" id="member-actions-cancel-btn" style="margin-top:6px;">Cancel</button>
+      <p class="muted hidden" id="member-actions-error" style="margin-top:8px; color:var(--danger);"></p>
     </div>
   </div>
 
@@ -2902,6 +3011,14 @@
         <span class="track"></span><span class="thumb"></span>
       </label>
     </div>
+
+    <!-- Blocked members (moderation, 0181) — fn_my_blocked_users, refreshed every time Settings
+         opens. Unblocking brings their chat messages back right away (renderClubChatMessages
+         re-filters against myBlockedUserIds). -->
+    <p class="section-label" style="margin-bottom:10px; margin-top:24px;">Blocked members</p>
+    <p class="muted" id="blocked-members-empty" style="font-size:13px;">You haven't blocked anyone. Blocked members' chat messages are hidden from you, and they can't nudge or challenge you.</p>
+    <div id="blocked-members-list" class="hidden"></div>
+    <p class="legal-note" style="margin-top:24px;"><a href="https://cesaryounes.github.io/terms/" target="_blank" rel="noopener">Terms of Use</a> · <a href="https://cesaryounes.github.io/privacy/" target="_blank" rel="noopener">Privacy Policy</a> · <a href="https://cesaryounes.github.io/support/" target="_blank" rel="noopener">Support</a></p>
   </div>
 
   <!-- ============ SHOP (user request 08-23: "add the shop, exactly similar to the app") ============
@@ -3283,6 +3400,11 @@ async function renderAuthState() {
       trialEndCheckedThisSession = true;
       checkTrialEnded();
     }
+    // Moderation (0181): who this viewer has blocked, so their chat messages stay hidden.
+    if (!blockedUsersLoadedThisSession) {
+      blockedUsersLoadedThisSession = true;
+      loadMyBlockedUsers();
+    }
     switchTab(lastActiveTab());
     prefetchOtherTabs(lastActiveTab());
     refreshNotifications();
@@ -3330,6 +3452,9 @@ el("sign-out-btn").addEventListener("click", async () => {
   timezoneSyncedThisSession = false;
   trialGrantCheckedThisSession = false;
   trialEndCheckedThisSession = false;
+  blockedUsersLoadedThisSession = false;
+  myBlockedUsers = [];
+  myBlockedUserIds = new Set();
   await refreshSession();
 });
 
@@ -5253,6 +5378,12 @@ let currentClubDetail = null;
 // display name/avatar without its own round trip — same "join client-side against an
 // already-loaded member list" convention ClubMessage's own doc comment (Models.kt) describes.
 let currentClubMembers = [];
+// Moderation (0181): everyone this viewer has blocked — fn_my_blocked_users, loaded at sign-in.
+// Their club chat messages are never rendered (isClubChatMessageVisible). See the Moderation
+// section further down for the actions that change it.
+let myBlockedUsers = []; // [{out_user_id, out_display_name, out_avatar_url, out_blocked_at}]
+let myBlockedUserIds = new Set();
+let blockedUsersLoadedThisSession = false;
 
 async function openClubDetail(group) {
   currentClubDetail = group;
@@ -5305,7 +5436,10 @@ async function openClubDetail(group) {
   renderClubMembers(currentClubMembers, pendingInvites);
 }
 
+// Last pending-invites list drawn, so a re-render after a block/unblock keeps those rows.
+let lastRenderedClubPendingInvites = [];
 function renderClubMembers(members, pendingInvites = []) {
+  lastRenderedClubPendingInvites = pendingInvites;
   const list = el("club-members-list");
   list.innerHTML = "";
   if (members.length === 0) {
@@ -5329,8 +5463,9 @@ function renderClubMembers(members, pendingInvites = []) {
     const canRemove = currentClubDetail?.owner_id === currentSession.user.id && !isMe;
     li.innerHTML = `
       ${avatarWithNudgeHtml(m.display_name, m.avatar_url, 34, m.user_id, !isMe)}
-      <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}</div>
+      <div class="member-row-name">${escapeHtml(m.display_name || "Member")}${isMe ? " (You)" : ""}${m.is_owner ? '<span class="owner-badge">Owner</span>' : ""}${!isMe && myBlockedUserIds.has(m.user_id) ? '<span class="blocked-tag">Blocked</span>' : ""}</div>
       ${historyChevronHtml(m.user_id, m.display_name)}
+      ${isMe ? "" : `<button type="button" class="row-more-btn" data-uid="${m.user_id}" data-name="${escapeHtml(m.display_name || "Member")}" aria-label="More options for ${escapeHtml(m.display_name || "Member")}" title="Report or block"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>`}
       ${canRemove ? `<button type="button" class="row-remove-btn" data-uid="${m.user_id}" data-name="${escapeHtml(m.display_name || "Member")}" aria-label="Remove ${escapeHtml(m.display_name || "Member")} from the club" title="Remove from club"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>` : ""}
     `;
     // "See their past workouts" (user request 08-26) — every row here is already a fellow member
@@ -5356,6 +5491,10 @@ function renderClubMembers(members, pendingInvites = []) {
   });
   Array.from(list.querySelectorAll(".avatar-nudge-badge")).forEach((btn) => {
     btn.addEventListener("click", () => openNudgePicker(btn.dataset.uid, btn.dataset.name));
+  });
+  // Report / block (moderation, 0181) — see openMemberActions.
+  Array.from(list.querySelectorAll(".row-more-btn")).forEach((btn) => {
+    btn.addEventListener("click", () => openMemberActions(btn.dataset.uid, btn.dataset.name, currentClubDetail?.id || null));
   });
   Array.from(list.querySelectorAll(".row-remove-btn")).forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -5723,6 +5862,13 @@ async function openClubChat() {
       { event: "DELETE", schema: "public", table: "club_messages", filter: `group_id=eq.${group.id}` },
       (payload) => removeClubChatMessage(payload.old.id)
     )
+    // Updates (moderation, 0181) — a message tombstoned after 3 reports, removed by KeepUp's
+    // review, or soft-deleted by its sender flips to its tombstone text live for everyone here.
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "club_messages", filter: `group_id=eq.${group.id}` },
+      (payload) => replaceClubChatMessage(payload.new)
+    )
     .subscribe();
 
   if (clubChatReactionsChannel) {
@@ -5830,9 +5976,10 @@ function highlightClubChatMentions(html) {
  *  what the click delegate below (jumpToClubChatMessage) reads to know which row to jump to. */
 function clubChatReplyPreviewHtml(replyToId) {
   const original = clubChatMessagesById.get(replyToId);
-  if (!original) return "";
+  // A blocked sender's message isn't quoted either (moderation, 0181) — same as not rendering it.
+  if (!original || myBlockedUserIds.has(original.sender_id)) return "";
   const label = clubChatSenderLabel(original.sender_id);
-  const preview = original.image_url ? "📷 Photo" : (original.body || "");
+  const preview = clubChatTombstoneText(original) || (original.image_url ? "📷 Photo" : (original.body || ""));
   return `
     <span class="club-chat-reply-preview" data-reply-to="${replyToId}">
       <span class="club-chat-reply-sender">${escapeHtml(label)}</span>
@@ -5854,26 +6001,74 @@ function jumpToClubChatMessage(messageId) {
   setTimeout(() => row.classList.remove("club-chat-row-jump-highlight"), 1200);
 }
 
+/** Tombstone text for a soft-deleted message (club_messages.deleted_at, 0162) — hidden_reason
+ *  (0181) says whether it was hidden automatically after reports or removed by KeepUp's review;
+ *  anything else is the sender's own delete, worded the same as ClubChatScreen.kt. Returns null
+ *  for a live message. */
+function clubChatTombstoneText(message) {
+  if (!message.deleted_at) return null;
+  if (message.hidden_reason === "reported") return "Message hidden after reports";
+  if (message.hidden_reason === "removed") return "Message removed by KeepUp";
+  return "This message was deleted";
+}
+
 function clubChatBubbleHtml(message) {
   const isMine = message.sender_id === currentSession.user.id;
-  const inner = message.image_url
-    ? `<img src="${message.image_url}" alt="Shared screenshot" draggable="false" />`
-    : highlightClubChatMentions(linkifyText(message.body || ""));
+  const tombstone = clubChatTombstoneText(message);
+  const inner = tombstone
+    ? escapeHtml(tombstone)
+    : message.image_url
+      ? `<img src="${message.image_url}" alt="Shared screenshot" draggable="false" />`
+      : highlightClubChatMentions(linkifyText(message.body || ""));
   const senderLabel = clubChatSenderLabel(message.sender_id);
+  // data-uid makes the avatar/name tappable for member actions (report/block, 0181) — theirs only.
   const avatarHtml = isMine
     ? ""
-    : `<div class="club-chat-avatar" style="background:${clubChatAvatarColorFor(message.sender_id)};">${escapeHtml(senderLabel.slice(0, 1).toUpperCase())}</div>`;
-  const replyHtml = message.reply_to_id ? clubChatReplyPreviewHtml(message.reply_to_id) : "";
+    : `<div class="club-chat-avatar" data-uid="${message.sender_id}" style="background:${clubChatAvatarColorFor(message.sender_id)};">${escapeHtml(senderLabel.slice(0, 1).toUpperCase())}</div>`;
+  const replyHtml = message.reply_to_id && !tombstone ? clubChatReplyPreviewHtml(message.reply_to_id) : "";
+  const bubbleClass = tombstone ? " is-tombstone" : message.image_url ? " has-image" : "";
   return `
     <li class="club-chat-row ${isMine ? "mine" : ""}" data-id="${message.id}">
       ${avatarHtml}
       <div class="club-chat-bubble-wrap">
-        ${isMine ? "" : `<p class="club-chat-sender">${escapeHtml(senderLabel)}</p>`}
-        <div class="club-chat-bubble${message.image_url ? " has-image" : ""}">${replyHtml}${inner}</div>
-        <div class="club-chat-reaction-badge-slot">${reactionBadgeHtml(message.id)}</div>
+        ${isMine ? "" : `<p class="club-chat-sender" data-uid="${message.sender_id}">${escapeHtml(senderLabel)}</p>`}
+        <div class="club-chat-bubble${bubbleClass}">${replyHtml}${inner}</div>
+        <div class="club-chat-reaction-badge-slot">${tombstone ? "" : reactionBadgeHtml(message.id)}</div>
       </div>
     </li>
   `;
+}
+
+/** Blocked senders' messages never render (moderation, 0181) — they stay in clubChatMessagesById
+ *  so unblocking can bring them straight back without a refetch. */
+function isClubChatMessageVisible(message) {
+  if (myBlockedUserIds.has(message.sender_id)) return false;
+  if (clubChatHideAutoShare && message.is_auto_share) return false;
+  return true;
+}
+
+/** Re-renders the open chat from what's already loaded (clubChatMessagesById keeps insertion =
+ *  chronological order) — after a block/unblock changes who's visible. No-op when chat is closed. */
+function rerenderOpenClubChat() {
+  if (el("screen-club-chat").classList.contains("hidden")) return;
+  const list = el("club-chat-list");
+  const keepScroll = list.scrollTop;
+  renderClubChatMessages(Array.from(clubChatMessagesById.values()));
+  list.scrollTop = keepScroll;
+}
+
+/** Swaps one already-rendered row in place (realtime UPDATE — e.g. a message tombstoned after
+ *  reports, removed by review, or deleted by its sender on another device). */
+function replaceClubChatMessage(message) {
+  if (!clubChatMessagesById.has(message.id)) return;
+  clubChatMessagesById.set(message.id, message);
+  const row = el("club-chat-list").querySelector(`.club-chat-row[data-id="${message.id}"]`);
+  if (!row) return;
+  if (!isClubChatMessageVisible(message)) {
+    row.remove();
+    return;
+  }
+  row.outerHTML = clubChatBubbleHtml(message);
 }
 
 // Receiver-side preference (user request 09-19: "there should be a setting for these auto
@@ -5889,7 +6084,7 @@ function renderClubChatMessages(rows) {
   // (clubChatReplyPreviewHtml, jumpToClubChatMessage) still need to resolve a reply pointing at
   // one even if this viewer has chosen not to see it rendered directly.
   clubChatMessagesById = new Map(rows.map((m) => [m.id, m]));
-  const visibleRows = clubChatHideAutoShare ? rows.filter((m) => !m.is_auto_share) : rows;
+  const visibleRows = rows.filter(isClubChatMessageVisible);
   if (visibleRows.length === 0) {
     el("club-chat-empty").textContent = "No messages yet — say hi to your club.";
     show("club-chat-empty");
@@ -5912,7 +6107,7 @@ function appendClubChatMessage(message) {
   const list = el("club-chat-list");
   if (list.querySelector(`[data-id="${message.id}"]`)) return; // this device's own optimistic send
   clubChatMessagesById.set(message.id, message);
-  if (clubChatHideAutoShare && message.is_auto_share) return;
+  if (!isClubChatMessageVisible(message)) return;
   hide("club-chat-empty");
   show("club-chat-list");
   list.insertAdjacentHTML("beforeend", clubChatBubbleHtml(message));
@@ -5927,7 +6122,7 @@ function appendClubChatMessage(message) {
 // ---------- Reply-to (user request 09-12: "swipe right to reply") ----------
 function startClubChatReply(messageId) {
   const original = clubChatMessagesById.get(messageId);
-  if (!original) return;
+  if (!original || original.deleted_at) return;
   clubChatReplyTarget = original;
   el("club-chat-reply-bar-sender").textContent = clubChatSenderLabel(original.sender_id);
   el("club-chat-reply-bar-preview").textContent = original.image_url ? "📷 Photo" : (original.body || "");
@@ -6001,6 +6196,9 @@ let clubChatReactionPickerTargetId = null;
 // else does.
 let clubChatReactionPickerSuppressNextClick = false;
 function showClubChatReactionPicker(messageId, rowEl) {
+  const message = clubChatMessagesById.get(messageId);
+  // Nothing to react to, reply to, or report on a tombstone (deleted/hidden/removed message).
+  if (!message || message.deleted_at) return;
   clubChatReactionPickerTargetId = messageId;
   clubChatReactionPickerSuppressNextClick = true;
   const picker = el("club-chat-reaction-picker");
@@ -6008,11 +6206,12 @@ function showClubChatReactionPicker(messageId, rowEl) {
   picker.style.top = `${Math.max(8, rect.top - 54)}px`;
   // Delete (user request 09-13) — only ever offered on your own messages, matching the RLS DELETE
   // policy (0136) which already restricts this server-side regardless; hiding it here is purely
-  // about not showing an action that would just fail.
-  const message = clubChatMessagesById.get(messageId);
-  const isMine = message?.sender_id === currentSession.user.id;
+  // about not showing an action that would just fail. Report (0181) is the exact opposite: only
+  // on someone else's message. So the divider is always shown — one of the two always follows it.
+  const isMine = message.sender_id === currentSession.user.id;
   el("club-chat-delete-btn").classList.toggle("hidden", !isMine);
-  el("club-chat-reaction-picker-divider").classList.toggle("hidden", !isMine);
+  el("club-chat-report-btn").classList.toggle("hidden", isMine);
+  el("club-chat-reaction-picker-divider").classList.remove("hidden");
   picker.classList.remove("hidden");
 }
 function hideClubChatReactionPicker() {
@@ -6319,6 +6518,9 @@ const CLUB_CHAT_SWIPE_REPLY_PX = 50;
 const CLUB_CHAT_LONG_PRESS_MS = 450;
 let clubChatGesture = null; // { row, messageId, startX, startY, dragging }
 let clubChatLongPressTimer = null;
+// When the last swipe-to-reply drag ended — the avatar/name tap handler ignores the click a drag
+// released over them would otherwise produce.
+let clubChatLastDragEndAt = 0;
 function cancelClubChatLongPress() {
   if (clubChatLongPressTimer) {
     clearTimeout(clubChatLongPressTimer);
@@ -6370,6 +6572,7 @@ function clubChatGestureEnd(e) {
   cancelClubChatLongPress();
   if (!clubChatGesture) return;
   const dx = e.clientX - clubChatGesture.startX;
+  if (clubChatGesture.dragging) clubChatLastDragEndAt = Date.now();
   clubChatGesture.row.style.transition = "transform 0.18s ease";
   clubChatGesture.row.style.transform = "";
   if (clubChatGesture.dragging && dx > CLUB_CHAT_SWIPE_REPLY_PX) {
@@ -6398,6 +6601,23 @@ el("club-chat-delete-btn").addEventListener("click", () => {
   const messageId = clubChatReactionPickerTargetId;
   hideClubChatReactionPicker();
   if (messageId) deleteClubChatMessage(messageId);
+});
+el("club-chat-report-btn").addEventListener("click", () => {
+  const messageId = clubChatReactionPickerTargetId;
+  hideClubChatReactionPicker();
+  const message = messageId ? clubChatMessagesById.get(messageId) : null;
+  if (message) openReportMessage(message);
+});
+// Tapping a sender's avatar or name opens member actions (report/block, 0181) — plain click, so it
+// never competes with the row's long-press (a long-press never produces this click: the picker's
+// one-shot click suppression above swallows it first).
+el("club-chat-list").addEventListener("click", (e) => {
+  const target = e.target.closest(".club-chat-avatar[data-uid], .club-chat-sender[data-uid]");
+  if (!target) return;
+  // The trailing click of a long-press (picker just opened) or of a swipe isn't a tap.
+  if (clubChatReactionPickerSuppressNextClick || Date.now() - clubChatLastDragEndAt < 300) return;
+  const uid = target.dataset.uid;
+  openMemberActions(uid, clubChatSenderLabel(uid), currentClubDetail?.id || null);
 });
 document.addEventListener("click", (e) => {
   if (clubChatReactionPickerSuppressNextClick) {
@@ -7007,7 +7227,11 @@ function wireHistoryChevrons(container) {
   });
 }
 
+// Who the clubmate-workouts sheet is currently showing — read by its "Report or block" button.
+let clubmateWorkoutsTarget = null;
 async function openClubmateWorkouts(userId, displayName) {
+  clubmateWorkoutsTarget = { userId, displayName };
+  el("clubmate-workouts-more-btn").classList.toggle("hidden", userId === currentSession.user.id);
   el("clubmate-workouts-title").textContent = `${displayName}'s recent workouts`;
   el("clubmate-workouts-empty").textContent = "Loading…";
   show("clubmate-workouts-empty");
@@ -7083,6 +7307,19 @@ function closeClubmateWorkouts() {
   setTimeout(() => hide("clubmate-workouts-backdrop"), 280);
 }
 el("clubmate-workouts-close-btn").addEventListener("click", closeClubmateWorkouts);
+// Report / block from the clubmate sheet (moderation, 0181). The club to report them in is the one
+// on screen: the open club detail, else a club-scoped leaderboard; Global/Region has none, so only
+// Block is offered there (openMemberActions hides Report without a group).
+el("clubmate-workouts-more-btn").addEventListener("click", () => {
+  if (!clubmateWorkoutsTarget) return;
+  const clubDetailOpen = !el("screen-club-detail").classList.contains("hidden");
+  const groupId = clubDetailOpen && currentClubDetail
+    ? currentClubDetail.id
+    : currentScope.type === "club" ? currentScope.id : null;
+  const { userId, displayName } = clubmateWorkoutsTarget;
+  closeClubmateWorkouts();
+  openMemberActions(userId, displayName, groupId);
+});
 el("clubmate-workouts-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "clubmate-workouts-backdrop") closeClubmateWorkouts();
 });
@@ -9719,6 +9956,7 @@ el("more-menu-settings").addEventListener("click", () => {
     await refreshNotifyPrefToggles();
   })();
   refreshAutoShareToggle(); // not part of the push-toggle sequence above — unrelated preference
+  loadMyBlockedUsers(); // Blocked members section (moderation, 0181) — always fresh on open
 });
 // Profile is a real tab (#tab-profile, part of TAB_ORDER), not an overlay like Membership/Shop/
 // Settings — so this closes the popover and switches to it directly, rather than going through
@@ -9728,6 +9966,236 @@ el("more-menu-profile").addEventListener("click", () => {
   switchTab("profile");
 });
 el("more-menu-shop").addEventListener("click", () => { openScreen("screen-shop"); loadShop(); });
+
+// ---------- Moderation: report & block (0181_moderation_reports_blocks.sql) ----------
+//
+// Same contract the Android/iOS apps use: fn_report_message / fn_report_member (reason one of
+// spam|harassment|inappropriate|other, optional details up to 500 chars), fn_block_user /
+// fn_unblock_user, and fn_my_blocked_users for the set of people whose chat messages this viewer
+// never sees. Blocking is silent — the other person isn't told — and the server already stops
+// their chat pushes and nudges reaching you and challenges in either direction; the client's only
+// job is hiding their messages (isClubChatMessageVisible) and offering the actions.
+// State (myBlockedUsers / myBlockedUserIds) is declared up next to currentClubMembers — the chat
+// renderer reads it long before this section.
+
+async function loadMyBlockedUsers() {
+  const { data, error } = await supabase.rpc("fn_my_blocked_users");
+  if (error) {
+    console.error("Couldn't load blocked members:", error);
+    return;
+  }
+  myBlockedUsers = data || [];
+  myBlockedUserIds = new Set(myBlockedUsers.map((b) => b.out_user_id));
+  renderBlockedMembers();
+  rerenderOpenClubChat();
+}
+
+function renderBlockedMembers() {
+  const list = el("blocked-members-list");
+  if (!list) return;
+  if (myBlockedUsers.length === 0) {
+    list.innerHTML = "";
+    hide("blocked-members-list");
+    show("blocked-members-empty");
+    return;
+  }
+  hide("blocked-members-empty");
+  show("blocked-members-list");
+  list.innerHTML = myBlockedUsers.map((b) => {
+    const name = b.out_display_name || "Member";
+    return `
+      <div class="blocked-row">
+        ${avatarHtml(name, b.out_avatar_url, 34)}
+        <div class="blocked-row-name">${escapeHtml(name)}</div>
+        <button type="button" class="btn-secondary" data-unblock-uid="${b.out_user_id}">Unblock</button>
+      </div>
+    `;
+  }).join("");
+  Array.from(list.querySelectorAll("[data-unblock-uid]")).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const ok = await unblockUser(btn.dataset.unblockUid);
+      if (!ok) btn.disabled = false;
+    });
+  });
+}
+
+/** Confirms, blocks, and updates everything that depends on the blocked set. Returns true on success. */
+async function blockUser(userId, displayName) {
+  const name = displayName || "this member";
+  if (!confirm(`Block ${name}? You won't see their messages in club chat, get their nudges, or be challenged by them. They won't be told.`)) return false;
+  const { error } = await supabase.rpc("fn_block_user", { p_user_id: userId });
+  if (error) {
+    console.error("Block error:", error);
+    alert(error.message || "Couldn't block them right now.");
+    return false;
+  }
+  myBlockedUserIds.add(userId);
+  if (!myBlockedUsers.some((b) => b.out_user_id === userId)) {
+    myBlockedUsers.unshift({ out_user_id: userId, out_display_name: displayName || null, out_avatar_url: null, out_blocked_at: new Date().toISOString() });
+  }
+  afterBlockListChanged();
+  loadMyBlockedUsers(); // refresh real names/avatars in the background
+  return true;
+}
+
+async function unblockUser(userId) {
+  const { error } = await supabase.rpc("fn_unblock_user", { p_user_id: userId });
+  if (error) {
+    console.error("Unblock error:", error);
+    alert(error.message || "Couldn't unblock them right now.");
+    return false;
+  }
+  myBlockedUserIds.delete(userId);
+  myBlockedUsers = myBlockedUsers.filter((b) => b.out_user_id !== userId);
+  afterBlockListChanged();
+  return true;
+}
+
+function afterBlockListChanged() {
+  renderBlockedMembers();
+  rerenderOpenClubChat();
+  // The club member list shows a "Blocked" tag per row — redraw it from what's already loaded.
+  if (currentClubDetail && !el("screen-club-detail").classList.contains("hidden") && currentClubMembers.length) {
+    renderClubMembers(currentClubMembers, lastRenderedClubPendingInvites);
+  }
+}
+
+// ----- Report sheet -----
+// { kind: "message", messageId, userId, name } | { kind: "member", userId, groupId, name }
+let reportTarget = null;
+let reportReason = null;
+
+function openReportSheet(target) {
+  reportTarget = target;
+  reportReason = null;
+  el("report-title").textContent = target.kind === "message" ? "Report message" : `Report ${target.name || "member"}`;
+  Array.from(el("report-reason-list").querySelectorAll(".report-reason")).forEach((b) => b.classList.remove("selected"));
+  el("report-details-input").value = "";
+  el("report-send-btn").disabled = true;
+  el("report-send-btn").textContent = "Send report";
+  el("report-also-block-btn").disabled = false;
+  hide("report-error");
+  show("report-form-view");
+  hide("report-done-view");
+  show("report-backdrop");
+}
+function openReportMessage(message) {
+  const name = clubChatSenderLabel(message.sender_id);
+  openReportSheet({ kind: "message", messageId: message.id, userId: message.sender_id, name });
+}
+function closeReportSheet() {
+  hide("report-backdrop");
+  reportTarget = null;
+}
+
+Array.from(el("report-reason-list").querySelectorAll(".report-reason")).forEach((btn) => {
+  btn.addEventListener("click", () => {
+    reportReason = btn.dataset.reason;
+    Array.from(el("report-reason-list").querySelectorAll(".report-reason")).forEach((b) => b.classList.toggle("selected", b === btn));
+    el("report-send-btn").disabled = false;
+  });
+});
+
+el("report-send-btn").addEventListener("click", async () => {
+  if (!reportTarget || !reportReason) return;
+  const target = reportTarget;
+  const details = el("report-details-input").value.trim().slice(0, 500) || null;
+  const sendBtn = el("report-send-btn");
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending…";
+  hide("report-error");
+
+  let hiddenNow = false;
+  let error = null;
+  if (target.kind === "message") {
+    const res = await supabase.rpc("fn_report_message", { p_message_id: target.messageId, p_reason: reportReason, p_details: details });
+    error = res.error;
+    const row = Array.isArray(res.data) ? res.data[0] : res.data;
+    hiddenNow = !!row?.out_hidden;
+  } else {
+    const res = await supabase.rpc("fn_report_member", { p_user_id: target.userId, p_group_id: target.groupId, p_reason: reportReason, p_details: details });
+    error = res.error;
+  }
+  if (reportTarget !== target) return; // sheet was closed/reopened meanwhile
+  if (error) {
+    console.error("Report error:", error);
+    el("report-error").textContent = error.message || "Couldn't send the report. Try again.";
+    show("report-error");
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send report";
+    return;
+  }
+
+  // That report was the one that hid it for everyone — reflect it here right away rather than
+  // waiting on the realtime UPDATE echo.
+  if (hiddenNow && target.kind === "message") {
+    const original = clubChatMessagesById.get(target.messageId);
+    if (original) {
+      replaceClubChatMessage({ ...original, deleted_at: new Date().toISOString(), hidden_reason: "reported", body: "", image_url: null });
+    }
+  }
+  el("report-done-text").textContent = hiddenNow
+    ? "Thanks — this message is now hidden while we review it."
+    : "Thanks — we'll review it.";
+  el("report-also-block-btn").textContent = `Also block ${target.name || "this member"}`;
+  el("report-also-block-btn").classList.toggle("hidden", myBlockedUserIds.has(target.userId));
+  hide("report-form-view");
+  show("report-done-view");
+});
+
+el("report-also-block-btn").addEventListener("click", async () => {
+  if (!reportTarget) return;
+  const { userId, name } = reportTarget;
+  const btn = el("report-also-block-btn");
+  btn.disabled = true;
+  const ok = await blockUser(userId, name);
+  btn.disabled = false;
+  if (ok) closeReportSheet();
+});
+el("report-done-btn").addEventListener("click", closeReportSheet);
+el("report-cancel-btn").addEventListener("click", closeReportSheet);
+el("report-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "report-backdrop") closeReportSheet();
+});
+
+// ----- Member actions sheet -----
+let memberActionsTarget = null; // { userId, name, groupId }
+
+function openMemberActions(userId, displayName, groupId) {
+  if (!userId || userId === currentSession.user.id) return;
+  const name = displayName || "Member";
+  memberActionsTarget = { userId, name, groupId: groupId || null };
+  el("member-actions-title").textContent = name;
+  el("member-actions-report-btn").classList.toggle("hidden", !groupId);
+  el("member-actions-block-btn").textContent = myBlockedUserIds.has(userId) ? `Unblock ${name}` : `Block ${name}`;
+  el("member-actions-block-btn").disabled = false;
+  hide("member-actions-error");
+  show("member-actions-backdrop");
+}
+function closeMemberActions() {
+  hide("member-actions-backdrop");
+  memberActionsTarget = null;
+}
+el("member-actions-report-btn").addEventListener("click", () => {
+  if (!memberActionsTarget?.groupId) return;
+  const { userId, name, groupId } = memberActionsTarget;
+  closeMemberActions();
+  openReportSheet({ kind: "member", userId, groupId, name });
+});
+el("member-actions-block-btn").addEventListener("click", async () => {
+  if (!memberActionsTarget) return;
+  const { userId, name } = memberActionsTarget;
+  const btn = el("member-actions-block-btn");
+  btn.disabled = true;
+  const ok = myBlockedUserIds.has(userId) ? await unblockUser(userId) : await blockUser(userId, name);
+  btn.disabled = false;
+  if (ok) closeMemberActions();
+});
+el("member-actions-cancel-btn").addEventListener("click", closeMemberActions);
+el("member-actions-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "member-actions-backdrop") closeMemberActions();
+});
 
 // ---------- Contact support (user request 08-24) ----------
 //

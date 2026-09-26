@@ -84,14 +84,14 @@
   <p class="eyebrow">Privacy policy</p>
   <h1>KeepUp</h1>
   <div class="meta">
-    <span class="pill">Effective August 16, 2026</span>
+    <span class="pill">Last updated September 27, 2026</span>
     <span>Contact: <a href="mailto:cesar.younes@gmail.com">cesar.younes@gmail.com</a></span>
   </div>
 
   <section>
     <h2>Who this policy covers</h2>
-    <p>KeepUp is a fitness and accountability app that turns your workouts into points, streaks, and friendly competition with clubs of friends. It's developed by Cesar Younes. This policy explains what information KeepUp collects, why, and what control you have over it.</p>
-    <p class="muted">By creating a KeepUp account, you agree to the practices described here.</p>
+    <p>KeepUp is a fitness and accountability app that turns your workouts into points, streaks, and friendly competition with clubs of friends. It's developed by Cesar Younes. This policy explains what information KeepUp collects, why, and what control you have over it. It applies to the Android app, the iPhone app, and the KeepUp web dashboard.</p>
+    <p class="muted">By creating a KeepUp account, you agree to the practices described here and to our <a href="/terms/">Terms of Use</a>.</p>
   </section>
 
   <section>
@@ -101,7 +101,7 @@
       <tr><th>Data</th><th>Source &amp; purpose</th></tr>
       <tr>
         <td class="what">Name, email, profile photo</td>
-        <td class="why">From Google Sign-In, to create and identify your account.</td>
+        <td class="why">From Google Sign-In or Sign in with Apple, to create and identify your account.</td>
       </tr>
       <tr>
         <td class="what">First name, family name, date of birth</td>
@@ -113,15 +113,31 @@
       </tr>
       <tr>
         <td class="what">Workout data — exercise type, duration, calories, heart rate</td>
-        <td class="why">Read from Android Health Connect, with your explicit permission, to calculate your points, streaks, and Estimated Effort score. KeepUp never writes anything back to Health Connect.</td>
+        <td class="why">Read from Android Health Connect or Apple Health (HealthKit), with your explicit permission, to calculate your points, streaks, and Estimated Effort score. KeepUp never writes anything back to Health Connect or Apple Health. See <a href="#health">Health data</a>.</td>
+      </tr>
+      <tr>
+        <td class="what">Daily step counts</td>
+        <td class="why">Read from Health Connect or Apple Health, with your explicit permission, to award steps points and show your daily steps in the app and in clubs that count steps.</td>
       </tr>
       <tr>
         <td class="what">Club, streak, and points activity</td>
-        <td class="why">Created by using the app — which clubs you're in, your streak, your rank, nudges you send or receive.</td>
+        <td class="why">Created by using the app — which clubs you're in, your streak, your rank, nudges you send or receive, and messages you post in club chat.</td>
+      </tr>
+      <tr>
+        <td class="what">Reports and blocked members</td>
+        <td class="why">Reports you send (the reason, any details you add, and a copy of the reported message) and the list of members you've blocked. Used to keep clubs safe — see <a href="#moderation">Moderation</a>.</td>
+      </tr>
+      <tr>
+        <td class="what">Purchase confirmations</td>
+        <td class="why">When you subscribe to Premium, the payment is processed by Apple (App Store) or Google (Google Play). KeepUp only receives confirmation of the purchase — which plan, and whether it's active — never your card or payment details.</td>
+      </tr>
+      <tr>
+        <td class="what">Crash reports</td>
+        <td class="why">Collected by Firebase Crashlytics when the app crashes: crash logs and basic device info (device model, operating system and app version), used only to find and fix bugs.</td>
       </tr>
       <tr>
         <td class="what">Push notification token</td>
-        <td class="why">Assigned by Firebase Cloud Messaging to your device, used to deliver the notifications you've enabled.</td>
+        <td class="why">Assigned to your device by Firebase Cloud Messaging (or your browser, on the web dashboard), used to deliver the notifications you've enabled.</td>
       </tr>
       <tr>
         <td class="what">Advertising identifiers</td>
@@ -131,14 +147,28 @@
     <p class="muted">KeepUp does not request your location, contacts, microphone, or camera access — photo uploads go through your device's own camera or gallery app, and KeepUp only ever receives the resulting image.</p>
   </section>
 
+  <section id="health">
+    <h2>Health data (Health Connect &amp; Apple Health)</h2>
+    <p>If you connect Android Health Connect or Apple Health (HealthKit), KeepUp reads only:</p>
+    <ul>
+      <li><strong>Workouts</strong> — exercise type, duration, calories burned, and heart rate.</li>
+      <li><strong>Daily step counts.</strong></li>
+    </ul>
+    <p>Nothing else is read, and KeepUp never writes, edits, or deletes anything in Health Connect or Apple Health.</p>
+    <div class="callout"><strong>Health data is used only to score your workouts and steps and to show them to you in the app and to the clubs you're in.</strong> It is never used for advertising or marketing, never sold, and never shared with third parties for advertising, marketing, or data-brokering purposes. Health data read from Apple Health is not stored in iCloud.</div>
+    <p class="muted">You can turn off access at any time — see <a href="#choices">Your choices</a>. KeepUp then simply stops syncing new workouts and steps.</p>
+  </section>
+
   <section>
     <h2>How we use it</h2>
     <ul>
-      <li>Calculate your points, XP, level, streaks, and Estimated Effort score from your synced workouts.</li>
-      <li>Show leaderboards and club standings to the people you're actually in a club with.</li>
-      <li>Send the notifications you've opted into — streak reminders, leaderboard changes, nudges from clubmates.</li>
-      <li>Keep your account working — signing you in, remembering your preferences, letting you recover your session.</li>
-      <li>Serve advertising to free accounts, once real ads are enabled (see <a href="#ads">Advertising</a>).</li>
+      <li>Calculate your points, XP, level, streaks, and Estimated Effort score from your synced workouts and daily steps.</li>
+      <li>Show leaderboards, club standings, and club chat to the people you're actually in a club with.</li>
+      <li>Send the notifications you've opted into — streak reminders, leaderboard changes, nudges and messages from clubmates.</li>
+      <li>Keep your account working — signing you in, remembering your preferences, restoring your Premium subscription.</li>
+      <li>Review reports and act on content or members that break our <a href="/terms/">Terms of Use</a>.</li>
+      <li>Find and fix crashes and bugs.</li>
+      <li>Serve advertising to free accounts, once real ads are enabled (see <a href="#ads">Advertising</a>). Health data is never used for this.</li>
     </ul>
   </section>
 
@@ -147,22 +177,32 @@
     <p>We don't sell your data. It's shared only with the services that make KeepUp work:</p>
     <ul>
       <li><strong>Supabase</strong> — hosts KeepUp's database and handles account authentication.</li>
-      <li><strong>Google</strong> — Sign-In (your account), Health Connect (your workout data, read locally on your device), Firebase Cloud Messaging (push notifications), and AdMob (advertising).</li>
+      <li><strong>Google</strong> — Sign-In (your account), Health Connect (your workout and step data, read on your device), Firebase Cloud Messaging (push notifications), Firebase Crashlytics (crash reports), Google Play (subscription payments), and AdMob (advertising).</li>
+      <li><strong>Apple</strong> — Sign in with Apple (your account), Apple Health (your workout and step data, read on your iPhone), and the App Store (subscription payments).</li>
     </ul>
-    <p class="muted">Other members of a club you're in can see your display name, avatar, level, and activity within that club — that visibility is the point of the app, not a third-party disclosure.</p>
+    <p class="muted">Other members of a club you're in can see your display name, avatar, level, activity, and chat messages within that club — that visibility is the point of the app, not a third-party disclosure.</p>
+  </section>
+
+  <section id="moderation">
+    <h2>Moderation</h2>
+    <p>You can report a club chat message or a club member, and block members you don't want to hear from. When you send a report, KeepUp stores the reason, any details you add, and a copy of the reported message or photo, and reviews it — even if the original message is later deleted. The person you report isn't told who reported them.</p>
+    <p>Your blocked-members list is stored so their messages stay hidden from you and they can't nudge or challenge you. Blocking is private — the other person isn't told. Reports are kept for as long as needed to review and act on them; your own reports and blocks are deleted along with your account.</p>
   </section>
 
   <section id="ads">
     <h2>Advertising</h2>
-    <p>Free KeepUp accounts may see advertising served through Google AdMob, which can use an advertising identifier to show and measure ads. Premium accounts don't see ads.</p>
+    <p>Free KeepUp accounts may see advertising served through Google AdMob, which can use an advertising identifier to show and measure ads. Premium accounts don't see ads. Health data from Health Connect or Apple Health is never used for advertising.</p>
     <div class="callout"><strong>If you're in the EEA, UK, or California,</strong> KeepUp asks for your consent before showing personalized ads, in line with applicable law. You can revisit that choice anytime in the app's Settings.</div>
   </section>
 
-  <section>
+  <section id="choices">
     <h2>Your choices</h2>
     <ul>
       <li><strong>Notifications</strong> — turn any notification type on or off in Settings, at any time.</li>
-      <li><strong>Health Connect access</strong> — revoke it anytime in Android's Health Connect settings; KeepUp simply stops syncing new workouts.</li>
+      <li><strong>Health Connect access</strong> — revoke it anytime in Android's Health Connect settings.</li>
+      <li><strong>Apple Health access</strong> — turn it off anytime on your iPhone in Settings → Health → Data Access &amp; Devices → KeepUp.</li>
+      <li><strong>Subscriptions</strong> — manage or cancel Premium in your App Store or Google Play subscription settings.</li>
+      <li><strong>Blocked members</strong> — see and unblock them anytime in Settings.</li>
       <li><strong>Delete your account</strong> — from Account → Cancel account, or from <a href="/delete-account/">this page</a> if you no longer have the app. This permanently deletes your profile, workouts, and activity. If you own a club, you'll need to delete or hand it off first.</li>
       <li><strong>Access or correct your data</strong> — most of it is editable directly in the app; for anything else, email us (see <a href="#contact">Contact</a>).</li>
     </ul>
@@ -170,12 +210,12 @@
 
   <section>
     <h2>Data retention</h2>
-    <p>We keep your data for as long as your account is active. Deleting your account removes your profile, workout history, and club activity from our systems right away — it isn't a soft delete or a 30-day grace period, it's immediate.</p>
+    <p>We keep your data for as long as your account is active. Deleting your account removes your profile, workout and step history, and club activity from our systems right away — it isn't a soft delete or a 30-day grace period, it's immediate.</p>
   </section>
 
   <section>
     <h2>Children's privacy</h2>
-    <p>KeepUp isn't directed at children, and we don't knowingly collect information from anyone under 13. If you believe a child has created an account, contact us and we'll remove it.</p>
+    <p>KeepUp is intended for people 18 and older and isn't directed at children. We don't knowingly collect information from anyone under 18. If you believe a minor has created an account, contact us and we'll remove it.</p>
   </section>
 
   <section>
@@ -185,15 +225,15 @@
 
   <section>
     <h2>Changes to this policy</h2>
-    <p>If this policy changes in a meaningful way, we'll update the effective date above and, for significant changes, let you know in the app.</p>
+    <p>If this policy changes in a meaningful way, we'll update the date above and, for significant changes, let you know in the app.</p>
   </section>
 
   <section id="contact">
     <h2>Contact</h2>
-    <p>Questions, requests, or concerns about your data: <a href="mailto:cesar.younes@gmail.com">cesar.younes@gmail.com</a>.</p>
+    <p>Questions, requests, or concerns about your data: <a href="mailto:cesar.younes@gmail.com">cesar.younes@gmail.com</a>. You can also visit <a href="/support/">KeepUp Support</a>.</p>
   </section>
 
-  <footer>KeepUp · <a href="/">home</a> · <a href="/delete-account/">delete account</a></footer>
+  <footer>KeepUp · <a href="/">home</a> · <a href="/terms/">terms of use</a> · <a href="/support/">support</a> · <a href="/delete-account/">delete account</a></footer>
 </div>
 </body>
 </html>
