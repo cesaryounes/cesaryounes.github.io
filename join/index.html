@@ -122,7 +122,7 @@
       var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.example.keepup";
       var APK_URL = "/downloads/keepup-debug.apk";
       // ---- end swap block ----
-      var WEB_URL = "https://cesaryounes.github.io/keepup/";
+
 
       var getAppBtn = document.getElementById('getAppBtn');
       var joinCopy = document.getElementById('joinCopy');
@@ -179,9 +179,9 @@
         // isn't installed): try the keepup:// scheme the app registers, and keep the web
         // dashboard one tap away.
         var iosDeepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        // (09-27: web dashboard closed) no web fallback anymore — the app is the only way in.
         joinCopy.textContent = 'Open this invite in the KeepUp app.';
-        getAppBtn.href = WEB_URL;
-        getAppBtn.textContent = 'Continue on the web instead';
+        getAppBtn.style.display = 'none';
         installHint.style.display = 'none';
         openBtn.textContent = 'Open in KeepUp';
         openBtn.addEventListener('click', function () {
@@ -189,15 +189,12 @@
         });
         window.location.href = iosDeepLink;
       } else {
-        // Desktop and anything else — no native app to hand off to, so this just goes straight
-        // to the web dashboard. Not carrying the invite id through: the web dashboard has no
-        // "auto-join from a link" flow yet (only Discover/browse).
-        joinCopy.textContent = "KeepUp isn't available as an app here yet — continue on the web instead.";
-        getAppBtn.href = WEB_URL;
-        getAppBtn.textContent = 'Continue to KeepUp Web';
+        // Desktop and anything else (09-27: the web dashboard is closed) — KeepUp is phone-only,
+        // so say so instead of redirecting to the web.
+        joinCopy.textContent = 'Open this link on your phone to join in the KeepUp app.';
+        getAppBtn.style.display = 'none';
         installHint.style.display = 'none';
         openBtn.style.display = 'none';
-        window.location.href = WEB_URL;
       }
     })();
   </script>
