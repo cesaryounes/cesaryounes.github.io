@@ -135,6 +135,9 @@
         return;
       }
       var inviterId = params.get('inviter');
+      // Secret invite token (0196): proves the link came from a club member. Passed on untouched.
+      var inviteToken = params.get('t');
+      var extra = (inviterId ? ('&inviter=' + encodeURIComponent(inviterId)) : '') + (inviteToken ? ('&t=' + encodeURIComponent(inviteToken)) : '');
 
       // Platform split (user request 08-24: "if opened on iphone, redirect to web... if on
       // android to the apk download") — there's no iOS app at all (never has been; KeepUp is
@@ -155,9 +158,9 @@
         //    invite in Play's "referrer" so the app can pick it up after install (the app reads it
         //    on first launch and shows "You've been invited to ..." once sign-up is done).
         // Replaces the old debug-APK download, which was never the right thing to hand a friend.
-        var referrer = 'join=' + encodeURIComponent(groupId) + (inviterId ? ('&inviter=' + encodeURIComponent(inviterId)) : '');
+        var referrer = 'join=' + encodeURIComponent(groupId) + extra;
         var playUrl = 'https://play.google.com/store/apps/details?id=' + PLAY_PACKAGE + '&referrer=' + encodeURIComponent(referrer);
-        var intentUrl = 'intent://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '') +
+        var intentUrl = 'intent://join/' + encodeURIComponent(groupId) + (extra ? ('?' + extra.slice(1)) : '') +
           '#Intent;scheme=keepup;package=' + PLAY_PACKAGE + ';S.browser_fallback_url=' + encodeURIComponent(playUrl) + ';end';
         getAppBtn.href = intentUrl;
         getAppBtn.textContent = 'Open in KeepUp';
@@ -168,7 +171,7 @@
         });
         // Best-effort automatic handoff when the app is installed (a plain App Link normally does
         // this before the page even loads); a no-op if the browser blocks a scripted intent.
-        window.location.href = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        window.location.href = 'keepup://join/' + encodeURIComponent(groupId) + (extra ? ('?' + extra.slice(1)) : '');
       } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
         // iOS (09-19: "iPhone ... directed to web and not the app, although the app is
         // installed"). With the app installed, a tapped https://.../join/ link normally never
@@ -177,7 +180,7 @@
         // cases that DO land here (the link opened inside another app's browser, or the app
         // isn't installed): try the keepup:// scheme the app registers, and keep the web
         // dashboard one tap away.
-        var iosDeepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        var iosDeepLink = 'keepup://join/' + encodeURIComponent(groupId) + (extra ? ('?' + extra.slice(1)) : '');
         // (09-27: web dashboard closed) no web fallback anymore — the app is the only way in.
         joinCopy.textContent = 'Open this invite in the KeepUp app.';
         getAppBtn.style.display = 'none';
