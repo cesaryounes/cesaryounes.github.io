@@ -1,10 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.cesaryounes.keepup",
       "sha256_cert_fingerprints": [
+        "85:81:66:4E:23:9B:FB:10:2C:8A:D7:24:B2:B2:B6:5F:8D:16:86:3C:B5:93:86:BB:D2:89:67:71:58:3E:75:97",
+        "4C:15:3A:2F:5B:55:BD:38:F5:12:B7:6F:71:A4:93:A0:1E:3E:9A:25:25:A7:81:97:73:2F:84:B2:61:4C:2E:D6",
         "49:7C:84:67:50:47:30:8E:C3:81:B2:05:1F:DD:BC:48:D1:4A:8B:21:23:32:DE:4F:70:B6:C0:57:32:7E:5C:AB"
       ]
     }

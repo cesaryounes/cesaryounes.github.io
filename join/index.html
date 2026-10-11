@@ -108,7 +108,7 @@
       <p id="joinCopy">Get KeepUp to accept the invite.</p>
       <a class="button" id="getAppBtn" href="#">Get KeepUp</a>
       <button class="already-have-it" id="openBtn" type="button">Already have it? Open the invite</button>
-      <p class="hint" id="installHint">This installs an APK directly — not from the Play Store yet. Android will ask you to allow installs from this source; that's expected for now.</p>
+      <p class="hint" id="installHint">No KeepUp yet? This takes you to Google Play, and your invite is waiting for you when you open the app.</p>
     </div>
     <div id="notFoundView" class="not-found">
       <h1>Missing invite</h1>
@@ -117,11 +117,7 @@
   </div>
   <script>
     (function () {
-      // ---- SWAP THIS ONE BLOCK WHEN KEEPUP GOES LIVE ON THE PLAY STORE ----
-      var PLAY_STORE_MODE = false;
-      var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.example.keepup";
-      var APK_URL = "/downloads/keepup-debug.apk";
-      // ---- end swap block ----
+      var PLAY_PACKAGE = "com.cesaryounes.keepup";
 
 
       var getAppBtn = document.getElementById('getAppBtn');
@@ -153,23 +149,26 @@
       var isAndroid = /Android/i.test(navigator.userAgent);
 
       if (isAndroid) {
-        if (PLAY_STORE_MODE) {
-          getAppBtn.href = PLAY_STORE_URL;
-          getAppBtn.textContent = 'Get KeepUp on Google Play';
-          joinCopy.textContent = 'Get KeepUp from the Play Store to accept the invite.';
-          installHint.style.display = 'none';
-        } else {
-          getAppBtn.href = APK_URL;
-          getAppBtn.textContent = 'Get KeepUp';
-        }
-
-        var deepLink = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
+        // One button for everyone on Android (user request 10-11: seamless invites):
+        //  * KeepUp installed  -> the intent:// link opens it straight on this invite;
+        //  * not installed     -> the same link falls back to the Play listing, carrying the
+        //    invite in Play's "referrer" so the app can pick it up after install (the app reads it
+        //    on first launch and shows "You've been invited to ..." once sign-up is done).
+        // Replaces the old debug-APK download, which was never the right thing to hand a friend.
+        var referrer = 'join=' + encodeURIComponent(groupId) + (inviterId ? ('&inviter=' + encodeURIComponent(inviterId)) : '');
+        var playUrl = 'https://play.google.com/store/apps/details?id=' + PLAY_PACKAGE + '&referrer=' + encodeURIComponent(referrer);
+        var intentUrl = 'intent://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '') +
+          '#Intent;scheme=keepup;package=' + PLAY_PACKAGE + ';S.browser_fallback_url=' + encodeURIComponent(playUrl) + ';end';
+        getAppBtn.href = intentUrl;
+        getAppBtn.textContent = 'Open in KeepUp';
+        joinCopy.textContent = 'Tap to join. If you don\u2019t have KeepUp yet, you\u2019ll get it from Google Play first.';
+        openBtn.textContent = 'Get KeepUp on Google Play';
         openBtn.addEventListener('click', function () {
-          window.location.href = deepLink;
+          window.location.href = playUrl;
         });
-        // Best-effort automatic handoff too, in case the app is installed but this device hasn't
-        // finished (or ever completed) App Link verification — harmless no-op if it's not.
-        window.location.href = deepLink;
+        // Best-effort automatic handoff when the app is installed (a plain App Link normally does
+        // this before the page even loads); a no-op if the browser blocks a scripted intent.
+        window.location.href = 'keepup://join/' + encodeURIComponent(groupId) + (inviterId ? ('?inviter=' + encodeURIComponent(inviterId)) : '');
       } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
         // iOS (09-19: "iPhone ... directed to web and not the app, although the app is
         // installed"). With the app installed, a tapped https://.../join/ link normally never
@@ -182,7 +181,7 @@
         // (09-27: web dashboard closed) no web fallback anymore — the app is the only way in.
         joinCopy.textContent = 'Open this invite in the KeepUp app.';
         getAppBtn.style.display = 'none';
-        installHint.style.display = 'none';
+        installHint.textContent = 'Don\u2019t have KeepUp on your iPhone yet? It\u2019s coming to the App Store soon.';
         openBtn.textContent = 'Open in KeepUp';
         openBtn.addEventListener('click', function () {
           window.location.href = iosDeepLink;
