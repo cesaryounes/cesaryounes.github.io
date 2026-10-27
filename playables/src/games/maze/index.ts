@@ -17,7 +17,7 @@ import {
   type Maze,
 } from './generator';
 import { slidePath } from './movement';
-import { renderMaze } from './render';
+import { renderMaze, spawnConfetti, spawnDust, type Particle } from './render';
 
 export interface MazeLevel extends Level {
   maze: Maze;
@@ -43,6 +43,8 @@ export interface MazeData {
   pointer: { id: number; x: number; y: number } | null;
   /** Clock value when the exit was reached; drives the arrival burst. */
   solvedAtMs: number | null;
+  /** Live dust and confetti. Purely visual. */
+  particles: Particle[];
 }
 
 const SWIPE_PX = 18;
@@ -122,6 +124,7 @@ export const mazeGame: PuzzleGame = {
       revealed: [],
       pointer: null,
       solvedAtMs: null,
+      particles: [],
     };
     return { level, view, elapsedMs: 0, moves: 0, solved: false, data: d };
   },
@@ -131,8 +134,14 @@ export const mazeGame: PuzzleGame = {
     const d = data(state);
     // Slides finish on the clock; a queued swipe starts the next one.
     if (!isSliding(d, state.elapsedMs)) {
-      if (d.slide.length > 0) d.slide = [];
-      if (d.solvedAtMs === null && d.pos === level.maze.end) d.solvedAtMs = state.elapsedMs;
+      if (d.slide.length > 0) {
+        d.slide = [];
+        spawnDust(d, level, state.elapsedMs, d.facing);
+      }
+      if (d.solvedAtMs === null && d.pos === level.maze.end) {
+        d.solvedAtMs = state.elapsedMs;
+        spawnConfetti(d, level, state.elapsedMs);
+      }
       if (d.queued !== null) {
         const next = d.queued;
         d.queued = null;

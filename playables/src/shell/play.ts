@@ -84,7 +84,7 @@ export class PlaySession {
     this.state.view = this.viewRect();
     const { ctx } = this.canvas;
     const { width, height } = this.canvas.size;
-    ctx.fillStyle = '#101418';
+    ctx.fillStyle = '#06120c';
     ctx.fillRect(0, 0, width, height);
     this.game.render(ctx, this.level, this.state);
     this.drawHud();
@@ -106,14 +106,34 @@ export class PlaySession {
   private drawHud(): void {
     const { ctx } = this.canvas;
     const { width } = this.canvas.size;
-    ctx.fillStyle = '#f4f6f8';
-    ctx.textBaseline = 'middle';
-    ctx.font = '600 22px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(formatTime(this.state.elapsedMs), width / 2, HUD_HEIGHT / 2 + 4);
-    ctx.font = '500 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(244, 246, 248, 0.7)';
-    ctx.fillText(`${this.state.moves} moves`, 16, HUD_HEIGHT / 2 + 4);
+    const cy = HUD_HEIGHT / 2 + 6;
+    const font = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+    const pill = (
+      text: string,
+      x: number,
+      align: CanvasTextAlign,
+      size: number,
+      bold: boolean,
+    ): void => {
+      ctx.font = `${bold ? 700 : 500} ${size}px ${font}`;
+      const w = ctx.measureText(text).width + size * 1.4;
+      const h = size * 1.9;
+      const left = align === 'center' ? x - w / 2 : align === 'left' ? x : x - w;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.roundRect(left, cy - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = bold ? '#ffffff' : 'rgba(255, 255, 255, 0.78)';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, left + w / 2, cy + 1);
+    };
+
+    pill(formatTime(this.state.elapsedMs), width / 2, 'center', 22, true);
+    pill(`${this.state.moves} moves`, 16, 'left', 13, false);
   }
 }

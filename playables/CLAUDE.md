@@ -3,7 +3,8 @@
 Browser games for **YouTube Playables**, built as one shared shell hosting
 several puzzle generators. The first game is the maze; block puzzle and flow
 connect follow on the same shell. The full spec is `BRIEF.md`; read it before
-starting any milestone. Later sessions start with "Read BRIEF.md and CLAUDE.md,
+starting any milestone. `DESIGN.md` holds the retention and difficulty plan
+(approved items and open proposals). Later sessions start with "Read BRIEF.md and CLAUDE.md,
 then continue with milestone N".
 
 This folder is a self-contained project inside the `cesaryounes.github.io`
@@ -38,7 +39,7 @@ playables/
   src/games/maze/       the maze game (implements PuzzleGame)
     generator.ts        carvePerfectMaze, addLoops, bfs, generateMaze, sizeForDifficulty, parTimeMs
     movement.ts         slidePath: slide until a wall or junction
-    render.ts           walls (cached layer), trail, hint, exit, blob character; theme tokens
+    render.ts           backdrop, cached board layer, trail, hint, exit portal, blob, particles; theme tokens
     index.ts            mazeGame: PuzzleGame glue, swipe/drag/keys, queued moves, hint
   src/games/<next>/     block puzzle, flow connect later
   public/               static assets copied into dist/ as-is
