@@ -17,9 +17,19 @@ export interface Level {
   parMs: number;
 }
 
+/** A rectangle in CSS pixels. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** Mutable per-attempt state. The shell creates it and owns the timer fields. */
 export interface PlayState {
   level: Level;
+  /** Area of the canvas the game may draw in (below the HUD), in CSS pixels. */
+  view: Rect;
   /** Milliseconds of play so far, maintained by the shell (paused while hidden). */
   elapsedMs: number;
   /** Number of player moves so far. */
@@ -36,7 +46,11 @@ export interface PuzzleGame {
   /** Pure: same seed + difficulty always yields the same level. */
   generate(seed: number, difficulty: number): Level;
   /** Fresh game-specific data for a new attempt at `level`. */
-  newPlayState(level: Level): PlayState;
+  newPlayState(level: Level, view: Rect): PlayState;
+  /**
+   * Advance animations and draw one frame into `state.view`. Called every
+   * frame while playing; `state.elapsedMs` is the clock (frozen when paused).
+   */
   render(ctx: CanvasRenderingContext2D, level: Level, state: PlayState): void;
   input(event: PointerEvent | KeyboardEvent, state: PlayState): void;
   isSolved(state: PlayState): boolean;

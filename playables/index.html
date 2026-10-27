@@ -50,6 +50,71 @@
       #screens > * {
         pointer-events: auto;
       }
+      .panel {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        min-width: 240px;
+        max-width: 90vw;
+        padding: 24px 28px;
+        border-radius: 20px;
+        background: rgba(16, 20, 24, 0.94);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        text-align: center;
+      }
+      .panel h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      .panel p {
+        margin: 6px 0;
+        opacity: 0.85;
+      }
+      .panel .time {
+        font-size: 40px;
+        font-weight: 700;
+        opacity: 1;
+      }
+      .panel .stars {
+        font-size: 28px;
+        color: #ffb62e;
+        opacity: 1;
+      }
+      .panel .par {
+        font-size: 14px;
+        color: #f4f6f8;
+        opacity: 0.6;
+        margin-left: 8px;
+      }
+      .panel .row {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .panel .row.small button {
+        padding: 8px 12px;
+        font-size: 14px;
+        background: transparent;
+        border: 1px solid rgba(244, 246, 248, 0.3);
+      }
+      .panel button {
+        font: inherit;
+        font-size: 17px;
+        font-weight: 600;
+        color: #f4f6f8;
+        background: #2a333c;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 20px;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      .panel button.primary {
+        background: #ff8a3d;
+        color: #1d1208;
+      }
     </style>
   </head>
   <body>

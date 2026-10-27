@@ -30,10 +30,16 @@ playables/
     platform.ts         the ONLY file that touches `ytgame`; mock when SDK absent
     storage.ts          SaveState type, parse/serialise, Storage class
     rng.ts              mulberry32, hash32, dailySeed(date), levelSeed(world, level)
-    game.ts             PuzzleGame / Level / PlayState interfaces
+    game.ts             PuzzleGame / Level / PlayState / Rect interfaces
     canvas.ts           full-viewport DPR-aware canvas
+    play.ts             PlaySession: timer, input routing, win check, HUD
+    scoring.ts          starsFor(elapsed, par), formatTime
     daily.ts, screens.ts, ads.ts, audio.ts, ui/   (later milestones)
   src/games/maze/       the maze game (implements PuzzleGame)
+    generator.ts        carvePerfectMaze, addLoops, bfs, generateMaze, sizeForDifficulty, parTimeMs
+    movement.ts         slidePath: slide until a wall or junction
+    render.ts           walls (cached layer), trail, hint, exit, blob character; theme tokens
+    index.ts            mazeGame: PuzzleGame glue, swipe/drag/keys, queued moves, hint
   src/games/<next>/     block puzzle, flow connect later
   public/               static assets copied into dist/ as-is
   dist/                 build output = the ZIP (git-ignored)
@@ -64,6 +70,10 @@ Shell rules:
 - Generators are pure: same seed + difficulty = same level. All randomness comes
   from `src/shell/rng.ts`; never `Math.random()` in generation. Unit-test determinism.
 - Daily seed comes from the UTC date (`dailySeed`), so every player gets the same daily puzzle.
+- Pinned snapshots in `generator.test.ts` and `rng.test.ts` freeze the algorithms.
+  A change that breaks them changes every player's levels; only update them on purpose.
+- Movement is "slide until a wall or junction" (`movement.ts`); a junction is any
+  cell with other than two openings. Swiping during a slide queues one move.
 
 ## YouTube Playables rules (certification)
 

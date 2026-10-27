@@ -2,16 +2,18 @@
  * Entry point. index.html has already loaded the Playables SDK (or not, in
  * local dev) before this module runs.
  *
- * Milestone 1: boot the shell, draw a blank canvas sized to the viewport,
- * report firstFrameReady then gameReady, wire pause/resume, audio state and
- * error logging. The maze itself arrives in milestone 2.
+ * Milestone 2: boot the shell, run the maze play loop with a minimal result
+ * overlay so a 7×7 and a 25×25 can be cleared on a phone. Real screens and
+ * progression arrive in milestone 3.
  */
 
+import { mazeGame } from './games/maze';
 import { GameCanvas } from './shell/canvas';
 import { getPlatform } from './shell/platform';
+import { PlaySession } from './shell/play';
+import { levelSeed } from './shell/rng';
+import { formatTime, starsFor } from './shell/scoring';
 import { Storage } from './shell/storage';
-
-const BACKGROUND = '#101418';
 
 async function boot(): Promise<void> {
   const platform = getPlatform();
@@ -21,50 +23,86 @@ async function boot(): Promise<void> {
   window.addEventListener('unhandledrejection', () => platform.logError());
 
   const canvasEl = document.getElementById('game');
-  if (!(canvasEl instanceof HTMLCanvasElement)) throw new Error('#game canvas missing');
+  const screens = document.getElementById('screens');
+  if (!(canvasEl instanceof HTMLCanvasElement) || !screens) throw new Error('markup missing');
   const canvas = new GameCanvas(canvasEl);
 
   const storage = new Storage(platform);
   await storage.load();
 
   // Audio: initialise from the platform and follow its changes. Never add an
-  // in-game toggle that overrides this.
+  // in-game toggle that overrides this. (Used by audio.ts in milestone 5.)
   let audioEnabled = platform.isAudioEnabled();
   platform.onAudioEnabledChange((enabled) => {
     audioEnabled = enabled;
   });
 
-  // Pause/resume: stop the loop and save. Resume may never come.
+  let session: PlaySession | null = null;
   let paused = false;
-  let frame = 0;
-  const draw = (): void => {
-    const { width, height } = canvas.size;
-    const ctx = canvas.ctx;
-    ctx.fillStyle = BACKGROUND;
-    ctx.fillRect(0, 0, width, height);
+  let difficulty = 1;
+  let attempt = 0;
+
+  const showOverlay = (html: string): void => {
+    screens.innerHTML = `<div class="panel">${html}</div>`;
   };
-  const loop = (): void => {
-    if (paused) return;
-    draw();
-    frame = requestAnimationFrame(loop);
+  const hideOverlay = (): void => {
+    screens.innerHTML = '';
   };
+
+  const play = (nextDifficulty: number): void => {
+    difficulty = nextDifficulty;
+    session?.destroy();
+    hideOverlay();
+    // Milestone 2: seed from difficulty + attempt so "play again" gives a new maze.
+    const level = mazeGame.generate(levelSeed(0, difficulty * 1000 + attempt), difficulty);
+    attempt++;
+    session = new PlaySession(mazeGame, canvas, level, {
+      onSolved(state) {
+        const stars = starsFor(state.elapsedMs, state.level.parMs);
+        showOverlay(`
+          <h1>Solved</h1>
+          <p class="time">${formatTime(state.elapsedMs)}</p>
+          <p class="stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}
+            <span class="par">par ${formatTime(state.level.parMs)}</span></p>
+          <p>${state.moves} moves</p>
+          <div class="row">
+            <button data-d="${difficulty}">Play again</button>
+            <button data-d="${Math.min(100, difficulty + 10)}" class="primary">Bigger</button>
+          </div>
+          <div class="row small">
+            <button data-d="1">7×7</button>
+            <button data-d="50">15×15</button>
+            <button data-d="100">25×25</button>
+          </div>`);
+      },
+    });
+    session.draw();
+    if (!paused) session.start();
+  };
+
+  screens.addEventListener('click', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLButtonElement) || !target.dataset.d) return;
+    play(Number(target.dataset.d));
+  });
+
+  // Pause/resume: stop the loop and save. Resume may never come.
   platform.onPause(() => {
     paused = true;
-    cancelAnimationFrame(frame);
+    session?.pause();
     void storage.flush();
   });
   platform.onResume(() => {
     if (!paused) return;
     paused = false;
-    loop();
+    session?.resume();
   });
-  canvas.onResize(draw);
+  canvas.onResize(() => session?.draw());
 
   // First frame, then ready: nothing else loads, so the game is interactable
   // as soon as the first frame is on screen.
-  draw();
+  play(1);
   platform.firstFrameReady();
-  loop();
   platform.gameReady();
 
   if (!platform.inPlayables) {
