@@ -1,0 +1,29 @@
+{
+  "name": "playables",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shared shell and games for YouTube Playables (maze, block puzzle, flow connect)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "zip": "npm run build && cd dist && rm -f ../playables.zip && zip -r ../playables.zip ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vite": "^7.1.11",
+    "vitest": "^3.2.4"
+  }
+}

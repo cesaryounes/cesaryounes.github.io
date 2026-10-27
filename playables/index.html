@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#101418" />
+    <title>Maze</title>
+    <!--
+      The YouTube Playables SDK must load before any game code. It is the only
+      external resource this bundle is allowed to reference. When it is absent
+      (plain `vite dev` in a browser) src/shell/platform.ts installs a mock.
+    -->
+    <script src="https://www.youtube.com/game_api/v1"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #101418;
+        color: #f4f6f8;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #game {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #screens {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      #screens > * {
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" aria-label="Game"></canvas>
+    <div id="screens"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
