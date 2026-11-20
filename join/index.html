@@ -182,10 +182,13 @@
         // dashboard one tap away.
         var iosDeepLink = 'keepup://join/' + encodeURIComponent(groupId) + (extra ? ('?' + extra.slice(1)) : '');
         // (09-27: web dashboard closed) no web fallback anymore — the app is the only way in.
-        joinCopy.textContent = 'Open this invite in the KeepUp app.';
-        getAppBtn.style.display = 'none';
-        installHint.textContent = 'Don\u2019t have KeepUp on your iPhone yet? It\u2019s coming to the App Store soon.';
-        openBtn.textContent = 'Open in KeepUp';
+        // (11-20: KeepUp is on the App Store) the main button installs it. iOS has no install
+        // referrer, so a new user taps the link again after installing to land on the invite.
+        joinCopy.textContent = 'New to KeepUp? Get it from the App Store, then tap this link again to join.';
+        getAppBtn.href = 'https://apps.apple.com/app/id6812012314';
+        getAppBtn.textContent = 'Get KeepUp on the App Store';
+        installHint.style.display = 'none';
+        openBtn.textContent = 'Already have it? Open the invite';
         openBtn.addEventListener('click', function () {
           window.location.href = iosDeepLink;
         });
