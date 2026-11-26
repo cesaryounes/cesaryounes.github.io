@@ -28,7 +28,17 @@
   <img src="icon.png" alt="Numzies app icon">
   <h1>Maths practice that feels like play</h1>
   <p>Quick maths tricks and games for children aged 6 to 9. Free, with no ads.</p>
-  <a class="btn" href="https://play.google.com/store/apps/details?id=com.cesaryounes.mathworlds">Get Numzies on Google Play</a>
+  <a class="btn" id="get" href="https://play.google.com/store/apps/details?id=com.cesaryounes.mathworlds&amp;referrer=utm_source%3Dinstagram%26utm_medium%3Dbio_link%26utm_campaign%3Dget_numzies_page">Get Numzies on Google Play</a>
+  <script>
+    /* Play Console counts installs per utm_source. The Instagram bio uses this page as is (source = instagram);
+       other places can link to /numzies/?src=whatsapp (or facebook, tiktok...) to be counted separately. */
+    (function () {
+      var m = /[?&]src=([a-z0-9_-]{1,30})/i.exec(location.search);
+      if (!m) return;
+      var r = encodeURIComponent('utm_source=' + m[1].toLowerCase() + '&utm_medium=link&utm_campaign=get_numzies_page');
+      document.getElementById('get').href = 'https://play.google.com/store/apps/details?id=com.cesaryounes.mathworlds&referrer=' + r;
+    })();
+  </script>
   <small>For Android phones and tablets · <a href="privacy/">Privacy</a></small>
 </main>
 </body>
